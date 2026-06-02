@@ -1,0 +1,176 @@
+import type { Ref } from 'react';
+import { PencilLine, Sparkles } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { cn } from '@/lib/utils';
+import type { SupplementField } from '../constants';
+
+type MemoryEntryFormProps = {
+  workNote: string;
+  isSupplementOpen: boolean;
+  activeSupplementFields: readonly SupplementField[];
+  commandKey: string;
+  isLocked: boolean;
+  isPrimaryPulsing: boolean;
+  primaryActionLabel: string;
+  primaryActionRef: Ref<HTMLButtonElement>;
+  supplementFields: readonly SupplementField[];
+  supplementPlaceholders: Record<SupplementField, string>;
+  supplementValues: Record<SupplementField, string>;
+  onSaveDraft: () => void;
+  onSettleTodayMemory: () => void;
+  onSupplementValueChange: (field: SupplementField, value: string) => void;
+  onToggleSupplementPanel: () => void;
+  onToggleSupplementField: (field: SupplementField) => void;
+  onWorkNoteChange: (value: string) => void;
+};
+
+export function MemoryEntryForm({
+  workNote,
+  isSupplementOpen,
+  activeSupplementFields,
+  commandKey,
+  isLocked,
+  isPrimaryPulsing,
+  primaryActionLabel,
+  primaryActionRef,
+  supplementFields,
+  supplementPlaceholders,
+  supplementValues,
+  onSaveDraft,
+  onSettleTodayMemory,
+  onSupplementValueChange,
+  onToggleSupplementPanel,
+  onToggleSupplementField,
+  onWorkNoteChange,
+}: MemoryEntryFormProps) {
+  const hasActiveSupplementFields = activeSupplementFields.length > 0;
+  const supplementInputClass =
+    'h-9 min-w-0 w-full rounded-lg border border-transparent bg-transparent px-2.5 text-[13px] text-app-ink outline-none transition-[background-color,border-color] duration-150 placeholder:text-[#94A3B8] hover:bg-[#F8FAFC] focus:border-[#E5E7EB] focus:bg-white disabled:cursor-not-allowed disabled:opacity-50';
+
+  return (
+    <section
+      className={cn('grid gap-0', isSupplementOpen ? 'mb-5' : 'mb-[30px]')}
+      aria-label="记录今日工作"
+    >
+      <Textarea
+        className="h-[138px] min-h-[138px] resize-none rounded-2xl border-app-border bg-app-surface px-5 pt-[22px] pb-[18px] text-sm leading-[1.62] text-app-ink shadow-none transition-[border-color,box-shadow,background-color] duration-150 placeholder:text-[var(--app-placeholder)] focus-visible:border-app-border-strong focus-visible:bg-app-surface focus-visible:ring-[3px] focus-visible:ring-[rgb(24_24_27/0.025)] max-[600px]:h-[136px] max-[600px]:min-h-[136px]"
+        value={workNote}
+        onChange={(event) => onWorkNoteChange(event.currentTarget.value)}
+        placeholder="例如：上午推进需求讨论，下午整理方案并同步进展，明天继续跟进剩余问题。"
+        disabled={isLocked}
+      />
+      <div className="flex pt-2.5" aria-label="补充记录项">
+        <Button
+          variant="ghost"
+          size="xs"
+          type="button"
+          className={cn(
+            'h-7 cursor-pointer rounded-full border border-transparent bg-transparent px-1.5 text-[13px] font-medium text-app-ink-subtle transition-colors duration-150 hover:border-app-border hover:bg-white/70 hover:text-app-ink-muted focus-visible:border-app-border focus-visible:bg-white/70 focus-visible:text-app-ink-muted',
+            isSupplementOpen && 'border-app-border bg-white/70 text-app-ink-muted',
+          )}
+          aria-controls="supplement-fields"
+          aria-expanded={isSupplementOpen}
+          onClick={onToggleSupplementPanel}
+          disabled={isLocked}
+        >
+          {isSupplementOpen ? '收起补充信息' : '+ 添加补充信息'}
+        </Button>
+      </div>
+      {isSupplementOpen ? (
+        <div
+          id="supplement-fields"
+          className="mt-2.5 rounded-2xl border border-[#E5E7EB] bg-white px-3 py-2.5"
+          aria-label="已展开的补充信息"
+        >
+          <div className="flex min-h-8 flex-wrap items-center gap-2.5">
+            <span className="mr-1 shrink-0 text-[13px] font-semibold text-app-ink-muted">
+              补充信息
+            </span>
+            {supplementFields.map((field) => {
+              const isActive = activeSupplementFields.includes(field);
+
+              return (
+                <Button
+                  key={field}
+                  variant="ghost"
+                  size="xs"
+                  type="button"
+                  className={cn(
+                    'h-7 cursor-pointer rounded-full border border-[#E5E7EB] bg-white px-2.5 text-[13px] font-medium text-[#334155] transition-colors duration-150 hover:border-[#CBD5E1] hover:bg-[#F8FAFC] hover:text-[#111827] focus-visible:border-[#CBD5E1] focus-visible:bg-[#F8FAFC] focus-visible:text-[#111827]',
+                    isActive && 'border-[#CBD5E1] bg-[#F3F4F6] text-[#111827]',
+                  )}
+                  aria-pressed={isActive}
+                  onClick={() => onToggleSupplementField(field)}
+                  disabled={isLocked}
+                >
+                  {isActive ? `✓ ${field}` : `+ ${field}`}
+                </Button>
+              );
+            })}
+          </div>
+
+          {hasActiveSupplementFields ? (
+            <div className="mt-2.5 grid gap-1.5">
+              {activeSupplementFields.map((field, index) => {
+                const inputId = `supplement-field-${index}`;
+
+                return (
+                  <div
+                    key={field}
+                    className="grid h-9 grid-cols-[80px_minmax(0,1fr)] items-center gap-2 rounded-lg"
+                  >
+                    <label
+                      htmlFor={inputId}
+                      className="truncate text-[13px] font-semibold text-app-ink-muted"
+                    >
+                      {field}
+                    </label>
+                    <input
+                      id={inputId}
+                      type="text"
+                      className={supplementInputClass}
+                      value={supplementValues[field]}
+                      onChange={(event) =>
+                        onSupplementValueChange(field, event.currentTarget.value)
+                      }
+                      aria-label={`${field}补充内容`}
+                      placeholder={supplementPlaceholders[field]}
+                      disabled={isLocked}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+      <div className="flex items-center justify-end gap-2 pt-4">
+        <Button
+          type="button"
+          variant="ghost"
+          className="h-[39px] cursor-pointer gap-1.5 rounded-xl px-2.5 text-sm text-app-ink-subtle hover:bg-[color-mix(in_srgb,var(--app-surface-muted)_54%,transparent)] hover:text-app-ink-muted focus-visible:bg-[color-mix(in_srgb,var(--app-surface-muted)_54%,transparent)] focus-visible:text-app-ink-muted [&_svg]:size-3.5"
+          onClick={onSaveDraft}
+          disabled={isLocked}
+        >
+          <PencilLine aria-hidden="true" />
+          保存草稿
+        </Button>
+        <Button
+          ref={primaryActionRef}
+          type="button"
+          className={cn(
+            'h-[39px] cursor-pointer rounded-xl px-3.5 text-sm font-semibold shadow-none transition-[background-color,box-shadow,transform] duration-150 hover:shadow-[0_4px_10px_rgb(24_24_27/0.08)] focus-visible:shadow-[0_4px_10px_rgb(24_24_27/0.08)] [&_svg]:size-3 [&_svg]:opacity-80',
+            isPrimaryPulsing && '-translate-y-px shadow-[0_4px_10px_rgb(24_24_27/0.08)]',
+          )}
+          aria-label={`${primaryActionLabel}，快捷键 ${commandKey} Enter`}
+          onClick={onSettleTodayMemory}
+          disabled={isLocked}
+        >
+          <Sparkles aria-hidden="true" />
+          {primaryActionLabel}
+        </Button>
+      </div>
+    </section>
+  );
+}
