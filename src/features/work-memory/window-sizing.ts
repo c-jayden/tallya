@@ -1,7 +1,7 @@
 import { getCurrentWindow, LogicalSize } from '@tauri-apps/api/window';
 
 const HOME_WINDOW_WIDTH = 720;
-const HOME_MIN_HEIGHT = 542;
+const HOME_MIN_HEIGHT = 500;
 const HOME_MAX_HEIGHT = 700;
 const MANUAL_RESIZE_TOLERANCE = 16;
 
@@ -18,14 +18,11 @@ export async function resizeHomeWindowToContent(contentElement: HTMLElement | nu
 
   try {
     const appWindow = getCurrentWindow();
-    const [innerSize, outerSize, scaleFactor] = await Promise.all([
+    const [innerSize, scaleFactor] = await Promise.all([
       appWindow.innerSize(),
-      appWindow.outerSize(),
       appWindow.scaleFactor(),
     ]);
-    const currentInnerSize = innerSize.toLogical(scaleFactor);
-    const currentOuterSize = outerSize.toLogical(scaleFactor);
-    const chromeHeight = Math.max(0, currentOuterSize.height - currentInnerSize.height);
+    const currentSize = innerSize.toLogical(scaleFactor);
     const containerElement = contentElement.parentElement;
     const containerStyle = containerElement ? window.getComputedStyle(containerElement) : null;
     const containerVerticalPadding = containerStyle
@@ -36,16 +33,16 @@ export async function resizeHomeWindowToContent(contentElement: HTMLElement | nu
       Math.max(contentElement.scrollHeight, contentElement.getBoundingClientRect().height) +
         containerVerticalPadding,
     );
-    const targetHeight = clampHeight(contentHeight + chromeHeight);
+    const targetHeight = clampHeight(contentHeight);
 
     if (
       lastAutoHeight !== null &&
-      currentOuterSize.height > Math.max(lastAutoHeight, targetHeight) + MANUAL_RESIZE_TOLERANCE
+      currentSize.height > Math.max(lastAutoHeight, targetHeight) + MANUAL_RESIZE_TOLERANCE
     ) {
       return;
     }
 
-    if (Math.abs(currentOuterSize.height - targetHeight) < 2) {
+    if (Math.abs(currentSize.height - targetHeight) < 2) {
       lastAutoHeight = targetHeight;
       return;
     }
