@@ -49,7 +49,7 @@ function HighlightedText({ text, keyword }: HighlightedTextProps) {
         return isMatch ? (
           <mark
             key={`${part}-${index}`}
-            className="rounded bg-[#FEF3C7]/75 px-0.5 font-medium text-amber-950 dark:bg-amber-300/15 dark:text-amber-100"
+            className="rounded bg-[color-mix(in_srgb,#f59e0b_22%,transparent)] px-0.5 font-medium text-app-ink"
           >
             {part}
           </mark>
@@ -90,7 +90,7 @@ export function SpotlightSearchPanel({
 
   return (
     <div
-      className="fixed inset-0 z-50 cursor-pointer bg-slate-950/10 backdrop-blur-[3px] dark:bg-black/35"
+      className="fixed inset-0 z-50 cursor-pointer bg-[color-mix(in_srgb,var(--app-bg)_72%,transparent)] backdrop-blur-[3px]"
       onMouseDown={onClose}
     >
       <div
@@ -149,8 +149,8 @@ export function SpotlightSearchPanel({
                       key={memory.id}
                       type="button"
                       className={cn(
-                        'block w-full cursor-pointer rounded-[10px] bg-transparent px-3.5 py-3 text-left transition-colors duration-150 hover:bg-[#F8FAFC] focus-visible:bg-[#F1F5F9] focus-visible:outline-none dark:hover:bg-app-surface-muted dark:focus-visible:bg-app-surface-muted',
-                        isActive && 'bg-[#F1F5F9] dark:bg-app-surface-muted',
+                        'block w-full cursor-pointer rounded-[10px] bg-transparent px-3.5 py-3 text-left transition-colors duration-150 hover:bg-app-surface-muted focus-visible:bg-app-surface-muted focus-visible:outline-none',
+                        isActive && 'bg-app-surface-muted',
                       )}
                       onMouseEnter={() => onActiveIndexChange(index)}
                       onClick={() => onOpenMemory(memory)}

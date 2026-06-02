@@ -29,11 +29,19 @@ export async function resizeHomeWindowToContent(contentElement: HTMLElement | nu
       ? Number.parseFloat(containerStyle.paddingTop) +
         Number.parseFloat(containerStyle.paddingBottom)
       : 0;
-    const contentHeight = Math.ceil(
+    const measuredContentHeight =
       Math.max(contentElement.scrollHeight, contentElement.getBoundingClientRect().height) +
-        containerVerticalPadding,
+      containerVerticalPadding;
+    const scrollContainerHeight = containerElement?.scrollHeight ?? 0;
+    const contentHeight = Math.ceil(Math.max(measuredContentHeight, scrollContainerHeight));
+    const targetViewportHeight = clampHeight(contentHeight);
+    const viewportHeight =
+      Number.isFinite(window.innerHeight) && window.innerHeight > 0
+        ? window.innerHeight
+        : currentSize.height;
+    const targetHeight = Math.ceil(
+      currentSize.height + (targetViewportHeight - viewportHeight),
     );
-    const targetHeight = clampHeight(contentHeight);
 
     if (
       lastAutoHeight !== null &&

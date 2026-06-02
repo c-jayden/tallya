@@ -58,7 +58,7 @@ export function MemoryEntryForm({
       aria-label="记录今日工作"
     >
       <Textarea
-        className="h-34.5 min-h-34.5 resize-none rounded-xl border-app-border bg-app-surface px-5 pt-5.5 pb-4.5 text-sm leading-[1.62] text-app-ink shadow-none transition-[border-color,box-shadow,background-color] duration-150 placeholder:text-[var(--app-placeholder)] focus-visible:border-app-border-strong focus-visible:bg-app-surface focus-visible:ring-3 focus-visible:ring-[color-mix(in_srgb,var(--app-ink)_6%,transparent)] max-[600px]:h-34 max-[600px]:min-h-34"
+        className="h-34.5 min-h-34.5 resize-none rounded-xl border-app-border bg-app-surface p-4 text-sm leading-[1.62] text-app-ink shadow-none transition-[border-color,box-shadow,background-color] duration-150 placeholder:text-[var(--app-placeholder)] focus-visible:border-app-border-strong focus-visible:bg-app-surface focus-visible:ring-3 focus-visible:ring-[color-mix(in_srgb,var(--app-ink)_6%,transparent)] max-[600px]:h-34 max-[600px]:min-h-34"
         value={workNote}
         onChange={(event) => onWorkNoteChange(event.currentTarget.value)}
         placeholder="例如：上午推进需求讨论，下午整理方案并同步进展，明天继续跟进剩余问题。"
