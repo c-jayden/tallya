@@ -20,7 +20,7 @@ export function MemoryStatusCard({
   return (
     <section
       className={cn(
-        'flex items-start justify-between gap-4 rounded-[14px] border border-app-border bg-app-surface px-3 py-[11px] max-[560px]:flex-col max-[560px]:gap-2.5',
+        'flex items-start justify-between gap-4 rounded-xl border border-app-border bg-app-surface px-3 py-[11px] max-[560px]:flex-col max-[560px]:gap-2.5',
         statusVariant === 'locked' && 'border-app-border-strong',
       )}
       aria-label="工作记忆状态"
@@ -46,7 +46,7 @@ export function MemoryStatusCard({
         ) : (
           <>
             <strong>本周已沉淀 {weeklySnapshot.settledDays} 天</strong>
-            <p>
+            <p className="!text-app-ink-subtle">
               上次记录：{weeklySnapshot.lastMemoryDate}，{weeklySnapshot.lastMemorySummary}
             </p>
           </>

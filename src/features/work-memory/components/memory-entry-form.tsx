@@ -54,7 +54,7 @@ export function MemoryEntryForm({
       aria-label="记录今日工作"
     >
       <Textarea
-        className="h-[138px] min-h-[138px] resize-none rounded-2xl border-app-border bg-app-surface px-5 pt-[22px] pb-[18px] text-sm leading-[1.62] text-app-ink shadow-none transition-[border-color,box-shadow,background-color] duration-150 placeholder:text-[var(--app-placeholder)] focus-visible:border-app-border-strong focus-visible:bg-app-surface focus-visible:ring-[3px] focus-visible:ring-[rgb(24_24_27/0.025)] max-[600px]:h-[136px] max-[600px]:min-h-[136px]"
+        className="h-[138px] min-h-[138px] resize-none rounded-xl border-app-border bg-app-surface px-5 pt-[22px] pb-[18px] text-sm leading-[1.62] text-app-ink shadow-none transition-[border-color,box-shadow,background-color] duration-150 placeholder:text-[var(--app-placeholder)] focus-visible:border-app-border-strong focus-visible:bg-app-surface focus-visible:ring-[3px] focus-visible:ring-[rgb(24_24_27/0.025)] max-[600px]:h-[136px] max-[600px]:min-h-[136px]"
         value={workNote}
         onChange={(event) => onWorkNoteChange(event.currentTarget.value)}
         placeholder="例如：上午推进需求讨论，下午整理方案并同步进展，明天继续跟进剩余问题。"
@@ -80,7 +80,7 @@ export function MemoryEntryForm({
       {isSupplementOpen ? (
         <div
           id="supplement-fields"
-          className="mt-2.5 rounded-2xl border border-[#E5E7EB] bg-white px-3 py-2.5"
+          className="mt-2.5 rounded-xl border border-[#E5E7EB] bg-white px-3 py-2.5"
           aria-label="已展开的补充信息"
         >
           <div className="flex min-h-8 flex-wrap items-center gap-2.5">
@@ -111,7 +111,7 @@ export function MemoryEntryForm({
           </div>
 
           {hasActiveSupplementFields ? (
-            <div className="mt-2.5 grid gap-1.5">
+            <div className="mt-2 grid gap-1.5">
               {activeSupplementFields.map((field, index) => {
                 const inputId = `supplement-field-${index}`;
 
@@ -149,7 +149,7 @@ export function MemoryEntryForm({
         <Button
           type="button"
           variant="ghost"
-          className="h-[39px] cursor-pointer gap-1.5 rounded-xl px-2.5 text-sm text-app-ink-subtle hover:bg-[color-mix(in_srgb,var(--app-surface-muted)_54%,transparent)] hover:text-app-ink-muted focus-visible:bg-[color-mix(in_srgb,var(--app-surface-muted)_54%,transparent)] focus-visible:text-app-ink-muted [&_svg]:size-3.5"
+          className="h-[39px] cursor-pointer gap-1.5 rounded-xl px-2.5 text-sm text-[#475569] hover:bg-[#F1F5F9] hover:text-[#0F172A] focus-visible:bg-[#F1F5F9] focus-visible:text-[#0F172A] [&_svg]:size-3.5"
           onClick={onSaveDraft}
           disabled={isLocked}
         >
