@@ -57,6 +57,10 @@ export class LocalStorageDailyMemoryRepository {
   }
 
   async getAllMemories() {
+    return this.readAll();
+  }
+
+  async getGeneratedMemories() {
     return this.readAll()
       .filter(isGeneratedMemory)
       .sort((first, second) => second.date.localeCompare(first.date));
@@ -75,7 +79,7 @@ export class LocalStorageDailyMemoryRepository {
       return [];
     }
 
-    return (await this.getAllMemories()).filter((memory) =>
+    return (await this.getGeneratedMemories()).filter((memory) =>
       getSearchableMemoryText(memory).includes(normalizedKeyword),
     );
   }
@@ -162,7 +166,7 @@ export class LocalStorageDailyMemoryRepository {
 export const dailyMemoryRepository = new LocalStorageDailyMemoryRepository();
 
 function isGeneratedMemory(memory: DailyMemory) {
-  return memory.status === 'generated' && memory.generated !== null;
+  return (memory.status === 'generated' || memory.status === 'locked') && memory.generated !== null;
 }
 
 function getSearchableMemoryText(memory: DailyMemory) {

@@ -258,16 +258,8 @@ export function useWorkMemoryController({ currentDate }: UseWorkMemoryController
     toast.info('已回到草稿编辑');
   }
 
-  function viewTodayMemory() {
-    if (!currentMemory?.generated) {
-      return;
-    }
-
-    openMemoryDetail(currentMemory);
-  }
-
   async function viewMemoryList() {
-    setMemoryListItems(await dailyMemoryRepository.getAllMemories());
+    setMemoryListItems(await dailyMemoryRepository.getGeneratedMemories());
     setIsMemoryListOpen(true);
   }
 
@@ -281,20 +273,17 @@ export function useWorkMemoryController({ currentDate }: UseWorkMemoryController
     setIsMemoryDialogOpen(true);
   }
 
-  function editOriginalRecord() {
-    if (viewingMemory) {
-      applyDailyMemory(viewingMemory, memories);
+  function editOriginalRecord(memory = viewingMemory) {
+    if (memory) {
+      applyDailyMemory(memory, memories);
     }
 
+    setIsMemoryListOpen(false);
     setIsMemoryDialogOpen(false);
   }
 
   function showReportPlaceholder() {
     toast.info('周报功能稍后接入');
-  }
-
-  function showWeeklyReportPlaceholder() {
-    toast.info('周报查看稍后接入');
   }
 
   return {
@@ -323,7 +312,6 @@ export function useWorkMemoryController({ currentDate }: UseWorkMemoryController
     setWorkNote,
     settleTodayMemory,
     showReportPlaceholder,
-    showWeeklyReportPlaceholder,
     supplementValues,
     todayMemory,
     toggleSupplementField,
@@ -332,7 +320,6 @@ export function useWorkMemoryController({ currentDate }: UseWorkMemoryController
     viewDraft,
     viewingMemory,
     viewMemoryList,
-    viewTodayMemory,
     weeklySnapshot,
     workNote,
   };

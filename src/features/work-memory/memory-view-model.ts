@@ -25,7 +25,7 @@ export function getMemorySummary(memory: DailyMemory) {
 
 export function getGeneratedMemories(memories: DailyMemory[]) {
   return memories
-    .filter((memory) => memory.status === 'generated' && memory.generated)
+    .filter((memory) => (memory.status === 'generated' || memory.status === 'locked') && memory.generated)
     .sort((first, second) => second.date.localeCompare(first.date));
 }
 
@@ -57,7 +57,7 @@ export function getRelativeMemoryDate(date: string, currentDate: string) {
   }
 
   if (dayDiff >= 2 && dayDiff < 7) {
-    return new Intl.DateTimeFormat('zh-CN', { weekday: 'long' }).format(memoryDate);
+    return new Intl.DateTimeFormat('zh-CN', { weekday: 'short' }).format(memoryDate);
   }
 
   return '';

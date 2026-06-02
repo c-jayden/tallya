@@ -251,3 +251,45 @@
     cursor: not-allowed;
   }
 }
+
+.tallya-search-overlay {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.tallya-search-overlay[data-state='open'] {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.tallya-memory-overlay {
+  animation: none !important;
+  background: color-mix(in srgb, var(--app-bg) 72%, transparent) !important;
+  opacity: 0;
+  pointer-events: none !important;
+  backdrop-filter: blur(3px);
+}
+
+.tallya-memory-overlay[data-state='open'] {
+  opacity: 1;
+  pointer-events: auto !important;
+}
+
+.tallya-motion-panel {
+  opacity: 0;
+}
+
+.tallya-motion-panel[data-state='open'] {
+  opacity: 1;
+}
+
+.tallya-dialog-content {
+  animation: none !important;
+  opacity: 0;
+  pointer-events: none !important;
+}
+
+.tallya-dialog-content[data-state='open'] {
+  opacity: 1;
+  pointer-events: auto !important;
+}

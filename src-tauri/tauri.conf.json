@@ -14,9 +14,9 @@
       {
         "title": "Tallya",
         "width": 720,
-        "height": 542,
+        "height": 460,
         "minWidth": 600,
-        "minHeight": 500,
+        "minHeight": 420,
         "decorations": true,
         "shadow": true
       }

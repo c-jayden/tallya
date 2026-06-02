@@ -1,7 +1,7 @@
 import { getCurrentWindow, LogicalSize } from '@tauri-apps/api/window';
 
 const HOME_WINDOW_WIDTH = 720;
-const HOME_MIN_HEIGHT = 500;
+const HOME_MIN_HEIGHT = 420;
 const HOME_MAX_HEIGHT = 700;
 const MANUAL_RESIZE_TOLERANCE = 16;
 

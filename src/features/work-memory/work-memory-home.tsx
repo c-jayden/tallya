@@ -82,15 +82,12 @@ export function WorkMemoryHome() {
           />
 
           <MemoryStatusCard
-            isLocked={memory.isLocked}
             statusVariant={statusVariant}
             todayMemory={memory.todayMemory}
             weeklySnapshot={memory.weeklySnapshot}
             onGenerateReport={memory.showReportPlaceholder}
             onViewDraft={memory.viewDraft}
             onViewMemory={memory.viewMemoryList}
-            onViewTodayMemory={memory.viewTodayMemory}
-            onViewWeeklyReport={memory.showWeeklyReportPlaceholder}
           />
         </div>
       </section>
@@ -107,7 +104,7 @@ export function WorkMemoryHome() {
         items={memory.memoryListItems}
         currentDate={currentDate}
         onOpenChange={memory.setIsMemoryListOpen}
-        onOpenMemory={memory.openMemoryDetail}
+        onEditOriginal={memory.editOriginalRecord}
       />
       <SpotlightSearchPanel
         open={search.isSearchOpen}

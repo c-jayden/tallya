@@ -166,7 +166,7 @@ describe('LocalStorageDailyMemoryRepository', () => {
     });
   });
 
-  it('lists only generated memories in reverse date order', async () => {
+  it('lists all memories and generated memories separately', async () => {
     const repository = new LocalStorageDailyMemoryRepository(new MemoryStorage());
 
     await repository.saveGenerated({
@@ -194,6 +194,11 @@ describe('LocalStorageDailyMemoryRepository', () => {
     });
 
     await expect(repository.getAllMemories()).resolves.toEqual([
+      expect.objectContaining({ date: '2026-06-01', status: 'generated' }),
+      expect.objectContaining({ date: '2026-06-02', status: 'draft' }),
+      expect.objectContaining({ date: '2026-06-03', status: 'generated' }),
+    ]);
+    await expect(repository.getGeneratedMemories()).resolves.toEqual([
       expect.objectContaining({ date: '2026-06-03', status: 'generated' }),
       expect.objectContaining({ date: '2026-06-01', status: 'generated' }),
     ]);
