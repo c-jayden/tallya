@@ -16,7 +16,6 @@ import {
   supplementFields,
   supplementPlaceholders,
   today,
-  weeklySnapshot,
   type SupplementField,
 } from './constants';
 import { HomeToolbar } from './components/home-toolbar';
@@ -28,6 +27,7 @@ import { mockGenerateDailyMemory } from './services/mock-generate-daily-memory';
 import type {
   DailyMemory,
   DailyMemoryGeneratedContent,
+  WeeklySnapshot,
   StatusVariant,
   TodayMemoryState,
 } from './types';
@@ -51,11 +51,51 @@ function getStatusVariant(todayMemory: TodayMemoryState, isLocked: boolean): Sta
   return todayMemory.hasDraft ? 'draft' : 'empty';
 }
 
-function getTodayMemoryState(memory: DailyMemory | null): TodayMemoryState {
+function getMemorySummary(memory: DailyMemory) {
+  return (
+    memory.generatedContent?.sections.find((section) => section.title === '今日摘要')?.content[0] ??
+    memory.rawContent
+  );
+}
+
+function getFallbackWeeklySnapshot(): WeeklySnapshot {
+  return {
+    settledDays: 0,
+    lastMemoryDate: '',
+    lastMemorySummary: '',
+  };
+}
+
+function getWeeklySnapshotFromMemories(memories: DailyMemory[]): WeeklySnapshot {
+  const generatedMemories = memories
+    .filter((memory) => memory.status === 'generated' || memory.status === 'locked')
+    .sort((first, second) => second.date.localeCompare(first.date));
+  const lastMemory = generatedMemories[0];
+
+  if (!lastMemory) {
+    return getFallbackWeeklySnapshot();
+  }
+
+  return {
+    settledDays: generatedMemories.length,
+    lastMemoryDate: lastMemory.date === getDailyMemoryDate(today) ? '今天' : '昨天',
+    lastMemorySummary: getMemorySummary(lastMemory),
+  };
+}
+
+function getTodayMemoryState(
+  memory: DailyMemory | null,
+  memories: DailyMemory[] = [],
+): TodayMemoryState {
+  const hasGeneratedHistory = memories.some(
+    (item) => item.status === 'generated' || item.status === 'locked',
+  );
+
   if (!memory) {
     return {
       officialStatus: 'notGenerated',
       hasDraft: false,
+      hasGeneratedHistory,
       referencedByWeeklyReport: false,
       reportFreshness: 'fresh',
     };
@@ -69,9 +109,25 @@ function getTodayMemoryState(memory: DailyMemory | null): TodayMemoryState {
           ? 'generated'
           : 'notGenerated',
     hasDraft: memory.status === 'draft',
+    hasGeneratedHistory:
+      hasGeneratedHistory || memory.status === 'generated' || memory.status === 'locked',
     referencedByWeeklyReport: false,
     reportFreshness: 'fresh',
   };
+}
+
+function getPreviewItems(content: string[]) {
+  const items = content.map((item) => item.trim()).filter(Boolean);
+
+  return items.length > 0 ? items : null;
+}
+
+function getUnmentionedSectionTitles(content: DailyMemoryGeneratedContent | null) {
+  return (
+    content?.sections
+      .filter((section) => !getPreviewItems(section.content))
+      .map((section) => section.title) ?? []
+  );
 }
 
 export function WorkMemoryHome() {
@@ -87,9 +143,11 @@ export function WorkMemoryHome() {
   const [todayMemory, setTodayMemory] = useState<TodayMemoryState>({
     officialStatus: 'notGenerated',
     hasDraft: false,
+    hasGeneratedHistory: false,
     referencedByWeeklyReport: false,
     reportFreshness: 'fresh',
   });
+  const [weeklySnapshot, setWeeklySnapshot] = useState<WeeklySnapshot>(getFallbackWeeklySnapshot);
   const [searchPulse, setSearchPulse] = useState(false);
   const [primaryPulse, setPrimaryPulse] = useState(false);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
@@ -109,6 +167,7 @@ export function WorkMemoryHome() {
   const primaryActionLabel = hasGeneratedToday ? '更新今日记录' : '整理成今日记录';
   const saveGeneratedLabel = hasGeneratedToday ? '更新今日记录' : '保存为今日记忆';
   const statusVariant = getStatusVariant(todayMemory, isLocked);
+  const unmentionedPreviewFields = getUnmentionedSectionTitles(generatedPreview);
 
   const buildDailyMemoryInput = useCallback(() => {
     const [projectTopicField, tomorrowPlanField, extraNoteField] = supplementFields;
@@ -128,31 +187,35 @@ export function WorkMemoryHome() {
     };
   }, [activeSupplementFields, currentDate, supplementValues, workNote]);
 
-  const applyDailyMemory = useCallback((memory: DailyMemory | null) => {
-    setTodayMemory(getTodayMemoryState(memory));
+  const applyDailyMemory = useCallback(
+    (memory: DailyMemory | null, memories: DailyMemory[] = []) => {
+      setTodayMemory(getTodayMemoryState(memory, memories));
+      setWeeklySnapshot(getWeeklySnapshotFromMemories(memories));
 
-    if (!memory) {
-      return;
-    }
+      if (!memory) {
+        return;
+      }
 
-    const [projectTopicField, tomorrowPlanField, extraNoteField] = supplementFields;
+      const [projectTopicField, tomorrowPlanField, extraNoteField] = supplementFields;
 
-    setWorkNote(memory.rawContent);
-    setSupplementValues((current) => ({
-      ...current,
-      [projectTopicField]: memory.projectTopic,
-      [tomorrowPlanField]: memory.tomorrowPlan,
-      [extraNoteField]: memory.extraNote,
-    }));
-    setActiveSupplementFields(
-      [
-        memory.projectTopic ? projectTopicField : null,
-        memory.tomorrowPlan ? tomorrowPlanField : null,
-        memory.extraNote ? extraNoteField : null,
-      ].filter((field): field is SupplementField => field !== null),
-    );
-    setIsSupplementOpen(Boolean(memory.projectTopic || memory.tomorrowPlan || memory.extraNote));
-  }, []);
+      setWorkNote(memory.rawContent);
+      setSupplementValues((current) => ({
+        ...current,
+        [projectTopicField]: memory.projectTopic,
+        [tomorrowPlanField]: memory.tomorrowPlan,
+        [extraNoteField]: memory.extraNote,
+      }));
+      setActiveSupplementFields(
+        [
+          memory.projectTopic ? projectTopicField : null,
+          memory.tomorrowPlan ? tomorrowPlanField : null,
+          memory.extraNote ? extraNoteField : null,
+        ].filter((field): field is SupplementField => field !== null),
+      );
+      setIsSupplementOpen(Boolean(memory.projectTopic || memory.tomorrowPlan || memory.extraNote));
+    },
+    [],
+  );
 
   const pulseAction = useCallback(
     (setter: (value: boolean) => void, button: HTMLButtonElement | null) => {
@@ -194,9 +257,12 @@ export function WorkMemoryHome() {
   useEffect(() => {
     let isMounted = true;
 
-    void dailyMemoryRepository.getByDate(currentDate).then((memory) => {
+    void Promise.all([
+      dailyMemoryRepository.getByDate(currentDate),
+      dailyMemoryRepository.list(),
+    ]).then(([memory, memories]) => {
       if (isMounted) {
-        applyDailyMemory(memory);
+        applyDailyMemory(memory, memories);
       }
     });
 
@@ -287,8 +353,10 @@ export function WorkMemoryHome() {
 
     try {
       const memory = await dailyMemoryRepository.saveDraft(buildDailyMemoryInput());
+      const memories = await dailyMemoryRepository.list();
 
-      setTodayMemory(getTodayMemoryState(memory));
+      setTodayMemory(getTodayMemoryState(memory, memories));
+      setWeeklySnapshot(getWeeklySnapshotFromMemories(memories));
       toast.success('草稿已保存');
     } finally {
       setIsSavingDraft(false);
@@ -307,11 +375,13 @@ export function WorkMemoryHome() {
         ...buildDailyMemoryInput(),
         generatedContent: generatedPreview,
       });
+      const memories = await dailyMemoryRepository.list();
 
       setTodayMemory((current) => ({
-        ...getTodayMemoryState(memory),
+        ...getTodayMemoryState(memory, memories),
         reportFreshness: current.referencedByWeeklyReport ? 'stale' : current.reportFreshness,
       }));
+      setWeeklySnapshot(getWeeklySnapshotFromMemories(memories));
       setIsPreviewOpen(false);
       toast.success(hasGeneratedToday ? '今日记录已更新' : '今日记忆已保存');
     } finally {
@@ -378,38 +448,65 @@ export function WorkMemoryHome() {
         </div>
       </section>
       <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
-        <DialogContent className="max-w-[min(calc(100%-2rem),560px)] gap-0 p-0">
-          <DialogHeader className="px-5 pt-5 pb-3">
+        <DialogContent className="flex max-h-[calc(100vh-72px)] w-[min(620px,calc(100vw-48px))] max-w-none flex-col gap-0 overflow-hidden p-0 sm:max-w-[min(620px,calc(100vw-48px))]">
+          <DialogHeader className="shrink-0 px-6 pt-5 pb-4">
             <DialogTitle>今日记忆预览</DialogTitle>
             <DialogDescription>确认后会保存为今天唯一一条工作记忆。</DialogDescription>
           </DialogHeader>
-          <div className="max-h-[58vh] overflow-y-auto px-5 pb-4">
-            <div className="grid gap-3">
-              {generatedPreview?.sections.map((section) => (
-                <section
-                  key={section.title}
-                  className="rounded-lg border border-app-border bg-app-surface px-3 py-2.5"
-                >
-                  <h3 className="text-[13px] font-semibold text-app-ink">{section.title}</h3>
-                  <ul className="mt-1.5 grid gap-1 text-[13px] leading-[1.55] text-app-ink-muted">
-                    {section.content.map((item) => (
-                      <li key={item}>{item}</li>
-                    ))}
-                  </ul>
-                </section>
-              ))}
+          <div className="min-h-0 max-h-[calc(100vh-220px)] flex-1 overflow-y-auto px-6 pb-5">
+            <div className="divide-y divide-app-border">
+              {generatedPreview?.sections
+                .filter((section) => getPreviewItems(section.content))
+                .map((section) => {
+                  const previewItems = getPreviewItems(section.content);
+                  const usesList = section.title === '完成事项' || (previewItems?.length ?? 0) > 1;
+
+                  if (!previewItems) {
+                    return null;
+                  }
+
+                  return (
+                    <section key={section.title} className="py-3 first:pt-0 last:pb-0">
+                      <h3 className="text-sm leading-5 font-semibold text-app-ink">
+                        {section.title}
+                      </h3>
+                      {usesList ? (
+                        <ul className="mt-1.5 list-disc space-y-1 pl-4 text-[14px] leading-[1.58] text-app-ink-muted">
+                          {previewItems.map((item, index) => (
+                            <li key={`${section.title}-${index}`}>{item}</li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="mt-1.5 text-[14px] leading-[1.62] text-app-ink-muted">
+                          {previewItems[0]}
+                        </p>
+                      )}
+                    </section>
+                  );
+                })}
+              {unmentionedPreviewFields.length > 0 ? (
+                <p className="py-3 text-[13px] leading-[1.5] text-app-ink-subtle">
+                  本次未提及：{unmentionedPreviewFields.join('、')}
+                </p>
+              ) : null}
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="mx-0 mt-0 mb-0 shrink-0 rounded-b-xl border-t border-app-border bg-[color-mix(in_srgb,var(--app-surface)_86%,var(--app-surface-muted))] px-6 py-3 sm:flex-row sm:justify-end">
             <Button
               type="button"
               variant="ghost"
+              className="cursor-pointer text-app-ink-muted hover:bg-app-surface-muted hover:text-app-ink disabled:cursor-not-allowed"
               onClick={() => setIsPreviewOpen(false)}
               disabled={isSavingGeneratedMemory}
             >
               取消
             </Button>
-            <Button type="button" onClick={saveGeneratedMemory} disabled={isSavingGeneratedMemory}>
+            <Button
+              type="button"
+              className="cursor-pointer bg-app-accent text-app-accent-ink hover:bg-[color-mix(in_srgb,var(--app-accent)_86%,var(--app-surface-muted))] disabled:cursor-not-allowed"
+              onClick={saveGeneratedMemory}
+              disabled={isSavingGeneratedMemory}
+            >
               {isSavingGeneratedMemory ? (
                 <Loader2 className="animate-spin" aria-hidden="true" />
               ) : null}

@@ -5,6 +5,7 @@ export type ReportFreshness = 'fresh' | 'stale';
 export type TodayMemoryState = {
   officialStatus: OfficialMemoryStatus;
   hasDraft: boolean;
+  hasGeneratedHistory: boolean;
   referencedByWeeklyReport: boolean;
   reportFreshness: ReportFreshness;
 };

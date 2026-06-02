@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "职迹",
+  "productName": "Tallya",
   "version": "0.1.0",
   "identifier": "com.tallya",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "职迹",
+        "title": "Tallya",
         "width": 720,
         "height": 542,
         "minWidth": 600,

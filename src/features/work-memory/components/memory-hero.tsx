@@ -8,7 +8,7 @@ export function MemoryHero() {
         今天做了什么？
       </h1>
       <p className="mt-0.5 text-sm leading-[1.55] text-app-ink-muted">
-        随便写几句，职迹会帮你整理和沉淀。
+        随便写几句，Tallya 会帮你整理和沉淀。
       </p>
     </section>
   );

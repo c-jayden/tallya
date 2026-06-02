@@ -30,8 +30,8 @@ export async function mockGenerateDailyMemory(
   input: MockGenerateDailyMemoryInput,
 ): Promise<DailyMemoryGeneratedContent> {
   const summaryPrefix = input.projectTopic.trim() ? `${input.projectTopic.trim()}：` : '';
-  const tomorrowPlan = input.tomorrowPlan.trim() || '明天继续推进今天未完成的后续事项。';
-  const extraNote = input.extraNote.trim() || '暂无补充说明。';
+  const tomorrowPlan = input.tomorrowPlan.trim();
+  const extraNote = input.extraNote.trim();
 
   return {
     sections: [
@@ -49,15 +49,15 @@ export async function mockGenerateDailyMemory(
       },
       {
         title: '遇到问题',
-        content: ['当前为 mock 整理结果，后续接入 AI 后可提取更具体的风险与阻塞。'],
+        content: [],
       },
       {
         title: '明日计划',
-        content: [tomorrowPlan],
+        content: tomorrowPlan ? [tomorrowPlan] : [],
       },
       {
         title: '补充说明',
-        content: [extraNote],
+        content: extraNote ? [extraNote] : [],
       },
     ],
   };

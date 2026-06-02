@@ -17,6 +17,12 @@ export function MemoryStatusCard({
   weeklySnapshot,
   onUnlockMemory,
 }: MemoryStatusCardProps) {
+  const hasAnyGeneratedMemory =
+    todayMemory.hasGeneratedHistory || todayMemory.officialStatus === 'generated';
+  const isEmpty = !isLocked && !todayMemory.hasDraft && !hasAnyGeneratedMemory;
+  const canViewMemory = !isEmpty;
+  const canGenerateReport = hasAnyGeneratedMemory && !isLocked;
+
   return (
     <section
       className={cn(
@@ -29,8 +35,7 @@ export function MemoryStatusCard({
         {isLocked ? (
           <>
             <strong>本周周报已生成</strong>
-            <p>本周工作记忆已归档，修改历史记录需先解锁。</p>
-            <small>该记录已被周报引用，修改后相关报告可能需要重新生成。</small>
+            <p>相关工作记忆已归档，修改历史记录需先解锁。</p>
           </>
         ) : todayMemory.officialStatus === 'generated' ? (
           <>
@@ -40,8 +45,13 @@ export function MemoryStatusCard({
           </>
         ) : todayMemory.hasDraft ? (
           <>
-            <strong>草稿已保存</strong>
-            <p>还没有生成正式工作记忆，整理后会沉淀为今天唯一一条正式记录。</p>
+            <strong>今日草稿已保存</strong>
+            <p>整理成今日记录后，会开始沉淀你的工作记忆。</p>
+          </>
+        ) : isEmpty ? (
+          <>
+            <strong>还没有工作记忆</strong>
+            <p>整理第一条今日记录后，这里会显示你的沉淀进度。</p>
           </>
         ) : (
           <>
@@ -52,36 +62,42 @@ export function MemoryStatusCard({
           </>
         )}
       </div>
-      <div className="flex shrink-0 items-center gap-0.5 max-[560px]:self-start">
-        {isLocked ? (
+      {!isEmpty ? (
+        <div className="flex shrink-0 items-center gap-0.5 max-[560px]:self-start">
+          {isLocked ? (
+            <Button
+              type="button"
+              variant="ghost"
+              className="h-7 cursor-pointer rounded-[9px] px-2 text-xs font-[520] text-app-ink-muted hover:bg-app-surface-muted hover:text-app-ink focus-visible:bg-app-surface-muted focus-visible:text-app-ink"
+              onClick={onUnlockMemory}
+            >
+              解锁修改
+            </Button>
+          ) : null}
           <Button
             type="button"
             variant="ghost"
-            className="h-7 cursor-pointer rounded-[9px] px-2 text-xs font-[520] text-app-ink-muted hover:bg-app-surface-muted hover:text-app-ink focus-visible:bg-app-surface-muted focus-visible:text-app-ink"
-            onClick={onUnlockMemory}
+            className="h-7 cursor-pointer rounded-[9px] px-2 text-xs font-[520] text-app-ink-muted hover:bg-app-surface-muted hover:text-app-ink focus-visible:bg-app-surface-muted focus-visible:text-app-ink disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:bg-transparent disabled:hover:text-app-ink-muted"
+            disabled={!canViewMemory}
           >
-            解锁修改
+            {isLocked
+              ? '查看周报'
+              : todayMemory.officialStatus === 'generated'
+                ? '查看今日记忆'
+                : todayMemory.hasDraft
+                  ? '查看草稿'
+                  : '查看记忆'}
           </Button>
-        ) : null}
-        <Button
-          type="button"
-          variant="ghost"
-          className="h-7 cursor-pointer rounded-[9px] px-2 text-xs font-[520] text-app-ink-muted hover:bg-app-surface-muted hover:text-app-ink focus-visible:bg-app-surface-muted focus-visible:text-app-ink"
-        >
-          {isLocked
-            ? '查看周报'
-            : todayMemory.officialStatus === 'generated'
-              ? '查看今日记忆'
-              : '查看记忆'}
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          className="h-7 cursor-pointer rounded-[9px] px-2 text-xs font-[520] text-app-ink-muted hover:bg-app-surface-muted hover:text-app-ink focus-visible:bg-app-surface-muted focus-visible:text-app-ink"
-        >
-          {isLocked ? '查看记忆' : '生成报告'}
-        </Button>
-      </div>
+          <Button
+            type="button"
+            variant="ghost"
+            className="h-7 cursor-pointer rounded-[9px] px-2 text-xs font-[520] text-app-ink-muted hover:bg-app-surface-muted hover:text-app-ink focus-visible:bg-app-surface-muted focus-visible:text-app-ink disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:bg-transparent disabled:hover:text-app-ink-muted"
+            disabled={!canGenerateReport && !isLocked}
+          >
+            {isLocked ? '查看记忆' : '生成报告'}
+          </Button>
+        </div>
+      ) : null}
     </section>
   );
 }
