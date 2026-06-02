@@ -1,10 +1,8 @@
-import type { DailyMemoryGeneratedContent } from '../types';
+import type { DailyMemoryGeneratedContent, DailyMemorySupplements } from '../types';
 
 type MockGenerateDailyMemoryInput = {
   rawContent: string;
-  projectTopic: string;
-  tomorrowPlan: string;
-  extraNote: string;
+  supplements: DailyMemorySupplements;
 };
 
 function firstSentence(value: string) {
@@ -29,36 +27,15 @@ function splitWorkItems(value: string) {
 export async function mockGenerateDailyMemory(
   input: MockGenerateDailyMemoryInput,
 ): Promise<DailyMemoryGeneratedContent> {
-  const summaryPrefix = input.projectTopic.trim() ? `${input.projectTopic.trim()}：` : '';
-  const tomorrowPlan = input.tomorrowPlan.trim();
-  const extraNote = input.extraNote.trim();
+  const projectTopic = input.supplements.projectTopic?.trim();
+  const summaryPrefix = projectTopic ? `${projectTopic}：` : '';
 
   return {
-    sections: [
-      {
-        title: '今日摘要',
-        content: [`${summaryPrefix}${firstSentence(input.rawContent)}`],
-      },
-      {
-        title: '完成事项',
-        content: splitWorkItems(input.rawContent),
-      },
-      {
-        title: '关键产出',
-        content: ['形成了一份可继续沉淀到今日记忆的工作记录。'],
-      },
-      {
-        title: '遇到问题',
-        content: [],
-      },
-      {
-        title: '明日计划',
-        content: tomorrowPlan ? [tomorrowPlan] : [],
-      },
-      {
-        title: '补充说明',
-        content: extraNote ? [extraNote] : [],
-      },
-    ],
+    summary: `${summaryPrefix}${firstSentence(input.rawContent)}`,
+    completedItems: splitWorkItems(input.rawContent),
+    keyOutcome: '形成了一份可继续沉淀到今日记忆的工作记录。',
+    problems: undefined,
+    tomorrowPlan: input.supplements.tomorrowPlan?.trim() || undefined,
+    extraNote: input.supplements.extraNote?.trim() || undefined,
   };
 }

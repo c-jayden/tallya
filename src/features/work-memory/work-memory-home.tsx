@@ -27,6 +27,8 @@ import { mockGenerateDailyMemory } from './services/mock-generate-daily-memory';
 import type {
   DailyMemory,
   DailyMemoryGeneratedContent,
+  DailyMemoryPreviewSection,
+  DailyMemorySupplements,
   WeeklySnapshot,
   StatusVariant,
   TodayMemoryState,
@@ -52,10 +54,7 @@ function getStatusVariant(todayMemory: TodayMemoryState, isLocked: boolean): Sta
 }
 
 function getMemorySummary(memory: DailyMemory) {
-  return (
-    memory.generatedContent?.sections.find((section) => section.title === '今日摘要')?.content[0] ??
-    memory.rawContent
-  );
+  return memory.generated?.summary ?? memory.rawContent;
 }
 
 function getFallbackWeeklySnapshot(): WeeklySnapshot {
@@ -122,12 +121,45 @@ function getPreviewItems(content: string[]) {
   return items.length > 0 ? items : null;
 }
 
+function getMemoryPreviewSections(
+  content: DailyMemoryGeneratedContent | null,
+): DailyMemoryPreviewSection[] {
+  if (!content) {
+    return [];
+  }
+
+  return [
+    {
+      title: '今日摘要',
+      content: [content.summary],
+    },
+    {
+      title: '完成事项',
+      content: content.completedItems,
+    },
+    {
+      title: '关键产出',
+      content: content.keyOutcome ? [content.keyOutcome] : [],
+    },
+    {
+      title: '遇到问题',
+      content: content.problems ? [content.problems] : [],
+    },
+    {
+      title: '明日计划',
+      content: content.tomorrowPlan ? [content.tomorrowPlan] : [],
+    },
+    {
+      title: '补充说明',
+      content: content.extraNote ? [content.extraNote] : [],
+    },
+  ];
+}
+
 function getUnmentionedSectionTitles(content: DailyMemoryGeneratedContent | null) {
-  return (
-    content?.sections
-      .filter((section) => !getPreviewItems(section.content))
-      .map((section) => section.title) ?? []
-  );
+  return getMemoryPreviewSections(content)
+    .filter((section) => !getPreviewItems(section.content))
+    .map((section) => section.title);
 }
 
 export function WorkMemoryHome() {
@@ -147,6 +179,8 @@ export function WorkMemoryHome() {
     referencedByWeeklyReport: false,
     reportFreshness: 'fresh',
   });
+  const [currentMemory, setCurrentMemory] = useState<DailyMemory | null>(null);
+  const [memories, setMemories] = useState<DailyMemory[]>([]);
   const [weeklySnapshot, setWeeklySnapshot] = useState<WeeklySnapshot>(getFallbackWeeklySnapshot);
   const [searchPulse, setSearchPulse] = useState(false);
   const [primaryPulse, setPrimaryPulse] = useState(false);
@@ -157,6 +191,8 @@ export function WorkMemoryHome() {
   const [generatedPreview, setGeneratedPreview] = useState<DailyMemoryGeneratedContent | null>(
     null,
   );
+  const [viewingMemory, setViewingMemory] = useState<DailyMemory | null>(null);
+  const [isMemoryDialogOpen, setIsMemoryDialogOpen] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
   const searchButtonRef = useRef<HTMLButtonElement>(null);
   const primaryActionRef = useRef<HTMLButtonElement>(null);
@@ -168,27 +204,41 @@ export function WorkMemoryHome() {
   const saveGeneratedLabel = hasGeneratedToday ? '更新今日记录' : '保存为今日记忆';
   const statusVariant = getStatusVariant(todayMemory, isLocked);
   const unmentionedPreviewFields = getUnmentionedSectionTitles(generatedPreview);
+  const viewingMemorySections = getMemoryPreviewSections(viewingMemory?.generated ?? null);
+  const unmentionedViewingFields = getUnmentionedSectionTitles(viewingMemory?.generated ?? null);
+  const isViewingTodayMemory = viewingMemory?.date === currentDate;
+  const viewingMemoryTitle = isViewingTodayMemory ? '今日记忆' : '工作记忆';
+  const viewingMemoryDescription = isViewingTodayMemory
+    ? '这是今天已保存的正式工作记忆。'
+    : `${viewingMemory?.date ?? ''} 已保存的正式工作记忆。`;
 
   const buildDailyMemoryInput = useCallback(() => {
     const [projectTopicField, tomorrowPlanField, extraNoteField] = supplementFields;
+    const supplements: DailyMemorySupplements = {};
+
+    if (activeSupplementFields.includes(projectTopicField)) {
+      supplements.projectTopic = supplementValues[projectTopicField];
+    }
+
+    if (activeSupplementFields.includes(tomorrowPlanField)) {
+      supplements.tomorrowPlan = supplementValues[tomorrowPlanField];
+    }
+
+    if (activeSupplementFields.includes(extraNoteField)) {
+      supplements.extraNote = supplementValues[extraNoteField];
+    }
 
     return {
       date: currentDate,
       rawContent: workNote,
-      projectTopic: activeSupplementFields.includes(projectTopicField)
-        ? supplementValues[projectTopicField]
-        : '',
-      tomorrowPlan: activeSupplementFields.includes(tomorrowPlanField)
-        ? supplementValues[tomorrowPlanField]
-        : '',
-      extraNote: activeSupplementFields.includes(extraNoteField)
-        ? supplementValues[extraNoteField]
-        : '',
+      supplements,
     };
   }, [activeSupplementFields, currentDate, supplementValues, workNote]);
 
   const applyDailyMemory = useCallback(
     (memory: DailyMemory | null, memories: DailyMemory[] = []) => {
+      setCurrentMemory(memory);
+      setMemories(memories);
       setTodayMemory(getTodayMemoryState(memory, memories));
       setWeeklySnapshot(getWeeklySnapshotFromMemories(memories));
 
@@ -201,18 +251,24 @@ export function WorkMemoryHome() {
       setWorkNote(memory.rawContent);
       setSupplementValues((current) => ({
         ...current,
-        [projectTopicField]: memory.projectTopic,
-        [tomorrowPlanField]: memory.tomorrowPlan,
-        [extraNoteField]: memory.extraNote,
+        [projectTopicField]: memory.supplements.projectTopic ?? '',
+        [tomorrowPlanField]: memory.supplements.tomorrowPlan ?? '',
+        [extraNoteField]: memory.supplements.extraNote ?? '',
       }));
       setActiveSupplementFields(
         [
-          memory.projectTopic ? projectTopicField : null,
-          memory.tomorrowPlan ? tomorrowPlanField : null,
-          memory.extraNote ? extraNoteField : null,
+          memory.supplements.projectTopic ? projectTopicField : null,
+          memory.supplements.tomorrowPlan ? tomorrowPlanField : null,
+          memory.supplements.extraNote ? extraNoteField : null,
         ].filter((field): field is SupplementField => field !== null),
       );
-      setIsSupplementOpen(Boolean(memory.projectTopic || memory.tomorrowPlan || memory.extraNote));
+      setIsSupplementOpen(
+        Boolean(
+          memory.supplements.projectTopic ||
+            memory.supplements.tomorrowPlan ||
+            memory.supplements.extraNote,
+        ),
+      );
     },
     [],
   );
@@ -355,6 +411,8 @@ export function WorkMemoryHome() {
       const memory = await dailyMemoryRepository.saveDraft(buildDailyMemoryInput());
       const memories = await dailyMemoryRepository.list();
 
+      setCurrentMemory(memory);
+      setMemories(memories);
       setTodayMemory(getTodayMemoryState(memory, memories));
       setWeeklySnapshot(getWeeklySnapshotFromMemories(memories));
       toast.success('草稿已保存');
@@ -373,28 +431,68 @@ export function WorkMemoryHome() {
     try {
       const memory = await dailyMemoryRepository.saveGenerated({
         ...buildDailyMemoryInput(),
-        generatedContent: generatedPreview,
+        generated: generatedPreview,
       });
       const memories = await dailyMemoryRepository.list();
 
+      setCurrentMemory(memory);
+      setMemories(memories);
       setTodayMemory((current) => ({
         ...getTodayMemoryState(memory, memories),
         reportFreshness: current.referencedByWeeklyReport ? 'stale' : current.reportFreshness,
       }));
       setWeeklySnapshot(getWeeklySnapshotFromMemories(memories));
       setIsPreviewOpen(false);
-      toast.success(hasGeneratedToday ? '今日记录已更新' : '今日记忆已保存');
+      toast.success('今日记忆已保存');
     } finally {
       setIsSavingGeneratedMemory(false);
     }
   }
 
-  function unlockMemory() {
-    setTodayMemory((current) => ({
-      ...current,
-      officialStatus: 'generated',
-      reportFreshness: 'stale',
-    }));
+  function viewDraft() {
+    if (currentMemory) {
+      applyDailyMemory(currentMemory, memories);
+    }
+
+    toast.info('已回到草稿编辑');
+  }
+
+  function viewTodayMemory() {
+    if (!currentMemory?.generated) {
+      return;
+    }
+
+    setViewingMemory(currentMemory);
+    setIsMemoryDialogOpen(true);
+  }
+
+  function viewLatestMemory() {
+    const latestMemory = memories
+      .filter((memory) => memory.status === 'generated' || memory.status === 'locked')
+      .sort((first, second) => second.date.localeCompare(first.date))[0];
+
+    if (!latestMemory?.generated) {
+      return;
+    }
+
+    setViewingMemory(latestMemory);
+    setIsMemoryDialogOpen(true);
+  }
+
+  function editOriginalRecord() {
+    if (viewingMemory) {
+      applyDailyMemory(viewingMemory, memories);
+    }
+
+    setIsMemoryDialogOpen(false);
+  }
+
+  function showReportPlaceholder() {
+    toast.info('周报功能稍后接入');
+  }
+
+  function showWeeklyReportPlaceholder() {
+    toast.info('周报查看稍后接入');
   }
 
   return (
@@ -443,7 +541,11 @@ export function WorkMemoryHome() {
             statusVariant={statusVariant}
             todayMemory={todayMemory}
             weeklySnapshot={weeklySnapshot}
-            onUnlockMemory={unlockMemory}
+            onGenerateReport={showReportPlaceholder}
+            onViewDraft={viewDraft}
+            onViewMemory={viewLatestMemory}
+            onViewTodayMemory={viewTodayMemory}
+            onViewWeeklyReport={showWeeklyReportPlaceholder}
           />
         </div>
       </section>
@@ -455,7 +557,7 @@ export function WorkMemoryHome() {
           </DialogHeader>
           <div className="min-h-0 max-h-[calc(100vh-220px)] flex-1 overflow-y-auto px-6 pb-5">
             <div className="divide-y divide-app-border">
-              {generatedPreview?.sections
+              {getMemoryPreviewSections(generatedPreview)
                 .filter((section) => getPreviewItems(section.content))
                 .map((section) => {
                   const previewItems = getPreviewItems(section.content);
@@ -511,6 +613,69 @@ export function WorkMemoryHome() {
                 <Loader2 className="animate-spin" aria-hidden="true" />
               ) : null}
               {saveGeneratedLabel}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={isMemoryDialogOpen} onOpenChange={setIsMemoryDialogOpen}>
+        <DialogContent className="flex max-h-[calc(100vh-72px)] w-[min(620px,calc(100vw-48px))] max-w-none flex-col gap-0 overflow-hidden p-0 sm:max-w-[min(620px,calc(100vw-48px))]">
+          <DialogHeader className="shrink-0 px-6 pt-5 pb-4">
+            <DialogTitle>{viewingMemoryTitle}</DialogTitle>
+            <DialogDescription>{viewingMemoryDescription}</DialogDescription>
+          </DialogHeader>
+          <div className="min-h-0 max-h-[calc(100vh-220px)] flex-1 overflow-y-auto px-6 pb-5">
+            <div className="divide-y divide-app-border">
+              {viewingMemorySections
+                .filter((section) => getPreviewItems(section.content))
+                .map((section) => {
+                  const previewItems = getPreviewItems(section.content);
+                  const usesList = section.title === '完成事项' || (previewItems?.length ?? 0) > 1;
+
+                  if (!previewItems) {
+                    return null;
+                  }
+
+                  return (
+                    <section key={section.title} className="py-3 first:pt-0 last:pb-0">
+                      <h3 className="text-sm leading-5 font-semibold text-app-ink">
+                        {section.title}
+                      </h3>
+                      {usesList ? (
+                        <ul className="mt-1.5 list-disc space-y-1 pl-4 text-[14px] leading-[1.58] text-app-ink-muted">
+                          {previewItems.map((item, index) => (
+                            <li key={`${section.title}-${index}`}>{item}</li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="mt-1.5 text-[14px] leading-[1.62] text-app-ink-muted">
+                          {previewItems[0]}
+                        </p>
+                      )}
+                    </section>
+                  );
+                })}
+              {unmentionedViewingFields.length > 0 ? (
+                <p className="py-3 text-[13px] leading-[1.5] text-app-ink-subtle">
+                  本次未提及：{unmentionedViewingFields.join('、')}
+                </p>
+              ) : null}
+            </div>
+          </div>
+          <DialogFooter className="mx-0 mt-0 mb-0 shrink-0 rounded-b-xl border-t border-app-border bg-[color-mix(in_srgb,var(--app-surface)_86%,var(--app-surface-muted))] px-6 py-3 sm:flex-row sm:justify-end">
+            <Button
+              type="button"
+              variant="ghost"
+              className="cursor-pointer text-app-ink-muted hover:bg-app-surface-muted hover:text-app-ink disabled:cursor-not-allowed"
+              onClick={() => setIsMemoryDialogOpen(false)}
+            >
+              关闭
+            </Button>
+            <Button
+              type="button"
+              className="cursor-pointer bg-app-accent text-app-accent-ink hover:bg-[color-mix(in_srgb,var(--app-accent)_86%,var(--app-surface-muted))] disabled:cursor-not-allowed"
+              onClick={editOriginalRecord}
+            >
+              编辑原始记录
             </Button>
           </DialogFooter>
         </DialogContent>

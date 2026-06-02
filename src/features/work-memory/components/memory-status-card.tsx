@@ -7,7 +7,11 @@ type MemoryStatusCardProps = {
   statusVariant: StatusVariant;
   todayMemory: TodayMemoryState;
   weeklySnapshot: WeeklySnapshot;
-  onUnlockMemory: () => void;
+  onGenerateReport: () => void;
+  onViewDraft: () => void;
+  onViewMemory: () => void;
+  onViewTodayMemory: () => void;
+  onViewWeeklyReport: () => void;
 };
 
 export function MemoryStatusCard({
@@ -15,13 +19,17 @@ export function MemoryStatusCard({
   statusVariant,
   todayMemory,
   weeklySnapshot,
-  onUnlockMemory,
+  onGenerateReport,
+  onViewDraft,
+  onViewMemory,
+  onViewTodayMemory,
+  onViewWeeklyReport,
 }: MemoryStatusCardProps) {
   const hasAnyGeneratedMemory =
     todayMemory.hasGeneratedHistory || todayMemory.officialStatus === 'generated';
   const isEmpty = !isLocked && !todayMemory.hasDraft && !hasAnyGeneratedMemory;
-  const canViewMemory = !isEmpty;
-  const canGenerateReport = hasAnyGeneratedMemory && !isLocked;
+  const actionButtonClass =
+    'h-7 cursor-pointer rounded-[9px] px-2 text-xs font-[520] text-app-ink-muted hover:bg-app-surface-muted hover:text-app-ink focus-visible:bg-app-surface-muted focus-visible:text-app-ink';
 
   return (
     <section
@@ -65,37 +73,72 @@ export function MemoryStatusCard({
       {!isEmpty ? (
         <div className="flex shrink-0 items-center gap-0.5 max-[560px]:self-start">
           {isLocked ? (
+            <>
+              <Button
+                type="button"
+                variant="ghost"
+                className={actionButtonClass}
+                onClick={onViewWeeklyReport}
+              >
+                查看周报
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                className={actionButtonClass}
+                onClick={onViewMemory}
+              >
+                查看记忆
+              </Button>
+            </>
+          ) : todayMemory.officialStatus === 'generated' ? (
+            <>
+              <Button
+                type="button"
+                variant="ghost"
+                className={actionButtonClass}
+                onClick={onViewTodayMemory}
+              >
+                查看今日记忆
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                className={actionButtonClass}
+                onClick={onGenerateReport}
+              >
+                生成报告
+              </Button>
+            </>
+          ) : todayMemory.hasDraft ? (
             <Button
               type="button"
               variant="ghost"
-              className="h-7 cursor-pointer rounded-[9px] px-2 text-xs font-[520] text-app-ink-muted hover:bg-app-surface-muted hover:text-app-ink focus-visible:bg-app-surface-muted focus-visible:text-app-ink"
-              onClick={onUnlockMemory}
+              className={actionButtonClass}
+              onClick={onViewDraft}
             >
-              解锁修改
+              查看草稿
             </Button>
-          ) : null}
-          <Button
-            type="button"
-            variant="ghost"
-            className="h-7 cursor-pointer rounded-[9px] px-2 text-xs font-[520] text-app-ink-muted hover:bg-app-surface-muted hover:text-app-ink focus-visible:bg-app-surface-muted focus-visible:text-app-ink disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:bg-transparent disabled:hover:text-app-ink-muted"
-            disabled={!canViewMemory}
-          >
-            {isLocked
-              ? '查看周报'
-              : todayMemory.officialStatus === 'generated'
-                ? '查看今日记忆'
-                : todayMemory.hasDraft
-                  ? '查看草稿'
-                  : '查看记忆'}
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            className="h-7 cursor-pointer rounded-[9px] px-2 text-xs font-[520] text-app-ink-muted hover:bg-app-surface-muted hover:text-app-ink focus-visible:bg-app-surface-muted focus-visible:text-app-ink disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:bg-transparent disabled:hover:text-app-ink-muted"
-            disabled={!canGenerateReport && !isLocked}
-          >
-            {isLocked ? '查看记忆' : '生成报告'}
-          </Button>
+          ) : (
+            <>
+              <Button
+                type="button"
+                variant="ghost"
+                className={actionButtonClass}
+                onClick={onViewMemory}
+              >
+                查看记忆
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                className={actionButtonClass}
+                onClick={onGenerateReport}
+              >
+                生成报告
+              </Button>
+            </>
+          )}
         </div>
       ) : null}
     </section>

@@ -20,23 +20,32 @@ export type WeeklySnapshot = {
 
 export type DailyMemoryStatus = 'draft' | 'generated' | 'locked';
 
-export type DailyMemoryGeneratedSection = {
-  title: '今日摘要' | '完成事项' | '关键产出' | '遇到问题' | '明日计划' | '补充说明';
-  content: string[];
+export type DailyMemorySupplements = {
+  projectTopic?: string;
+  tomorrowPlan?: string;
+  extraNote?: string;
 };
 
 export type DailyMemoryGeneratedContent = {
-  sections: DailyMemoryGeneratedSection[];
+  summary: string;
+  completedItems: string[];
+  keyOutcome?: string;
+  problems?: string;
+  tomorrowPlan?: string;
+  extraNote?: string;
+};
+
+export type DailyMemoryPreviewSection = {
+  title: '今日摘要' | '完成事项' | '关键产出' | '遇到问题' | '明日计划' | '补充说明';
+  content: string[];
 };
 
 export type DailyMemory = {
   id: string;
   date: string;
   rawContent: string;
-  projectTopic: string;
-  tomorrowPlan: string;
-  extraNote: string;
-  generatedContent: DailyMemoryGeneratedContent | null;
+  supplements: DailyMemorySupplements;
+  generated: DailyMemoryGeneratedContent | null;
   status: DailyMemoryStatus;
   createdAt: string;
   updatedAt: string;

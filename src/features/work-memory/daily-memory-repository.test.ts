@@ -42,19 +42,23 @@ describe('LocalStorageDailyMemoryRepository', () => {
     const memory = await repository.saveDraft({
       date: '2026-06-02',
       rawContent: 'Finished the home interaction loop.',
-      projectTopic: 'Tallya',
-      tomorrowPlan: 'Verify local persistence.',
-      extraNote: 'Keep UI unchanged.',
+      supplements: {
+        projectTopic: 'Tallya',
+        tomorrowPlan: 'Verify local persistence.',
+        extraNote: 'Keep UI unchanged.',
+      },
     });
 
     expect(memory).toMatchObject({
       id: 'daily-memory-2026-06-02',
       date: '2026-06-02',
       rawContent: 'Finished the home interaction loop.',
-      projectTopic: 'Tallya',
-      tomorrowPlan: 'Verify local persistence.',
-      extraNote: 'Keep UI unchanged.',
-      generatedContent: null,
+      supplements: {
+        projectTopic: 'Tallya',
+        tomorrowPlan: 'Verify local persistence.',
+        extraNote: 'Keep UI unchanged.',
+      },
+      generated: null,
       status: 'draft',
       createdAt: '2026-06-02T01:00:00.000Z',
       updatedAt: '2026-06-02T01:00:00.000Z',
@@ -70,9 +74,7 @@ describe('LocalStorageDailyMemoryRepository', () => {
     const first = await repository.saveDraft({
       date: '2026-06-02',
       rawContent: 'First draft.',
-      projectTopic: '',
-      tomorrowPlan: '',
-      extraNote: '',
+      supplements: {},
     });
 
     repository.setClock(() => new Date('2026-06-02T11:00:00+08:00'));
@@ -80,15 +82,16 @@ describe('LocalStorageDailyMemoryRepository', () => {
     const second = await repository.saveDraft({
       date: '2026-06-02',
       rawContent: 'Updated draft.',
-      projectTopic: 'Homepage',
-      tomorrowPlan: '',
-      extraNote: '',
+      supplements: {
+        projectTopic: 'Homepage',
+      },
     });
 
     expect(second.id).toBe(first.id);
     expect(second.createdAt).toBe(first.createdAt);
     expect(second.updatedAt).toBe('2026-06-02T03:00:00.000Z');
     expect(second.rawContent).toBe('Updated draft.');
+    expect(second.supplements).toEqual({ projectTopic: 'Homepage' });
     expect(await repository.getByDate('2026-06-02')).toEqual(second);
     expect(await repository.list()).toHaveLength(1);
   });
@@ -97,42 +100,73 @@ describe('LocalStorageDailyMemoryRepository', () => {
     const repository = new LocalStorageDailyMemoryRepository(new MemoryStorage(), {
       now: () => new Date('2026-06-02T09:00:00+08:00'),
     });
-    const generatedContent = await mockGenerateDailyMemory({
+    const generated = await mockGenerateDailyMemory({
       rawContent: 'Implemented draft save and generated preview.',
-      projectTopic: '',
-      tomorrowPlan: 'Run build.',
-      extraNote: '',
+      supplements: {
+        tomorrowPlan: 'Run build.',
+      },
     });
 
     await repository.saveDraft({
       date: '2026-06-02',
       rawContent: 'Initial text.',
-      projectTopic: '',
-      tomorrowPlan: '',
-      extraNote: '',
+      supplements: {},
     });
 
     repository.setClock(() => new Date('2026-06-02T12:00:00+08:00'));
 
-    const generated = await repository.saveGenerated({
+    const memory = await repository.saveGenerated({
       date: '2026-06-02',
       rawContent: 'Implemented draft save and generated preview.',
-      projectTopic: '',
-      tomorrowPlan: 'Run build.',
-      extraNote: '',
-      generatedContent,
+      supplements: {
+        tomorrowPlan: 'Run build.',
+      },
+      generated,
     });
 
-    expect(generated.status).toBe('generated');
-    expect(generated.generatedContent?.sections.map((section) => section.title)).toEqual([
-      '今日摘要',
-      '完成事项',
-      '关键产出',
-      '遇到问题',
-      '明日计划',
-      '补充说明',
-    ]);
+    expect(memory).toMatchObject({
+      status: 'generated',
+      rawContent: 'Implemented draft save and generated preview.',
+      generated: {
+        summary: 'Implemented draft save and generated preview.',
+        completedItems: ['Implemented draft save and generated preview.'],
+        keyOutcome: '形成了一份可继续沉淀到今日记忆的工作记录。',
+        tomorrowPlan: 'Run build.',
+      },
+    });
     expect(await repository.list()).toHaveLength(1);
+  });
+
+  it('can migrate the previous flat localStorage shape', async () => {
+    const storage = new MemoryStorage();
+    storage.setItem(
+      'tallya.daily-memories.v1',
+      JSON.stringify([
+        {
+          id: 'daily-memory-2026-06-02',
+          date: '2026-06-02',
+          rawContent: 'Old flat record.',
+          projectTopic: 'Migration',
+          tomorrowPlan: '',
+          extraNote: 'Keep this note.',
+          generatedContent: null,
+          status: 'draft',
+          createdAt: '2026-06-02T01:00:00.000Z',
+          updatedAt: '2026-06-02T01:30:00.000Z',
+        },
+      ]),
+    );
+    const repository = new LocalStorageDailyMemoryRepository(storage);
+
+    await expect(repository.getByDate('2026-06-02')).resolves.toMatchObject({
+      rawContent: 'Old flat record.',
+      supplements: {
+        projectTopic: 'Migration',
+        extraNote: 'Keep this note.',
+      },
+      generated: null,
+      status: 'draft',
+    });
   });
 });
 
