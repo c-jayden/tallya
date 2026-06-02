@@ -175,7 +175,7 @@ export function WorkMemoryHome() {
   return (
     <main className="h-screen w-screen bg-app-bg">
       <section
-        className="mx-auto flex h-screen w-[min(calc(100%_-_96px),740px)] flex-col overflow-y-auto pt-6 pb-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden max-[560px]:w-[min(calc(100%_-_36px),740px)] max-[560px]:pt-6 max-[560px]:pb-5 max-[600px]:pt-5"
+        className="mx-auto flex max-h-screen w-[min(calc(100%-96px),740px)] flex-col overflow-y-auto pt-6 pb-5 scrollbar-none [&::-webkit-scrollbar]:hidden max-[560px]:w-[min(calc(100%-36px),740px)] max-[560px]:pt-6 max-[560px]:pb-5 max-[600px]:pt-5"
         aria-label="工作记忆首页"
       >
         <div ref={contentRef} className="flex flex-col">

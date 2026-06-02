@@ -50,9 +50,7 @@ export async function resizeHomeWindowToContent(contentElement: HTMLElement | nu
       return;
     }
 
-    await appWindow.setSize(
-      new LogicalSize(currentOuterSize.width || HOME_WINDOW_WIDTH, targetHeight),
-    );
+    await appWindow.setSize(new LogicalSize(HOME_WINDOW_WIDTH, targetHeight));
     lastAutoHeight = targetHeight;
   } catch (error) {
     console.warn('Failed to resize home window from content', error);
