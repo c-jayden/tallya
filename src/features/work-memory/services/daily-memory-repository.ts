@@ -56,6 +56,28 @@ export class LocalStorageDailyMemoryRepository {
     return this.readAll();
   }
 
+  async getAllMemories() {
+    return this.readAll()
+      .filter(isGeneratedMemory)
+      .sort((first, second) => second.date.localeCompare(first.date));
+  }
+
+  async getMemoryByDate(date: string) {
+    return this.readAll().find((memory) => memory.date === date && isGeneratedMemory(memory)) ?? null;
+  }
+
+  async searchMemories(keyword: string) {
+    const normalizedKeyword = keyword.trim().toLowerCase();
+
+    if (!normalizedKeyword) {
+      return [];
+    }
+
+    return (await this.getAllMemories()).filter((memory) =>
+      getSearchableMemoryText(memory).includes(normalizedKeyword),
+    );
+  }
+
   async saveDraft(input: DailyMemoryDraftInput) {
     const existing = await this.getByDate(input.date);
 
@@ -132,6 +154,29 @@ export class LocalStorageDailyMemoryRepository {
 }
 
 export const dailyMemoryRepository = new LocalStorageDailyMemoryRepository();
+
+function isGeneratedMemory(memory: DailyMemory) {
+  return memory.status === 'generated' && memory.generated !== null;
+}
+
+function getSearchableMemoryText(memory: DailyMemory) {
+  const generated = memory.generated;
+  const parts = [
+    memory.date,
+    memory.rawContent,
+    memory.supplements.projectTopic,
+    memory.supplements.tomorrowPlan,
+    memory.supplements.extraNote,
+    generated?.summary,
+    ...(generated?.completedItems ?? []),
+    generated?.keyOutcome,
+    generated?.problems,
+    generated?.tomorrowPlan,
+    generated?.extraNote,
+  ];
+
+  return parts.filter((part): part is string => Boolean(part)).join('\n').toLowerCase();
+}
 
 function normalizeDailyMemory(value: unknown): DailyMemory | null {
   if (!value || typeof value !== 'object') {

@@ -2,13 +2,11 @@ import type { Ref } from 'react';
 import { Search, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Kbd, KbdGroup } from '@/components/ui/kbd';
-import { cn } from '@/lib/utils';
 
 type HomeToolbarProps = {
   commandKey: string;
   date: string;
   dateTime: string;
-  isSearchPulsing: boolean;
   searchButtonRef: Ref<HTMLButtonElement>;
   weekday: string;
   onSearchClick: () => void;
@@ -18,7 +16,6 @@ export function HomeToolbar({
   commandKey,
   date,
   dateTime,
-  isSearchPulsing,
   searchButtonRef,
   weekday,
   onSearchClick,
@@ -37,11 +34,7 @@ export function HomeToolbar({
           ref={searchButtonRef}
           variant="ghost"
           type="button"
-          className={cn(
-            'h-[35px] cursor-pointer gap-2 rounded-xl border border-app-border bg-app-surface px-3 text-[13px] text-app-ink-muted shadow-[0_1px_2px_rgb(0_0_0/0.03)] transition-[background-color,border-color,color,box-shadow] duration-150 hover:border-app-border-strong hover:bg-app-surface-muted hover:text-app-ink focus-visible:border-app-border-strong focus-visible:bg-app-surface-muted focus-visible:text-app-ink focus-visible:ring-0 [&_svg]:size-3.5',
-            isSearchPulsing &&
-              'border-app-border-strong bg-app-surface-muted text-app-ink ring-4 ring-[color-mix(in_srgb,var(--app-ink)_8%,transparent)]',
-          )}
+          className="h-[35px] cursor-pointer gap-2 rounded-xl border border-app-border bg-app-surface px-3 text-[13px] text-app-ink-muted shadow-[0_1px_2px_rgb(0_0_0/0.03)] transition-[background-color,border-color,color,box-shadow] duration-150 hover:border-app-border-strong hover:bg-app-surface-muted hover:text-app-ink focus-visible:border-app-border-strong focus-visible:bg-app-surface-muted focus-visible:text-app-ink focus-visible:ring-0 [&_svg]:size-3.5"
           aria-label={`搜索记忆，快捷键 ${commandKey} K`}
           onClick={onSearchClick}
         >

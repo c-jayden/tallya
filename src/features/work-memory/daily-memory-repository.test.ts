@@ -168,6 +168,80 @@ describe('LocalStorageDailyMemoryRepository', () => {
       status: 'draft',
     });
   });
+
+  it('lists only generated memories in reverse date order', async () => {
+    const repository = new LocalStorageDailyMemoryRepository(new MemoryStorage());
+
+    await repository.saveGenerated({
+      date: '2026-06-01',
+      rawContent: 'Finished first memory.',
+      supplements: {},
+      generated: {
+        summary: 'First memory',
+        completedItems: ['Finished first memory.'],
+      },
+    });
+    await repository.saveDraft({
+      date: '2026-06-02',
+      rawContent: 'Draft should not appear.',
+      supplements: {},
+    });
+    await repository.saveGenerated({
+      date: '2026-06-03',
+      rawContent: 'Finished latest memory.',
+      supplements: {},
+      generated: {
+        summary: 'Latest memory',
+        completedItems: ['Finished latest memory.'],
+      },
+    });
+
+    await expect(repository.getAllMemories()).resolves.toEqual([
+      expect.objectContaining({ date: '2026-06-03', status: 'generated' }),
+      expect.objectContaining({ date: '2026-06-01', status: 'generated' }),
+    ]);
+  });
+
+  it('finds a generated memory by date and searches generated memory fields', async () => {
+    const repository = new LocalStorageDailyMemoryRepository(new MemoryStorage());
+
+    await repository.saveGenerated({
+      date: '2026-06-01',
+      rawContent: 'Implemented billing export recovery.',
+      supplements: {
+        projectTopic: 'Billing',
+        tomorrowPlan: 'Verify invoices.',
+        extraNote: 'Customer support sync.',
+      },
+      generated: {
+        summary: 'Recovered billing export',
+        completedItems: ['Fixed CSV export', 'Added regression coverage'],
+        keyOutcome: 'Export flow is stable again.',
+        problems: 'Legacy formatter returned invalid dates.',
+        tomorrowPlan: 'Verify invoices.',
+        extraNote: 'Customer support sync.',
+      },
+    });
+    await repository.saveDraft({
+      date: '2026-06-02',
+      rawContent: 'Billing draft should not be searchable.',
+      supplements: {
+        projectTopic: 'Billing draft',
+      },
+    });
+
+    await expect(repository.getMemoryByDate('2026-06-01')).resolves.toMatchObject({
+      date: '2026-06-01',
+      status: 'generated',
+    });
+    await expect(repository.searchMemories('formatter')).resolves.toEqual([
+      expect.objectContaining({ date: '2026-06-01' }),
+    ]);
+    await expect(repository.searchMemories('Billing draft')).resolves.toEqual([]);
+    await expect(repository.searchMemories('2026-06-01')).resolves.toEqual([
+      expect.objectContaining({ date: '2026-06-01' }),
+    ]);
+  });
 });
 
 describe('getDailyMemoryDate', () => {
