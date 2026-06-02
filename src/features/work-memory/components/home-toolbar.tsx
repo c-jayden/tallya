@@ -38,9 +38,9 @@ export function HomeToolbar({
           variant="ghost"
           type="button"
           className={cn(
-            'h-[35px] cursor-pointer gap-2 rounded-xl border border-app-border bg-white px-3 text-[13px] text-app-ink-muted shadow-[0_1px_2px_rgb(0_0_0/0.03)] transition-[background-color,border-color,color,box-shadow] duration-150 hover:border-app-border-strong hover:bg-[#F9FAFB] hover:text-app-ink focus-visible:border-app-border-strong focus-visible:bg-[#F9FAFB] focus-visible:text-app-ink focus-visible:ring-0 [&_svg]:size-3.5',
+            'h-[35px] cursor-pointer gap-2 rounded-xl border border-app-border bg-app-surface px-3 text-[13px] text-app-ink-muted shadow-[0_1px_2px_rgb(0_0_0/0.03)] transition-[background-color,border-color,color,box-shadow] duration-150 hover:border-app-border-strong hover:bg-app-surface-muted hover:text-app-ink focus-visible:border-app-border-strong focus-visible:bg-app-surface-muted focus-visible:text-app-ink focus-visible:ring-0 [&_svg]:size-3.5',
             isSearchPulsing &&
-              'border-app-border-strong bg-[#F9FAFB] text-app-ink ring-4 ring-[color-mix(in_srgb,var(--app-ink)_8%,transparent)]',
+              'border-app-border-strong bg-app-surface-muted text-app-ink ring-4 ring-[color-mix(in_srgb,var(--app-ink)_8%,transparent)]',
           )}
           aria-label={`搜索记忆，快捷键 ${commandKey} K`}
           onClick={onSearchClick}
@@ -59,7 +59,7 @@ export function HomeToolbar({
           variant="ghost"
           size="icon-sm"
           type="button"
-          className="size-[35px] cursor-pointer rounded-xl text-app-ink-muted hover:bg-[#F9FAFB] hover:text-app-ink focus-visible:bg-[#F9FAFB] focus-visible:text-app-ink [&_svg]:size-3.5"
+          className="size-[35px] cursor-pointer rounded-xl text-app-ink-muted hover:bg-app-surface-muted hover:text-app-ink focus-visible:bg-app-surface-muted focus-visible:text-app-ink [&_svg]:size-3.5"
         >
           <Settings aria-hidden="true" />
           <span className="sr-only">设置</span>

@@ -16,3 +16,27 @@ export type WeeklySnapshot = {
   lastMemoryDate: string;
   lastMemorySummary: string;
 };
+
+export type DailyMemoryStatus = 'draft' | 'generated' | 'locked';
+
+export type DailyMemoryGeneratedSection = {
+  title: '今日摘要' | '完成事项' | '关键产出' | '遇到问题' | '明日计划' | '补充说明';
+  content: string[];
+};
+
+export type DailyMemoryGeneratedContent = {
+  sections: DailyMemoryGeneratedSection[];
+};
+
+export type DailyMemory = {
+  id: string;
+  date: string;
+  rawContent: string;
+  projectTopic: string;
+  tomorrowPlan: string;
+  extraNote: string;
+  generatedContent: DailyMemoryGeneratedContent | null;
+  status: DailyMemoryStatus;
+  createdAt: string;
+  updatedAt: string;
+};

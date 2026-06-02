@@ -1,4 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   displayDate,
   displayWeekday,
@@ -12,7 +23,14 @@ import { HomeToolbar } from './components/home-toolbar';
 import { MemoryEntryForm } from './components/memory-entry-form';
 import { MemoryHero } from './components/memory-hero';
 import { MemoryStatusCard } from './components/memory-status-card';
-import type { StatusVariant, TodayMemoryState } from './types';
+import { dailyMemoryRepository, getDailyMemoryDate } from './services/daily-memory-repository';
+import { mockGenerateDailyMemory } from './services/mock-generate-daily-memory';
+import type {
+  DailyMemory,
+  DailyMemoryGeneratedContent,
+  StatusVariant,
+  TodayMemoryState,
+} from './types';
 import { resizeHomeWindowToContent } from './window-sizing';
 
 function getCommandKey() {
@@ -33,7 +51,31 @@ function getStatusVariant(todayMemory: TodayMemoryState, isLocked: boolean): Sta
   return todayMemory.hasDraft ? 'draft' : 'empty';
 }
 
+function getTodayMemoryState(memory: DailyMemory | null): TodayMemoryState {
+  if (!memory) {
+    return {
+      officialStatus: 'notGenerated',
+      hasDraft: false,
+      referencedByWeeklyReport: false,
+      reportFreshness: 'fresh',
+    };
+  }
+
+  return {
+    officialStatus:
+      memory.status === 'locked'
+        ? 'locked'
+        : memory.status === 'generated'
+          ? 'generated'
+          : 'notGenerated',
+    hasDraft: memory.status === 'draft',
+    referencedByWeeklyReport: false,
+    reportFreshness: 'fresh',
+  };
+}
+
 export function WorkMemoryHome() {
+  const currentDate = getDailyMemoryDate(today);
   const [workNote, setWorkNote] = useState('');
   const [isSupplementOpen, setIsSupplementOpen] = useState(false);
   const [activeSupplementFields, setActiveSupplementFields] = useState<SupplementField[]>([]);
@@ -50,6 +92,13 @@ export function WorkMemoryHome() {
   });
   const [searchPulse, setSearchPulse] = useState(false);
   const [primaryPulse, setPrimaryPulse] = useState(false);
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
+  const [isGeneratingMemory, setIsGeneratingMemory] = useState(false);
+  const [isSavingGeneratedMemory, setIsSavingGeneratedMemory] = useState(false);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [generatedPreview, setGeneratedPreview] = useState<DailyMemoryGeneratedContent | null>(
+    null,
+  );
   const contentRef = useRef<HTMLDivElement>(null);
   const searchButtonRef = useRef<HTMLButtonElement>(null);
   const primaryActionRef = useRef<HTMLButtonElement>(null);
@@ -58,7 +107,52 @@ export function WorkMemoryHome() {
   const hasGeneratedToday = todayMemory.officialStatus !== 'notGenerated';
   const isLocked = todayMemory.officialStatus === 'locked';
   const primaryActionLabel = hasGeneratedToday ? '更新今日记录' : '整理成今日记录';
+  const saveGeneratedLabel = hasGeneratedToday ? '更新今日记录' : '保存为今日记忆';
   const statusVariant = getStatusVariant(todayMemory, isLocked);
+
+  const buildDailyMemoryInput = useCallback(() => {
+    const [projectTopicField, tomorrowPlanField, extraNoteField] = supplementFields;
+
+    return {
+      date: currentDate,
+      rawContent: workNote,
+      projectTopic: activeSupplementFields.includes(projectTopicField)
+        ? supplementValues[projectTopicField]
+        : '',
+      tomorrowPlan: activeSupplementFields.includes(tomorrowPlanField)
+        ? supplementValues[tomorrowPlanField]
+        : '',
+      extraNote: activeSupplementFields.includes(extraNoteField)
+        ? supplementValues[extraNoteField]
+        : '',
+    };
+  }, [activeSupplementFields, currentDate, supplementValues, workNote]);
+
+  const applyDailyMemory = useCallback((memory: DailyMemory | null) => {
+    setTodayMemory(getTodayMemoryState(memory));
+
+    if (!memory) {
+      return;
+    }
+
+    const [projectTopicField, tomorrowPlanField, extraNoteField] = supplementFields;
+
+    setWorkNote(memory.rawContent);
+    setSupplementValues((current) => ({
+      ...current,
+      [projectTopicField]: memory.projectTopic,
+      [tomorrowPlanField]: memory.tomorrowPlan,
+      [extraNoteField]: memory.extraNote,
+    }));
+    setActiveSupplementFields(
+      [
+        memory.projectTopic ? projectTopicField : null,
+        memory.tomorrowPlan ? tomorrowPlanField : null,
+        memory.extraNote ? extraNoteField : null,
+      ].filter((field): field is SupplementField => field !== null),
+    );
+    setIsSupplementOpen(Boolean(memory.projectTopic || memory.tomorrowPlan || memory.extraNote));
+  }, []);
 
   const pulseAction = useCallback(
     (setter: (value: boolean) => void, button: HTMLButtonElement | null) => {
@@ -70,23 +164,46 @@ export function WorkMemoryHome() {
     [],
   );
 
-  const settleTodayMemory = useCallback(() => {
-    if (isLocked) {
+  const settleTodayMemory = useCallback(async () => {
+    if (isLocked || isGeneratingMemory || isSavingDraft) {
       return;
     }
 
+    if (!workNote.trim()) {
+      toast.warning('先写点内容再整理');
+      return;
+    }
+
+    setIsGeneratingMemory(true);
     pulseAction(setPrimaryPulse, primaryActionRef.current);
-    setTodayMemory((current) => ({
-      ...current,
-      officialStatus: 'generated',
-      hasDraft: false,
-      reportFreshness: current.referencedByWeeklyReport ? 'stale' : current.reportFreshness,
-    }));
-  }, [isLocked, pulseAction]);
+
+    try {
+      const generatedContent = await mockGenerateDailyMemory(buildDailyMemoryInput());
+
+      setGeneratedPreview(generatedContent);
+      setIsPreviewOpen(true);
+    } finally {
+      setIsGeneratingMemory(false);
+    }
+  }, [buildDailyMemoryInput, isGeneratingMemory, isLocked, isSavingDraft, pulseAction, workNote]);
 
   const triggerSearch = useCallback(() => {
     pulseAction(setSearchPulse, searchButtonRef.current);
   }, [pulseAction]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    void dailyMemoryRepository.getByDate(currentDate).then((memory) => {
+      if (isMounted) {
+        applyDailyMemory(memory);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [applyDailyMemory, currentDate]);
 
   useEffect(() => {
     function handleShortcut(event: KeyboardEvent) {
@@ -156,12 +273,50 @@ export function WorkMemoryHome() {
     );
   }
 
-  function saveDraft() {
-    if (isLocked) {
+  async function saveDraft() {
+    if (isLocked || isSavingDraft || isGeneratingMemory) {
       return;
     }
 
-    setTodayMemory((current) => ({ ...current, hasDraft: true }));
+    if (!workNote.trim()) {
+      toast.warning('先写点内容再保存');
+      return;
+    }
+
+    setIsSavingDraft(true);
+
+    try {
+      const memory = await dailyMemoryRepository.saveDraft(buildDailyMemoryInput());
+
+      setTodayMemory(getTodayMemoryState(memory));
+      toast.success('草稿已保存');
+    } finally {
+      setIsSavingDraft(false);
+    }
+  }
+
+  async function saveGeneratedMemory() {
+    if (!generatedPreview || isSavingGeneratedMemory) {
+      return;
+    }
+
+    setIsSavingGeneratedMemory(true);
+
+    try {
+      const memory = await dailyMemoryRepository.saveGenerated({
+        ...buildDailyMemoryInput(),
+        generatedContent: generatedPreview,
+      });
+
+      setTodayMemory((current) => ({
+        ...getTodayMemoryState(memory),
+        reportFreshness: current.referencedByWeeklyReport ? 'stale' : current.reportFreshness,
+      }));
+      setIsPreviewOpen(false);
+      toast.success(hasGeneratedToday ? '今日记录已更新' : '今日记忆已保存');
+    } finally {
+      setIsSavingGeneratedMemory(false);
+    }
   }
 
   function unlockMemory() {
@@ -197,7 +352,9 @@ export function WorkMemoryHome() {
             activeSupplementFields={activeSupplementFields}
             commandKey={commandKey}
             isLocked={isLocked}
+            isGeneratingMemory={isGeneratingMemory}
             isPrimaryPulsing={primaryPulse}
+            isSavingDraft={isSavingDraft}
             primaryActionLabel={primaryActionLabel}
             primaryActionRef={primaryActionRef}
             supplementFields={supplementFields}
@@ -220,6 +377,47 @@ export function WorkMemoryHome() {
           />
         </div>
       </section>
+      <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
+        <DialogContent className="max-w-[min(calc(100%-2rem),560px)] gap-0 p-0">
+          <DialogHeader className="px-5 pt-5 pb-3">
+            <DialogTitle>今日记忆预览</DialogTitle>
+            <DialogDescription>确认后会保存为今天唯一一条工作记忆。</DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[58vh] overflow-y-auto px-5 pb-4">
+            <div className="grid gap-3">
+              {generatedPreview?.sections.map((section) => (
+                <section
+                  key={section.title}
+                  className="rounded-lg border border-app-border bg-app-surface px-3 py-2.5"
+                >
+                  <h3 className="text-[13px] font-semibold text-app-ink">{section.title}</h3>
+                  <ul className="mt-1.5 grid gap-1 text-[13px] leading-[1.55] text-app-ink-muted">
+                    {section.content.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </section>
+              ))}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setIsPreviewOpen(false)}
+              disabled={isSavingGeneratedMemory}
+            >
+              取消
+            </Button>
+            <Button type="button" onClick={saveGeneratedMemory} disabled={isSavingGeneratedMemory}>
+              {isSavingGeneratedMemory ? (
+                <Loader2 className="animate-spin" aria-hidden="true" />
+              ) : null}
+              {saveGeneratedLabel}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </main>
   );
 }
