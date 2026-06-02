@@ -1,13 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  CalendarRange,
-  FileClock,
-  FileText,
-  Search,
-  Settings,
-  Sparkles,
-  Trophy,
-} from 'lucide-react';
+import { Search, Settings, Sparkles } from 'lucide-react';
 import './App.css';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -35,47 +27,31 @@ const supplementPlaceholders: Record<string, string> = {
   协作沟通: '例如：同步交付风险和排期',
 };
 
-const recentMemories = [
-  {
-    date: '今天',
-    content: '推进客户需求评审，明确阶段交付范围，并同步风险事项。',
-  },
-  {
-    date: '昨天',
-    content: '修复订单导出异常，补充回归用例，整理发布说明。',
-  },
-  {
-    date: '周一',
-    content: '完成新人任务拆解，沉淀一份接口联调检查清单。',
-  },
-];
+const weeklySnapshot = {
+  settledDays: 3,
+  lastMemoryDate: '昨天',
+  lastMemorySummary: '修复订单导出异常，补充回归用例。',
+};
 
-const quickGenerates = [
-  {
-    label: '本周周报',
-    description: '汇总本周工作重点',
-    icon: FileText,
-  },
-  {
-    label: '本月月报',
-    description: '整理阶段成果',
-    icon: CalendarRange,
-  },
-  {
-    label: '自定义范围',
-    description: '按任意时间生成',
-    icon: FileClock,
-  },
-  {
-    label: '绩效素材',
-    description: '提炼可证明的产出',
-    icon: Trophy,
-  },
-];
+type OfficialMemoryStatus = 'notGenerated' | 'generated' | 'locked';
+type ReportFreshness = 'fresh' | 'stale';
+
+type TodayMemoryState = {
+  officialStatus: OfficialMemoryStatus;
+  hasDraft: boolean;
+  referencedByWeeklyReport: boolean;
+  reportFreshness: ReportFreshness;
+};
 
 function App() {
   const [workNote, setWorkNote] = useState('');
   const [activeSupplements, setActiveSupplements] = useState<string[]>([]);
+  const [todayMemory, setTodayMemory] = useState<TodayMemoryState>({
+    officialStatus: 'notGenerated',
+    hasDraft: false,
+    referencedByWeeklyReport: false,
+    reportFreshness: 'fresh',
+  });
   const [searchPulse, setSearchPulse] = useState(false);
   const [primaryPulse, setPrimaryPulse] = useState(false);
   const searchButtonRef = useRef<HTMLButtonElement>(null);
@@ -85,6 +61,16 @@ function App() {
     typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/i.test(navigator.platform)
       ? 'Cmd'
       : 'Ctrl';
+  const hasGeneratedToday = todayMemory.officialStatus !== 'notGenerated';
+  const isLocked = todayMemory.officialStatus === 'locked';
+  const primaryActionLabel = hasGeneratedToday ? '更新今日记录' : '整理成今日记录';
+  const statusVariant = isLocked
+    ? 'locked'
+    : todayMemory.officialStatus === 'generated'
+      ? 'settled'
+      : todayMemory.hasDraft
+        ? 'draft'
+        : 'empty';
 
   const pulseAction = useCallback(
     (setter: (value: boolean) => void, button: HTMLButtonElement | null) => {
@@ -95,6 +81,20 @@ function App() {
     },
     [],
   );
+
+  const settleTodayMemory = useCallback(() => {
+    if (isLocked) {
+      return;
+    }
+
+    pulseAction(setPrimaryPulse, primaryActionRef.current);
+    setTodayMemory((current) => ({
+      ...current,
+      officialStatus: 'generated',
+      hasDraft: false,
+      reportFreshness: current.referencedByWeeklyReport ? 'stale' : current.reportFreshness,
+    }));
+  }, [isLocked, pulseAction]);
 
   useEffect(() => {
     function handleShortcut(event: KeyboardEvent) {
@@ -111,7 +111,7 @@ function App() {
 
       if (event.key === 'Enter') {
         event.preventDefault();
-        pulseAction(setPrimaryPulse, primaryActionRef.current);
+        settleTodayMemory();
       }
     }
 
@@ -122,7 +122,7 @@ function App() {
       pulseTimeoutsRef.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
       pulseTimeoutsRef.current = [];
     };
-  }, [pulseAction]);
+  }, [pulseAction, settleTodayMemory]);
 
   function toggleSupplement(tag: string) {
     setActiveSupplements((current) => {
@@ -134,13 +134,26 @@ function App() {
     });
   }
 
+  function saveDraft() {
+    if (isLocked) {
+      return;
+    }
+
+    setTodayMemory((current) => ({ ...current, hasDraft: true }));
+  }
+
+  function unlockMemory() {
+    setTodayMemory((current) => ({
+      ...current,
+      officialStatus: 'generated',
+      reportFreshness: 'stale',
+    }));
+  }
+
   return (
     <main className="app-shell">
       <section className="workspace" aria-label="工作记忆首页">
         <header className="topbar">
-          <div className="brand-mark" aria-label="职迹">
-            职迹
-          </div>
           <div className="topbar-actions">
             <Button
               ref={searchButtonRef}
@@ -181,6 +194,7 @@ function App() {
             value={workNote}
             onChange={(event) => setWorkNote(event.currentTarget.value)}
             placeholder="例如：推进客户需求评审，联调导出接口，修复权限问题，明天继续验收。"
+            disabled={isLocked}
           />
           <div className="template-row" aria-label="补充记录项">
             {templateTags.map((tag) => (
@@ -192,6 +206,7 @@ function App() {
                 className={`template-chip ${activeSupplements.includes(tag) ? 'is-active' : ''}`}
                 aria-label={`添加${tag}字段`}
                 onClick={() => toggleSupplement(tag)}
+                disabled={isLocked}
               >
                 + {tag}
               </Button>
@@ -206,6 +221,7 @@ function App() {
                     type="text"
                     aria-label={`${tag}补充内容`}
                     placeholder={supplementPlaceholders[tag]}
+                    disabled={isLocked}
                   />
                 </label>
               ))}
@@ -213,65 +229,79 @@ function App() {
           ) : null}
           <div className="primary-actions">
             <Button
+              type="button"
+              variant="ghost"
+              className="draft-action"
+              onClick={saveDraft}
+              disabled={isLocked}
+            >
+              保存草稿
+            </Button>
+            <Button
               ref={primaryActionRef}
               type="button"
               className={`primary-action ${primaryPulse ? 'is-pulsing' : ''}`}
-              aria-label={`整理成今日记录，快捷键 ${commandKey} Enter`}
-              onClick={() => pulseAction(setPrimaryPulse, primaryActionRef.current)}
+              aria-label={`${primaryActionLabel}，快捷键 ${commandKey} Enter`}
+              onClick={settleTodayMemory}
+              disabled={isLocked}
             >
               <Sparkles aria-hidden="true" />
-              整理成今日记录
-            </Button>
-            <Button type="button" variant="ghost" className="draft-action">
-              保存草稿
+              {primaryActionLabel}
             </Button>
           </div>
         </section>
 
-        <section className="memory-section" aria-labelledby="recent-memory-title">
-          <div className="section-heading">
-            <h2 id="recent-memory-title" className="section-title">
-              最近工作记忆
-            </h2>
-            <Button type="button" variant="ghost" size="xs" className="view-all-button">
-              查看全部
-            </Button>
+        <section className={`status-section status-${statusVariant}`} aria-label="工作记忆状态">
+          <div className="status-copy">
+            {isLocked ? (
+              <>
+                <strong>本周周报已生成</strong>
+                <p>本周工作记忆已归档，修改历史记录需先解锁。</p>
+                <small>该记录已被周报引用，修改后相关报告可能需要重新生成。</small>
+              </>
+            ) : todayMemory.officialStatus === 'generated' ? (
+              <>
+                <strong>今日记忆已沉淀</strong>
+                <p>你可以继续补充内容并重新整理。</p>
+                {todayMemory.reportFreshness === 'stale' ? (
+                  <small>相关报告需要重新生成。</small>
+                ) : null}
+              </>
+            ) : todayMemory.hasDraft ? (
+              <>
+                <strong>草稿已保存</strong>
+                <p>还没有生成正式工作记忆，整理后会沉淀为今天唯一一条正式记录。</p>
+              </>
+            ) : (
+              <>
+                <strong>本周已沉淀 {weeklySnapshot.settledDays} 天</strong>
+                <p>
+                  上次记录：{weeklySnapshot.lastMemoryDate}，{weeklySnapshot.lastMemorySummary}
+                </p>
+              </>
+            )}
           </div>
-          <ol className="timeline-list">
-            {recentMemories.map((memory) => (
-              <li key={`${memory.date}-${memory.content}`} className="timeline-item">
-                <span className="timeline-marker" aria-hidden="true" />
-                <div className="timeline-content">
-                  <div className="timeline-meta">{memory.date}</div>
-                  <p>{memory.content}</p>
-                  <div className="timeline-actions" aria-label={`${memory.date}记忆操作`}>
-                    <Button type="button" variant="ghost" size="xs">
-                      查看
-                    </Button>
-                    <Button type="button" variant="ghost" size="xs">
-                      生成报告
-                    </Button>
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ol>
-        </section>
-
-        <section className="quick-section" aria-labelledby="quick-generate-title">
-          <h2 id="quick-generate-title" className="section-title">
-            从记忆生成
-          </h2>
-          <div className="generate-grid">
-            {quickGenerates.map(({ label, description, icon: Icon }) => (
-              <Button key={label} variant="ghost" type="button" className="generate-card">
-                <Icon aria-hidden="true" />
-                <span>
-                  <strong>{label}</strong>
-                  <small>{description}</small>
-                </span>
+          <div className="status-actions">
+            {isLocked ? (
+              <Button
+                type="button"
+                variant="ghost"
+                className="status-action"
+                onClick={unlockMemory}
+              >
+                解锁修改
               </Button>
-            ))}
+            ) : null}
+            <Button type="button" variant="ghost" className="status-action">
+              {isLocked
+                ? '查看周报'
+                : todayMemory.officialStatus === 'generated'
+                  ? '查看今日记忆'
+                  : '查看记忆'}
+            </Button>
+            <Button type="button" variant="ghost" className="status-action">
+              {isLocked ? '查看记忆' : '生成报告'}
+            </Button>
           </div>
         </section>
       </section>
