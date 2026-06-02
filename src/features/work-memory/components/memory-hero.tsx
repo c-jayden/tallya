@@ -3,7 +3,7 @@ export function MemoryHero() {
     <section className="mb-4 grid gap-0" aria-labelledby="today-title">
       <h1
         id="today-title"
-        className="mb-2 text-[30px] leading-[1.15] font-bold tracking-normal text-app-ink max-[560px]:text-[28px]"
+        className="mb-2 text-3xl leading-[1.15] font-bold tracking-normal text-app-ink max-[560px]:text-[28px]"
       >
         今天做了什么？
       </h1>

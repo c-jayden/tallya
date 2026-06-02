@@ -54,11 +54,11 @@ export function MemoryEntryForm({
 
   return (
     <section
-      className={cn('grid gap-0', isSupplementOpen ? 'mb-5' : 'mb-[30px]')}
+      className={cn('grid gap-0', isSupplementOpen ? 'mb-5' : 'mb-7.5')}
       aria-label="记录今日工作"
     >
       <Textarea
-        className="h-[138px] min-h-[138px] resize-none rounded-xl border-app-border bg-app-surface px-5 pt-[22px] pb-[18px] text-sm leading-[1.62] text-app-ink shadow-none transition-[border-color,box-shadow,background-color] duration-150 placeholder:text-[var(--app-placeholder)] focus-visible:border-app-border-strong focus-visible:bg-app-surface focus-visible:ring-[3px] focus-visible:ring-[color-mix(in_srgb,var(--app-ink)_6%,transparent)] max-[600px]:h-[136px] max-[600px]:min-h-[136px]"
+        className="h-34.5 min-h-34.5 resize-none rounded-xl border-app-border bg-app-surface px-5 pt-5.5 pb-4.5 text-sm leading-[1.62] text-app-ink shadow-none transition-[border-color,box-shadow,background-color] duration-150 placeholder:text-[var(--app-placeholder)] focus-visible:border-app-border-strong focus-visible:bg-app-surface focus-visible:ring-3 focus-visible:ring-[color-mix(in_srgb,var(--app-ink)_6%,transparent)] max-[600px]:h-34 max-[600px]:min-h-34"
         value={workNote}
         onChange={(event) => onWorkNoteChange(event.currentTarget.value)}
         placeholder="例如：上午推进需求讨论，下午整理方案并同步进展，明天继续跟进剩余问题。"
@@ -154,7 +154,7 @@ export function MemoryEntryForm({
         <Button
           type="button"
           variant="ghost"
-          className="h-[39px] cursor-pointer gap-1.5 rounded-xl px-2.5 text-sm text-app-ink-muted hover:bg-app-surface-muted hover:text-app-ink focus-visible:bg-app-surface-muted focus-visible:text-app-ink [&_svg]:size-3.5"
+          className="h-9.75 cursor-pointer gap-1.5 rounded-xl px-2.5 text-sm text-app-ink-muted hover:bg-app-surface-muted hover:text-app-ink focus-visible:bg-app-surface-muted focus-visible:text-app-ink [&_svg]:size-3.5"
           onClick={onSaveDraft}
           disabled={isLocked || isSavingDraft || isGeneratingMemory}
           aria-busy={isSavingDraft}
@@ -170,7 +170,7 @@ export function MemoryEntryForm({
           ref={primaryActionRef}
           type="button"
           className={cn(
-            'h-[39px] cursor-pointer rounded-xl px-3.5 text-sm font-semibold shadow-none transition-[background-color,box-shadow,transform] duration-150 hover:shadow-[0_4px_10px_rgb(24_24_27/0.08)] focus-visible:shadow-[0_4px_10px_rgb(24_24_27/0.08)] [&_svg]:size-3 [&_svg]:opacity-80',
+            'h-9.75 cursor-pointer rounded-xl px-3.5 text-sm font-semibold shadow-none transition-[background-color,box-shadow,transform] duration-150 hover:shadow-[0_4px_10px_rgb(24_24_27/0.08)] focus-visible:shadow-[0_4px_10px_rgb(24_24_27/0.08)] [&_svg]:size-3 [&_svg]:opacity-80',
             isPrimaryPulsing && '-translate-y-px shadow-[0_4px_10px_rgb(24_24_27/0.08)]',
           )}
           aria-label={`${primaryActionLabel}，快捷键 ${commandKey} Enter`}

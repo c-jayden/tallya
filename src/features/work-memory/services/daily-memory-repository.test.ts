@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import {
-  LocalStorageDailyMemoryRepository,
-  getDailyMemoryDate,
-} from './services/daily-memory-repository';
-import { mockGenerateDailyMemory } from './services/mock-generate-daily-memory';
+import { LocalStorageDailyMemoryRepository, getDailyMemoryDate } from './daily-memory-repository';
+import { mockGenerateDailyMemory } from './mock-generate-daily-memory';
 
 class MemoryStorage implements Storage {
   private readonly values = new Map<string, string>();

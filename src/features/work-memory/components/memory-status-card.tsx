@@ -34,12 +34,12 @@ export function MemoryStatusCard({
   return (
     <section
       className={cn(
-        'flex items-start justify-between gap-4 rounded-xl border border-app-border bg-app-surface px-3 py-[11px] max-[560px]:flex-col max-[560px]:gap-2.5',
+        'flex items-start justify-between gap-4 rounded-xl border border-app-border bg-app-surface px-3 py-2.75 max-[560px]:flex-col max-[560px]:gap-2.5',
         statusVariant === 'locked' && 'border-app-border-strong',
       )}
       aria-label="工作记忆状态"
     >
-      <div className="min-w-0 [&_p]:mt-[3px] [&_p]:text-[13px] [&_p]:leading-normal [&_p]:text-app-ink-muted [&_small]:mt-1 [&_small]:block [&_small]:text-xs [&_small]:leading-[1.45] [&_small]:text-app-ink-subtle [&_strong]:block [&_strong]:text-[13.5px] [&_strong]:leading-[1.35] [&_strong]:font-[590] [&_strong]:text-app-ink">
+      <div className="min-w-0 [&_p]:mt-0.75 [&_p]:text-[13px] [&_p]:leading-normal [&_p]:text-app-ink-muted [&_small]:mt-1 [&_small]:block [&_small]:text-xs [&_small]:leading-[1.45] [&_small]:text-app-ink-subtle [&_strong]:block [&_strong]:text-[13.5px] [&_strong]:leading-[1.35] [&_strong]:font-[590] [&_strong]:text-app-ink">
         {isLocked ? (
           <>
             <strong>本周周报已生成</strong>

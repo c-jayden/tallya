@@ -63,7 +63,9 @@ export class LocalStorageDailyMemoryRepository {
   }
 
   async getMemoryByDate(date: string) {
-    return this.readAll().find((memory) => memory.date === date && isGeneratedMemory(memory)) ?? null;
+    return (
+      this.readAll().find((memory) => memory.date === date && isGeneratedMemory(memory)) ?? null
+    );
   }
 
   async searchMemories(keyword: string) {
@@ -84,9 +86,13 @@ export class LocalStorageDailyMemoryRepository {
     return this.upsert({
       ...input,
       generated:
-        existing?.status === 'generated' || existing?.status === 'locked' ? existing.generated : null,
+        existing?.status === 'generated' || existing?.status === 'locked'
+          ? existing.generated
+          : null,
       status:
-        existing?.status === 'generated' || existing?.status === 'locked' ? existing.status : 'draft',
+        existing?.status === 'generated' || existing?.status === 'locked'
+          ? existing.status
+          : 'draft',
     });
   }
 
@@ -175,7 +181,10 @@ function getSearchableMemoryText(memory: DailyMemory) {
     generated?.extraNote,
   ];
 
-  return parts.filter((part): part is string => Boolean(part)).join('\n').toLowerCase();
+  return parts
+    .filter((part): part is string => Boolean(part))
+    .join('\n')
+    .toLowerCase();
 }
 
 function normalizeDailyMemory(value: unknown): DailyMemory | null {
@@ -257,7 +266,9 @@ function normalizeGenerated(value: unknown): DailyMemoryGeneratedContent | null 
   const input = value as Record<string, unknown>;
   const summary = typeof input.summary === 'string' ? input.summary.trim() : '';
   const completedItems = Array.isArray(input.completedItems)
-    ? input.completedItems.filter((item): item is string => typeof item === 'string' && Boolean(item.trim()))
+    ? input.completedItems.filter(
+        (item): item is string => typeof item === 'string' && Boolean(item.trim()),
+      )
     : [];
 
   if (!summary || completedItems.length === 0) {
@@ -295,7 +306,9 @@ function normalizeLegacyGenerated(value: unknown): DailyMemoryGeneratedContent |
     }) as { content?: unknown } | undefined;
 
     return Array.isArray(section?.content)
-      ? section.content.filter((item): item is string => typeof item === 'string' && Boolean(item.trim()))
+      ? section.content.filter(
+          (item): item is string => typeof item === 'string' && Boolean(item.trim()),
+        )
       : [];
   };
   const summary = getSectionItems('今日摘要')[0] ?? '';
