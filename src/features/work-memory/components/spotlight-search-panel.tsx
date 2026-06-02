@@ -27,6 +27,44 @@ type SpotlightSearchPanelProps = {
   onOpenMemory: (memory: DailyMemory) => void;
 };
 
+type HighlightedTextProps = {
+  text: string;
+  keyword: string;
+};
+
+function HighlightedText({ text, keyword }: HighlightedTextProps) {
+  const normalizedKeyword = keyword.trim();
+
+  if (!normalizedKeyword) {
+    return text;
+  }
+
+  const parts = text.split(new RegExp(`(${escapeRegExp(normalizedKeyword)})`, 'gi'));
+
+  return (
+    <>
+      {parts.map((part, index) => {
+        const isMatch = part.toLowerCase() === normalizedKeyword.toLowerCase();
+
+        return isMatch ? (
+          <mark
+            key={`${part}-${index}`}
+            className="rounded bg-[#FEF3C7]/75 px-0.5 font-medium text-amber-950 dark:bg-amber-300/15 dark:text-amber-100"
+          >
+            {part}
+          </mark>
+        ) : (
+          part
+        );
+      })}
+    </>
+  );
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 export function SpotlightSearchPanel({
   open,
   keyword,
@@ -101,6 +139,9 @@ export function SpotlightSearchPanel({
                 {results.map((memory, index) => {
                   const snippet = getMemorySnippet(memory, keyword);
                   const relativeDate = getRelativeMemoryDate(memory.date, currentDate);
+                  const dateLabel = `${formatMemoryDate(memory.date)}${
+                    relativeDate ? ` · ${relativeDate}` : ''
+                  }`;
                   const isActive = index === activeIndex;
 
                   return (
@@ -115,15 +156,15 @@ export function SpotlightSearchPanel({
                       onClick={() => onOpenMemory(memory)}
                     >
                       <p className="text-xs leading-4 text-app-ink-subtle">
-                        {formatMemoryDate(memory.date)}
-                        {relativeDate ? ` · ${relativeDate}` : ''}
+                        <HighlightedText text={dateLabel} keyword={keyword} />
                       </p>
                       <p className="mt-1 line-clamp-2 text-[14.5px] leading-[1.55] text-app-ink">
-                        {getMemorySummary(memory)}
+                        <HighlightedText text={getMemorySummary(memory)} keyword={keyword} />
                       </p>
                       {snippet ? (
                         <p className="mt-1 line-clamp-1 text-[13px] leading-[1.45] text-app-ink-muted">
-                          匹配：{snippet}
+                          匹配：
+                          <HighlightedText text={snippet} keyword={keyword} />
                         </p>
                       ) : null}
                     </button>
