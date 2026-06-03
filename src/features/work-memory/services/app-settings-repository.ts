@@ -32,10 +32,11 @@ export type AppSettings = {
 };
 
 const STORAGE_KEY = 'tallya.app-settings.v1';
+export const DEFAULT_CODEX_COMMAND = 'codex';
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
   aiProviderId: 'ai-codex-cli',
-  codexCommand: 'codex',
+  codexCommand: DEFAULT_CODEX_COMMAND,
   openAICompatible: {
     baseUrl: '',
     apiKey: '',

@@ -7,8 +7,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
+import { Textarea } from '@/components/ui/textarea';
 import type { AppSettings } from '../../services/app-settings-repository';
-import { Field, SectionHeader, SwitchField } from './settings-shared';
+import { Field, SwitchField } from './settings-shared';
 import { weekdays } from './settings-types';
 
 type NotificationSettingsSectionProps = {
@@ -21,13 +22,7 @@ export function NotificationSettingsSection({
   onUpdateSettings,
 }: NotificationSettingsSectionProps) {
   return (
-    <section className="space-y-5" aria-labelledby="notification-settings-title">
-      <SectionHeader
-        id="notification-settings-title"
-        title="通知提醒"
-        description="到点提醒你记录工作，后续可用于周报提醒。"
-      />
-
+    <section className="space-y-5" aria-label="通知提醒">
       <div className="space-y-3">
         <SwitchField
           label="启用每日记录提醒"
@@ -44,9 +39,9 @@ export function NotificationSettingsSection({
             />
           </Field>
           <Field label="提醒文案">
-            <Input
+            <Textarea
               value={settings.dailyReminderMessage}
-              className="bg-app-surface"
+              className="min-h-20 resize-none bg-app-surface"
               onChange={(event) => onUpdateSettings({ dailyReminderMessage: event.target.value })}
             />
           </Field>
@@ -61,7 +56,7 @@ export function NotificationSettingsSection({
           checked={settings.weeklyReminderEnabled}
           onCheckedChange={(checked) => onUpdateSettings({ weeklyReminderEnabled: checked })}
         />
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2">
           <Field label="星期">
             <Select
               value={settings.weeklyReminderWeekday}
@@ -87,13 +82,17 @@ export function NotificationSettingsSection({
               onChange={(event) => onUpdateSettings({ weeklyReminderTime: event.target.value })}
             />
           </Field>
-          <Field label="提醒文案">
-            <Input
-              value={settings.weeklyReminderMessage}
-              className="bg-app-surface"
-              onChange={(event) => onUpdateSettings({ weeklyReminderMessage: event.target.value })}
-            />
-          </Field>
+          <div className="sm:col-span-2">
+            <Field label="提醒文案">
+              <Textarea
+                value={settings.weeklyReminderMessage}
+                className="min-h-20 resize-none bg-app-surface"
+                onChange={(event) =>
+                  onUpdateSettings({ weeklyReminderMessage: event.target.value })
+                }
+              />
+            </Field>
+          </div>
         </div>
       </div>
 

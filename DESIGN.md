@@ -105,7 +105,7 @@ The home screen's core task is always:
 - Structure AI settings as provider management first, provider-specific configuration second.
 - Do not expose Mock or development-only providers in user-facing settings.
 - Settings persistence must go through repository/service modules, not direct component storage access.
-- Codex command is user-configurable and must not be hard-coded in the provider.
+- Codex command uses an internal default unless an explicit advanced setting is requested. Do not expose command-path configuration in the lightweight settings UI.
 - Provider health checks should use a shared model such as `unknown`, `checking`, `available`, and `unavailable`.
 - AI failures should show friendly messages and preserve user input.
 - Test generation from settings must not save a formal work memory.

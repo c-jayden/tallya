@@ -1,13 +1,7 @@
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
+import { cn } from '@/lib/utils';
 import type { AppSettings, AppTheme } from '../../services/app-settings-repository';
-import { Field, SectionHeader, SwitchField } from './settings-shared';
+import { Field, SwitchField } from './settings-shared';
 import { themeOptions } from './settings-types';
 
 type AppSettingsSectionProps = {
@@ -17,29 +11,29 @@ type AppSettingsSectionProps = {
 
 export function AppSettingsSection({ settings, onUpdateSettings }: AppSettingsSectionProps) {
   return (
-    <section className="space-y-5" aria-labelledby="app-settings-title">
-      <SectionHeader id="app-settings-title" title="应用设置" />
+    <section className="space-y-5" aria-label="应用设置">
+      <Field label="主题">
+        <div className="inline-flex w-fit rounded-lg border border-app-border bg-app-surface p-1">
+          {themeOptions.map((option) => {
+            const isActive = settings.theme === option.value;
 
-      <div className="space-y-3">
-        <h3 className="text-sm font-semibold text-app-ink">外观</h3>
-        <Field label="主题">
-          <Select
-            value={settings.theme}
-            onValueChange={(value) => onUpdateSettings({ theme: value as AppTheme })}
-          >
-            <SelectTrigger className="w-full bg-app-surface">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {themeOptions.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Field>
-      </div>
+            return (
+              <button
+                key={option.value}
+                type="button"
+                className={cn(
+                  'h-8 cursor-pointer rounded-md px-3 text-sm text-app-ink-muted transition-colors hover:bg-slate-50 hover:text-app-ink focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none disabled:cursor-not-allowed dark:hover:bg-app-surface-muted',
+                  isActive &&
+                    'bg-slate-100 font-semibold text-app-ink hover:bg-slate-100 dark:bg-app-surface-muted dark:hover:bg-app-surface-muted',
+                )}
+                onClick={() => onUpdateSettings({ theme: option.value as AppTheme })}
+              >
+                {option.label}
+              </button>
+            );
+          })}
+        </div>
+      </Field>
 
       <Separator />
 
@@ -60,7 +54,6 @@ export function AppSettingsSection({ settings, onUpdateSettings }: AppSettingsSe
           checked={settings.startMinimized}
           onCheckedChange={(checked) => onUpdateSettings({ startMinimized: checked })}
         />
-        <p className="text-sm text-app-ink-subtle">部分启动与托盘行为需要系统权限支持。</p>
       </div>
 
       <Separator />

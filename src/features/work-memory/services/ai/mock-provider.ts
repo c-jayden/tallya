@@ -1,4 +1,4 @@
-import { mockGenerateDailyMemory } from '../mock-generate-daily-memory';
+import { mockGenerateDailyMemory } from './mock-generate-daily-memory';
 import type { AIProvider } from './ai-provider';
 
 export const mockProvider: AIProvider = {

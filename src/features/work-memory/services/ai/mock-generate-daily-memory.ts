@@ -1,4 +1,4 @@
-import type { GeneratedDailyMemory, GenerateDailyMemoryInput } from '../types';
+import type { GeneratedDailyMemory, GenerateDailyMemoryInput } from '../../types';
 
 function firstSentence(value: string) {
   const normalized = value.trim().replace(/\s+/g, ' ');

@@ -3,25 +3,6 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import type { ProviderHealth } from './settings-types';
 
-export function SectionHeader({
-  id,
-  title,
-  description,
-}: {
-  id: string;
-  title: string;
-  description?: string;
-}) {
-  return (
-    <div className="space-y-1.5">
-      <h2 id={id} className="text-[15px] leading-5 font-semibold text-app-ink">
-        {title}
-      </h2>
-      {description && <p className="text-sm text-app-ink-subtle">{description}</p>}
-    </div>
-  );
-}
-
 export function Field({
   label,
   description,

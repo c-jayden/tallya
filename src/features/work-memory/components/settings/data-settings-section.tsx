@@ -1,11 +1,8 @@
 import { Button } from '@/components/ui/button';
-import { SectionHeader } from './settings-shared';
 
 export function DataSettingsSection({ onRequestClear }: { onRequestClear: () => void }) {
   return (
-    <section className="space-y-6" aria-labelledby="data-settings-title">
-      <SectionHeader id="data-settings-title" title="数据管理" />
-
+    <section className="space-y-6" aria-label="数据管理">
       <div className="space-y-1.5">
         <div className="text-sm font-semibold text-app-ink">本地数据</div>
         <p className="text-sm text-app-ink-subtle">你的工作记忆默认保存在本机。</p>
