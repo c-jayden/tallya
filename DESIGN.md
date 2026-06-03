@@ -17,6 +17,12 @@ The home screen's core task is always:
 
 > 今天做了什么？
 
+## Product Personality
+
+Tallya is a quiet, restrained, and reliable local work memory assistant.
+
+It does not rush users, create pressure, use exaggerated language, or turn work records into performance supervision. It should feel like a long-term record keeper: gently helping users put down what happened today, then retrieving it later for weekly reports, reviews, performance notes, handoffs, or search.
+
 ## Design Principles
 
 - Keep the product minimal, local-first, and non-intrusive.
@@ -113,6 +119,13 @@ The home screen's core task is always:
 ## Copy
 
 - Use concise Chinese labels.
+- Copy should be gentle, restrained, and clear.
+- Avoid bossy, supervisory, overexcited, or overly cute language.
+- Avoid words such as `必须`, `立即`, `马上`, `赶紧`, and avoid unnecessary exclamation marks.
+- Reminder copy should prefer soft openings such as `可以...`.
+- Prefer words such as `沉淀`, `整理`, `回顾`, `留下`, and `继续跟进`.
+- Do not make users feel like they missed an obligation.
+- Do not use `日报` as the core product concept. Prefer `工作记忆`, `沉淀`, and `整理`.
 - Status text should be explicit and close to its related action, for example:
   - `状态：尚未检测`
   - `状态：可用`
@@ -121,6 +134,13 @@ The home screen's core task is always:
 - Do not imply future system integrations are already active. Use light notes such as:
   - `提醒配置会保存在本机，系统通知能力将在接入后生效。`
   - `部分启动与托盘行为需要系统权限支持。`
+- Copy examples:
+  - Avoid: `快来填写今天的日报！`
+  - Avoid: `你还没有记录工作！`
+  - Avoid: `立即生成周报！`
+  - Prefer: `可以花一分钟沉淀一下今天的工作。`
+  - Prefer: `今天还没有工作记忆。`
+  - Prefer: `可以整理一下这周的工作脉络了。`
 
 ## Code Organization
 

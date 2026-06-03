@@ -15,9 +15,11 @@ export type SettingsContentProps = {
   providerHealth: ProviderHealth;
   testResult: TestResult;
   isCheckingProvider: boolean;
+  isSendingTestNotification: boolean;
   isTestingCodex: boolean;
   onUpdateSettings: (patch: Partial<AppSettings>) => void;
   onCheckHealth: () => void;
+  onSendTestNotification: () => void;
   onTestGenerate: () => void;
   onRequestClear: () => void;
 };
@@ -47,9 +49,11 @@ function SettingsSectionContent({
   providerHealth,
   testResult,
   isCheckingProvider,
+  isSendingTestNotification,
   isTestingCodex,
   onUpdateSettings,
   onCheckHealth,
+  onSendTestNotification,
   onTestGenerate,
   onRequestClear,
 }: SettingsContentProps) {
@@ -69,7 +73,14 @@ function SettingsSectionContent({
   }
 
   if (activeSection === 'notifications') {
-    return <NotificationSettingsSection settings={settings} onUpdateSettings={onUpdateSettings} />;
+    return (
+      <NotificationSettingsSection
+        settings={settings}
+        isSendingTestNotification={isSendingTestNotification}
+        onUpdateSettings={onUpdateSettings}
+        onSendTestNotification={onSendTestNotification}
+      />
+    );
   }
 
   if (activeSection === 'app') {

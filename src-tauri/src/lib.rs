@@ -6,9 +6,17 @@ use std::{
     thread,
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
+#[cfg(target_os = "windows")]
+use tauri::Manager;
+#[cfg(not(target_os = "windows"))]
+use tauri_plugin_notification::NotificationExt;
 
 const CODEX_CLI_TIMEOUT: Duration = Duration::from_secs(60);
 const CODEX_CLI_CHECK_TIMEOUT: Duration = Duration::from_secs(8);
+#[cfg(target_os = "windows")]
+const TALLYA_NOTIFICATION_APP_ID: &str = "com.tallya";
+#[cfg(target_os = "windows")]
+const TALLYA_NOTIFICATION_APP_NAME: &str = "Tallya";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -71,6 +79,68 @@ async fn generate_daily_memory_with_codex(
         eprintln!("Codex task join failed: {error}");
         "Codex 生成失败，请检查 Codex CLI 是否可用。".to_string()
     })?
+}
+
+#[tauri::command]
+fn send_tallya_notification(app: tauri::AppHandle, body: String) -> Result<(), String> {
+    send_system_notification(app, body).map_err(|error| {
+        eprintln!("Failed to send Tallya notification: {error}");
+        "发送测试通知失败，请检查系统通知权限。".to_string()
+    })
+}
+
+#[cfg(target_os = "windows")]
+fn send_system_notification(app: tauri::AppHandle, body: String) -> Result<(), String> {
+    use tauri_winrt_notification::{Duration as ToastDuration, Scenario, Toast};
+
+    ensure_windows_notification_app_id()?;
+
+    let app_for_activation = app.clone();
+
+    Toast::new(TALLYA_NOTIFICATION_APP_ID)
+        .title(TALLYA_NOTIFICATION_APP_NAME)
+        .text1(&body)
+        .duration(ToastDuration::Short)
+        .scenario(Scenario::Reminder)
+        .on_activated(move |_| {
+            focus_main_window(&app_for_activation);
+            Ok(())
+        })
+        .show()
+        .map_err(|error| error.to_string())
+}
+
+#[cfg(target_os = "windows")]
+fn ensure_windows_notification_app_id() -> Result<(), String> {
+    let key = windows_registry::CURRENT_USER
+        .create(format!(
+            r"SOFTWARE\Classes\AppUserModelId\{TALLYA_NOTIFICATION_APP_ID}"
+        ))
+        .map_err(|error| error.to_string())?;
+
+    key.set_string("DisplayName", TALLYA_NOTIFICATION_APP_NAME)
+        .map_err(|error| error.to_string())?;
+    key.set_string("IconBackgroundColor", "0")
+        .map_err(|error| error.to_string())
+}
+
+#[cfg(target_os = "windows")]
+fn focus_main_window(app: &tauri::AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.show();
+        let _ = window.unminimize();
+        let _ = window.set_focus();
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+fn send_system_notification(app: tauri::AppHandle, body: String) -> Result<(), String> {
+    app.notification()
+        .builder()
+        .title("Tallya")
+        .body(body)
+        .show()
+        .map_err(|error| error.to_string())
 }
 
 fn run_codex_daily_memory_generation(
@@ -386,11 +456,13 @@ fn normalize_optional_string(value: Option<String>) -> Option<String> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             greet,
             check_codex_cli,
-            generate_daily_memory_with_codex
+            generate_daily_memory_with_codex,
+            send_tallya_notification
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

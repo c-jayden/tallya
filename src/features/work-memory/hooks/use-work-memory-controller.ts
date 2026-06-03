@@ -138,7 +138,7 @@ export function useWorkMemoryController({ currentDate }: UseWorkMemoryController
     }
 
     if (!workNote.trim()) {
-      toast.warning('先写点内容再整理');
+      toast.warning('可以先写一点内容，再整理成工作记忆');
       return;
     }
 
@@ -205,7 +205,7 @@ export function useWorkMemoryController({ currentDate }: UseWorkMemoryController
     }
 
     if (!workNote.trim()) {
-      toast.warning('先写点内容再保存');
+      toast.warning('可以先写一点内容，再保存草稿');
       return;
     }
 

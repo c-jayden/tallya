@@ -1,3 +1,5 @@
+import { Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -8,19 +10,29 @@ import {
 } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
-import type { AppSettings } from '../../services/app-settings-repository';
+import {
+  DEFAULT_APP_SETTINGS,
+  type AppSettings,
+} from '../../services/app-settings-repository';
 import { Field, SwitchField } from './settings-shared';
 import { weekdays } from './settings-types';
 
 type NotificationSettingsSectionProps = {
   settings: AppSettings;
+  isSendingTestNotification: boolean;
   onUpdateSettings: (patch: Partial<AppSettings>) => void;
+  onSendTestNotification: () => void;
 };
 
 export function NotificationSettingsSection({
   settings,
+  isSendingTestNotification,
   onUpdateSettings,
+  onSendTestNotification,
 }: NotificationSettingsSectionProps) {
+  const isDailyReminderDisabled = !settings.dailyReminderEnabled;
+  const isWeeklyReminderDisabled = !settings.weeklyReminderEnabled;
+
   return (
     <section className="space-y-5" aria-label="通知提醒">
       <div className="space-y-3">
@@ -35,13 +47,16 @@ export function NotificationSettingsSection({
               type="time"
               value={settings.dailyReminderTime}
               className="bg-app-surface"
+              disabled={isDailyReminderDisabled}
               onChange={(event) => onUpdateSettings({ dailyReminderTime: event.target.value })}
             />
           </Field>
           <Field label="提醒文案">
             <Textarea
               value={settings.dailyReminderMessage}
+              placeholder={DEFAULT_APP_SETTINGS.dailyReminderMessage}
               className="min-h-16 resize-none bg-app-surface"
+              disabled={isDailyReminderDisabled}
               onChange={(event) => onUpdateSettings({ dailyReminderMessage: event.target.value })}
             />
           </Field>
@@ -61,6 +76,7 @@ export function NotificationSettingsSection({
             <Field label="星期">
               <Select
                 value={settings.weeklyReminderWeekday}
+                disabled={isWeeklyReminderDisabled}
                 onValueChange={(value) => onUpdateSettings({ weeklyReminderWeekday: value })}
               >
                 <SelectTrigger className="w-full bg-app-surface">
@@ -80,6 +96,7 @@ export function NotificationSettingsSection({
                 type="time"
                 value={settings.weeklyReminderTime}
                 className="bg-app-surface"
+                disabled={isWeeklyReminderDisabled}
                 onChange={(event) => onUpdateSettings({ weeklyReminderTime: event.target.value })}
               />
             </Field>
@@ -88,7 +105,9 @@ export function NotificationSettingsSection({
             <Field label="提醒文案">
               <Textarea
                 value={settings.weeklyReminderMessage}
+                placeholder={DEFAULT_APP_SETTINGS.weeklyReminderMessage}
                 className="min-h-16 resize-none bg-app-surface"
+                disabled={isWeeklyReminderDisabled}
                 onChange={(event) =>
                   onUpdateSettings({ weeklyReminderMessage: event.target.value })
                 }
@@ -98,9 +117,22 @@ export function NotificationSettingsSection({
         </div>
       </div>
 
-      <p className="text-sm text-app-ink-subtle">
-        提醒配置会保存在本机，系统通知能力将在接入后生效。
-      </p>
+      <div className="space-y-2">
+        <Button
+          type="button"
+          variant="outline"
+          disabled={isSendingTestNotification}
+          onClick={onSendTestNotification}
+        >
+          {isSendingTestNotification && (
+            <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+          )}
+          发送测试通知
+        </Button>
+        <p className="text-sm text-app-ink-subtle">
+          提醒会通过系统通知发送，应用需要在后台运行。
+        </p>
+      </div>
     </section>
   );
 }

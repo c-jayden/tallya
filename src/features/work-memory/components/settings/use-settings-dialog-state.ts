@@ -8,6 +8,7 @@ import {
   type AppSettings,
 } from '../../services/app-settings-repository';
 import { getDailyMemoryDate } from '../../services/daily-memory-repository';
+import { reminderService } from '../../services/reminder-service';
 import {
   testMemoryInput,
   type ProviderHealth,
@@ -26,15 +27,21 @@ const initialProviderHealth: ProviderHealth = {
 };
 
 const initialTestResult: TestResult = { type: 'idle' };
+const SETTINGS_SAVE_DEBOUNCE_MS = 500;
 
 export function useSettingsDialogState({ open, onClearLocalData }: UseSettingsDialogStateOptions) {
   const { setTheme } = useTheme();
   const asyncRunId = useRef(0);
+  const settingsSaveRunId = useRef(0);
+  const latestSettingsRef = useRef<AppSettings>(DEFAULT_APP_SETTINGS);
+  const pendingSettingsRef = useRef<AppSettings | null>(null);
+  const saveTimeoutRef = useRef<number | null>(null);
   const [activeSection, setActiveSection] = useState<SettingsSection>('ai');
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_APP_SETTINGS);
   const [isLoadingSettings, setIsLoadingSettings] = useState(false);
   const [isCheckingProvider, setIsCheckingProvider] = useState(false);
   const [isTestingCodex, setIsTestingCodex] = useState(false);
+  const [isSendingTestNotification, setIsSendingTestNotification] = useState(false);
   const [isClearingData, setIsClearingData] = useState(false);
   const [isClearConfirmOpen, setIsClearConfirmOpen] = useState(false);
   const [providerHealth, setProviderHealth] = useState<ProviderHealth>(initialProviderHealth);
@@ -47,10 +54,14 @@ export function useSettingsDialogState({ open, onClearLocalData }: UseSettingsDi
 
     let isMounted = true;
 
+    clearPendingSettingsSave();
+
     void appSettingsRepository
       .getSettings()
       .then((savedSettings) => {
         if (isMounted) {
+          latestSettingsRef.current = savedSettings;
+          pendingSettingsRef.current = null;
           setSettings(savedSettings);
           setTheme(savedSettings.theme);
         }
@@ -66,13 +77,23 @@ export function useSettingsDialogState({ open, onClearLocalData }: UseSettingsDi
     };
   }, [open, setTheme]);
 
-  async function saveSettings(nextSettings: AppSettings) {
+  async function persistSettings(nextSettings: AppSettings) {
+    clearPendingSettingsSave();
+    pendingSettingsRef.current = null;
+
+    const runId = ++settingsSaveRunId.current;
+
     setSettings(nextSettings);
 
     try {
       const savedSettings = await appSettingsRepository.saveSettings(nextSettings);
-      setSettings(savedSettings);
+      if (runId === settingsSaveRunId.current) {
+        latestSettingsRef.current = savedSettings;
+        pendingSettingsRef.current = null;
+        setSettings(savedSettings);
+      }
       setTheme(savedSettings.theme);
+      void reminderService.reschedule(savedSettings);
 
       return savedSettings;
     } catch {
@@ -82,8 +103,49 @@ export function useSettingsDialogState({ open, onClearLocalData }: UseSettingsDi
     }
   }
 
+  function clearPendingSettingsSave() {
+    if (saveTimeoutRef.current !== null) {
+      window.clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = null;
+    }
+  }
+
+  function scheduleSettingsSave(nextSettings: AppSettings) {
+    pendingSettingsRef.current = nextSettings;
+    clearPendingSettingsSave();
+
+    saveTimeoutRef.current = window.setTimeout(() => {
+      saveTimeoutRef.current = null;
+
+      if (pendingSettingsRef.current) {
+        void persistSettings(pendingSettingsRef.current);
+      }
+    }, SETTINGS_SAVE_DEBOUNCE_MS);
+  }
+
+  function flushPendingSettingsSave() {
+    const pendingSettings = pendingSettingsRef.current;
+
+    if (!pendingSettings) {
+      return;
+    }
+
+    clearPendingSettingsSave();
+    void persistSettings(pendingSettings);
+  }
+
   function updateSettings(patch: Partial<AppSettings>) {
-    void saveSettings({ ...settings, ...patch });
+    const nextSettings = { ...latestSettingsRef.current, ...patch };
+
+    settingsSaveRunId.current += 1;
+    latestSettingsRef.current = nextSettings;
+    setSettings(nextSettings);
+
+    if (patch.theme) {
+      setTheme(nextSettings.theme);
+    }
+
+    scheduleSettingsSave(nextSettings);
   }
 
   async function checkProviderHealth() {
@@ -93,7 +155,7 @@ export function useSettingsDialogState({ open, onClearLocalData }: UseSettingsDi
     setProviderHealth({ status: 'checking', message: '正在检测连接...' });
 
     try {
-      await saveSettings(normalizeCodexCommand(settings));
+      await persistSettings(normalizeCodexCommand(latestSettingsRef.current));
       const health = await aiService.checkHealth();
 
       if (runId === asyncRunId.current) {
@@ -121,7 +183,7 @@ export function useSettingsDialogState({ open, onClearLocalData }: UseSettingsDi
     setTestResult(initialTestResult);
 
     try {
-      await saveSettings(normalizeCodexCommand(settings));
+      await persistSettings(normalizeCodexCommand(latestSettingsRef.current));
       const generated = await aiService.generateDailyMemory({
         date: getDailyMemoryDate(),
         rawContent: testMemoryInput,
@@ -155,11 +217,26 @@ export function useSettingsDialogState({ open, onClearLocalData }: UseSettingsDi
     }
   }
 
+  async function sendTestNotification() {
+    setIsSendingTestNotification(true);
+
+    try {
+      await reminderService.sendTestNotification();
+      toast.success('测试通知已发送');
+    } catch {
+      toast.error('发送测试通知失败，请检查系统通知权限。');
+    } finally {
+      setIsSendingTestNotification(false);
+    }
+  }
+
   function resetTransientState() {
+    flushPendingSettingsSave();
     asyncRunId.current += 1;
     setActiveSection('ai');
     setIsClearConfirmOpen(false);
     setIsCheckingProvider(false);
+    setIsSendingTestNotification(false);
     setIsTestingCodex(false);
     setProviderHealth(initialProviderHealth);
     setTestResult(initialTestResult);
@@ -174,10 +251,12 @@ export function useSettingsDialogState({ open, onClearLocalData }: UseSettingsDi
     isClearConfirmOpen,
     isClearingData,
     isLoadingSettings,
+    isSendingTestNotification,
     isTestingCodex,
     setActiveSection,
     setIsClearConfirmOpen,
     settings,
+    sendTestNotification,
     testGenerate,
     testResult,
     updateSettings,

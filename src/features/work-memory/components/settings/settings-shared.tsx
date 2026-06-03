@@ -33,14 +33,15 @@ export function SwitchField({
   onCheckedChange: (checked: boolean) => void;
 }) {
   return (
-    <label className="flex items-center justify-between gap-3 text-sm">
+    <div className="flex items-center justify-between gap-3 text-sm">
       <span className="font-medium text-app-ink-muted">{label}</span>
       <Switch
+        aria-label={label}
         checked={checked}
         className="cursor-pointer disabled:cursor-not-allowed"
         onCheckedChange={onCheckedChange}
       />
-    </label>
+    </div>
   );
 }
 
