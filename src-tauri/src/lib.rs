@@ -7,13 +7,8 @@ use std::{
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
-#[cfg(target_os = "windows")]
-const CODEX_CLI_COMMANDS: &[&str] = &["codex.cmd", "codex.exe", "codex"];
-
-#[cfg(not(target_os = "windows"))]
-const CODEX_CLI_COMMANDS: &[&str] = &["codex"];
-
 const CODEX_CLI_TIMEOUT: Duration = Duration::from_secs(60);
+const CODEX_CLI_CHECK_TIMEOUT: Duration = Duration::from_secs(8);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -54,23 +49,37 @@ fn greet(name: &str) -> String {
 }
 
 #[tauri::command]
-async fn generate_daily_memory_with_codex(
-    input: GenerateDailyMemoryInput,
-) -> Result<GeneratedDailyMemory, String> {
-    tauri::async_runtime::spawn_blocking(move || run_codex_daily_memory_generation(input))
+async fn check_codex_cli(command: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || run_codex_cli_check(command))
         .await
         .map_err(|error| {
-            eprintln!("Codex task join failed: {error}");
-            "Codex 生成失败，请检查 Codex CLI 是否可用。".to_string()
+            eprintln!("Codex check task join failed: {error}");
+            "未检测到 Codex，请检查命令路径或登录状态。".to_string()
         })?
+}
+
+#[tauri::command]
+async fn generate_daily_memory_with_codex(
+    input: GenerateDailyMemoryInput,
+    codex_command: String,
+) -> Result<GeneratedDailyMemory, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        run_codex_daily_memory_generation(input, codex_command)
+    })
+    .await
+    .map_err(|error| {
+        eprintln!("Codex task join failed: {error}");
+        "Codex 生成失败，请检查 Codex CLI 是否可用。".to_string()
+    })?
 }
 
 fn run_codex_daily_memory_generation(
     input: GenerateDailyMemoryInput,
+    codex_command: String,
 ) -> Result<GeneratedDailyMemory, String> {
     let prompt = build_codex_prompt(&input);
     let output_path = create_codex_output_path();
-    let mut child = spawn_codex_cli(&output_path)?;
+    let mut child = spawn_codex_cli(&codex_command, &output_path)?;
 
     if let Some(mut stdin) = child.stdin.take() {
         stdin.write_all(prompt.as_bytes()).map_err(|error| {
@@ -122,11 +131,14 @@ fn run_codex_daily_memory_generation(
     Err("生成超时，请稍后重试。".to_string())
 }
 
-fn spawn_codex_cli(output_path: &std::path::Path) -> Result<std::process::Child, String> {
+fn spawn_codex_cli(
+    command: &str,
+    output_path: &std::path::Path,
+) -> Result<std::process::Child, String> {
     let mut last_error = None;
 
-    for command in CODEX_CLI_COMMANDS {
-        match Command::new(command)
+    for command in get_command_candidates(command)? {
+        match Command::new(&command)
             .args([
                 "exec",
                 "--ephemeral",
@@ -165,15 +177,108 @@ fn spawn_codex_cli(output_path: &std::path::Path) -> Result<std::process::Child,
     Err("Codex 生成失败，请检查 Codex CLI 是否可用。".to_string())
 }
 
+fn run_codex_cli_check(command: String) -> Result<String, String> {
+    let mut last_error = None;
+
+    for command in get_command_candidates(&command)? {
+        match Command::new(&command)
+            .arg("--version")
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+        {
+            Ok(mut child) => {
+                let started_at = Instant::now();
+
+                while started_at.elapsed() < CODEX_CLI_CHECK_TIMEOUT {
+                    match child.try_wait() {
+                        Ok(Some(_)) => {
+                            let output = child.wait_with_output().map_err(|error| {
+                                eprintln!("Failed to read Codex check output: {error}");
+                                "未检测到 Codex，请检查命令路径或登录状态。".to_string()
+                            })?;
+
+                            if !output.status.success() {
+                                eprintln!(
+                                    "Codex check exited with {:?}: {}",
+                                    output.status.code(),
+                                    String::from_utf8_lossy(&output.stderr)
+                                );
+                                return Err(
+                                    "未检测到 Codex，请检查命令路径或登录状态。".to_string()
+                                );
+                            }
+
+                            let version =
+                                String::from_utf8_lossy(&output.stdout).trim().to_string();
+                            let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+
+                            return Ok(if !version.is_empty() {
+                                version
+                            } else if !stderr.is_empty() {
+                                stderr
+                            } else {
+                                "Codex 可用".to_string()
+                            });
+                        }
+                        Ok(None) => thread::sleep(Duration::from_millis(100)),
+                        Err(error) => {
+                            eprintln!("Failed to poll Codex check: {error}");
+                            let _ = child.kill();
+                            return Err("未检测到 Codex，请检查命令路径或登录状态。".to_string());
+                        }
+                    }
+                }
+
+                let _ = child.kill();
+                return Err("检测 Codex 超时，请稍后重试。".to_string());
+            }
+            Err(error) => {
+                eprintln!("Failed to start Codex check with {command}: {error}");
+                last_error = Some(error);
+            }
+        }
+    }
+
+    if let Some(error) = last_error {
+        eprintln!("Failed to check Codex CLI after trying candidates: {error}");
+    }
+
+    Err("未检测到 Codex，请检查命令路径或登录状态。".to_string())
+}
+
+fn get_command_candidates(command: &str) -> Result<Vec<String>, String> {
+    let command = command.trim().trim_matches('"');
+
+    if command.is_empty() {
+        return Err("未检测到 Codex，请检查命令路径或登录状态。".to_string());
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        let path = std::path::Path::new(command);
+        let is_plain_command =
+            !command.contains('\\') && !command.contains('/') && path.extension().is_none();
+
+        if is_plain_command {
+            return Ok(vec![
+                command.to_string(),
+                format!("{command}.cmd"),
+                format!("{command}.exe"),
+            ]);
+        }
+    }
+
+    Ok(vec![command.to_string()])
+}
+
 fn build_codex_prompt(input: &GenerateDailyMemoryInput) -> String {
     let input_json = serde_json::to_string(input).unwrap_or_else(|_| "{}".to_string());
 
     format!(
         r#"把输入整理为中文今日工作记忆。只输出合法 JSON，不要 markdown、解释、代码块或工具调用。
 JSON keys: summary:string, completedItems:string[], keyOutcome?:string, problems?:string, tomorrowPlan?:string, extraNote?:string.
-规则：不编造；只做轻度归纳和润色；未提及的可选字段用 "" 或省略。
-completedItems：必须是字符串数组，控制在 3-5 条；合并相近事项；每条尽量是完整动作；不要把同一件事拆成过多细碎步骤。
-keyOutcome：有明确可交付成果时直接提炼；没有明确成果但有多个完成事项时，保守总结一个阶段性产出；不要虚构业务结果或夸大价值。输入很少且无法判断时才留空。
+规则：不编造；只做轻度归纳和润色；未提及的可选字段用 "" 或省略。completedItems 必须是字符串数组，控制在 3-5 条；合并相近事项；每条尽量是完整动作；不要把同一件事拆成过多细碎步骤。keyOutcome 有明确可交付成果时直接提炼；没有明确成果但有多个完成事项时，保守总结一个阶段性产出；不要虚构业务结果或夸大价值。输入很少且无法判断时才留空。
 输入：{input_json}
 "#
     )
@@ -284,6 +389,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             greet,
+            check_codex_cli,
             generate_daily_memory_with_codex
         ])
         .run(tauri::generate_context!())

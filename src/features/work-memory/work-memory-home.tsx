@@ -5,6 +5,7 @@ import {
   supplementPlaceholders,
   today,
 } from './constants';
+import { useState } from 'react';
 import { DailyMemoryPreviewDialog } from './components/daily-memory-preview-dialog';
 import { HomeToolbar } from './components/home-toolbar';
 import { MemoryEntryForm } from './components/memory-entry-form';
@@ -12,6 +13,7 @@ import { MemoryDetailDialog } from './components/memory-detail-dialog';
 import { MemoryHero } from './components/memory-hero';
 import { MemoryListDialog } from './components/memory-list-dialog';
 import { MemoryStatusCard } from './components/memory-status-card';
+import { SettingsDialog } from './components/settings-dialog';
 import { SpotlightSearchPanel } from './components/spotlight-search-panel';
 import { useHomeWindowSizing } from './hooks/use-home-window-sizing';
 import { useMemorySearch } from './hooks/use-memory-search';
@@ -27,6 +29,7 @@ function getCommandKey() {
 }
 
 export function WorkMemoryHome() {
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const currentDate = getDailyMemoryDate(today);
   const commandKey = getCommandKey();
   const contentRef = useHomeWindowSizing();
@@ -55,6 +58,7 @@ export function WorkMemoryHome() {
             searchButtonRef={search.searchButtonRef}
             weekday={displayWeekday}
             onSearchClick={search.openSearchPanel}
+            onSettingsClick={() => setIsSettingsOpen(true)}
           />
 
           <MemoryHero />
@@ -129,6 +133,11 @@ export function WorkMemoryHome() {
         currentDate={currentDate}
         onOpenChange={memory.setIsMemoryDialogOpen}
         onEditOriginal={memory.editOriginalRecord}
+      />
+      <SettingsDialog
+        open={isSettingsOpen}
+        onOpenChange={setIsSettingsOpen}
+        onClearLocalData={memory.clearLocalData}
       />
     </main>
   );

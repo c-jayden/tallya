@@ -267,6 +267,27 @@ export function useWorkMemoryController({ currentDate }: UseWorkMemoryController
     setIsMemoryListOpen(true);
   }
 
+  async function clearLocalData() {
+    await dailyMemoryRepository.clearLocalData();
+    const [projectTopicField, tomorrowPlanField, extraNoteField] = supplementFields;
+
+    setWorkNote('');
+    setActiveSupplementFields([]);
+    setSupplementValues({
+      [projectTopicField]: '',
+      [tomorrowPlanField]: '',
+      [extraNoteField]: '',
+    });
+    setIsSupplementOpen(false);
+    setGeneratedPreview(null);
+    setViewingMemory(null);
+    setMemoryListItems([]);
+    setIsPreviewOpen(false);
+    setIsMemoryDialogOpen(false);
+    setIsMemoryListOpen(false);
+    applyDailyMemory(null, []);
+  }
+
   function openMemoryDetail(memory: DailyMemory) {
     if (!memory.generated) {
       return;
@@ -292,6 +313,7 @@ export function useWorkMemoryController({ currentDate }: UseWorkMemoryController
 
   return {
     activeSupplementFields,
+    clearLocalData,
     editOriginalRecord,
     generatedPreview,
     isGeneratingMemory,

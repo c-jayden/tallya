@@ -10,6 +10,7 @@ type HomeToolbarProps = {
   searchButtonRef: Ref<HTMLButtonElement>;
   weekday: string;
   onSearchClick: () => void;
+  onSettingsClick: () => void;
 };
 
 export function HomeToolbar({
@@ -19,6 +20,7 @@ export function HomeToolbar({
   searchButtonRef,
   weekday,
   onSearchClick,
+  onSettingsClick,
 }: HomeToolbarProps) {
   return (
     <header className="mb-3 flex h-9 items-center justify-between overflow-visible">
@@ -53,6 +55,7 @@ export function HomeToolbar({
           size="icon-sm"
           type="button"
           className="size-8.75 cursor-pointer rounded-xl text-app-ink-muted hover:bg-app-surface-muted hover:text-app-ink focus-visible:bg-app-surface-muted focus-visible:text-app-ink [&_svg]:size-3.5"
+          onClick={onSettingsClick}
         >
           <Settings aria-hidden="true" />
           <span className="sr-only">设置</span>

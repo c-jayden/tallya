@@ -245,6 +245,29 @@ describe('LocalStorageDailyMemoryRepository', () => {
       expect.objectContaining({ date: '2026-06-01' }),
     ]);
   });
+
+  it('clears all local data', async () => {
+    const repository = new LocalStorageDailyMemoryRepository(new MemoryStorage());
+
+    await repository.saveDraft({
+      date: '2026-06-02',
+      rawContent: 'Draft to remove.',
+      supplements: {},
+    });
+    await repository.saveGenerated({
+      date: '2026-06-03',
+      rawContent: 'Memory to remove.',
+      supplements: {},
+      generated: {
+        summary: 'Memory to remove',
+        completedItems: ['Saved memory'],
+      },
+    });
+
+    await repository.clearLocalData();
+
+    await expect(repository.list()).resolves.toEqual([]);
+  });
 });
 
 describe('getDailyMemoryDate', () => {

@@ -72,6 +72,10 @@ export class LocalStorageDailyMemoryRepository {
     );
   }
 
+  async clearLocalData() {
+    this.writeAll([]);
+  }
+
   async searchMemories(keyword: string) {
     const normalizedKeyword = keyword.trim().toLowerCase();
 
