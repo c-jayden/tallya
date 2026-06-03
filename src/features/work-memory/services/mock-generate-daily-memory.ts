@@ -1,9 +1,4 @@
-import type { DailyMemoryGeneratedContent, DailyMemorySupplements } from '../types';
-
-type MockGenerateDailyMemoryInput = {
-  rawContent: string;
-  supplements: DailyMemorySupplements;
-};
+import type { GeneratedDailyMemory, GenerateDailyMemoryInput } from '../types';
 
 function firstSentence(value: string) {
   const normalized = value.trim().replace(/\s+/g, ' ');
@@ -25,9 +20,10 @@ function splitWorkItems(value: string) {
 }
 
 export async function mockGenerateDailyMemory(
-  input: MockGenerateDailyMemoryInput,
-): Promise<DailyMemoryGeneratedContent> {
-  const projectTopic = input.supplements.projectTopic?.trim();
+  input: GenerateDailyMemoryInput,
+): Promise<GeneratedDailyMemory> {
+  const supplements = input.supplements ?? {};
+  const projectTopic = supplements.projectTopic?.trim();
   const summaryPrefix = projectTopic ? `${projectTopic}：` : '';
 
   return {
@@ -35,7 +31,7 @@ export async function mockGenerateDailyMemory(
     completedItems: splitWorkItems(input.rawContent),
     keyOutcome: '形成了一份可继续沉淀到今日记忆的工作记录。',
     problems: undefined,
-    tomorrowPlan: input.supplements.tomorrowPlan?.trim() || undefined,
-    extraNote: input.supplements.extraNote?.trim() || undefined,
+    tomorrowPlan: supplements.tomorrowPlan?.trim() || undefined,
+    extraNote: supplements.extraNote?.trim() || undefined,
   };
 }

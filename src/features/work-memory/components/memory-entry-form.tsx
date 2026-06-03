@@ -1,5 +1,6 @@
 import type { Ref } from 'react';
 import { Loader2, PencilLine, Sparkles } from 'lucide-react';
+import { TallyaScrollArea } from '@/components/tallya-scroll-area';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
@@ -57,13 +58,15 @@ export function MemoryEntryForm({
       className={cn('grid gap-0', isSupplementOpen ? 'mb-5' : 'mb-7.5')}
       aria-label="记录今日工作"
     >
-      <Textarea
-        className="h-26 min-h-26 resize-none rounded-xl border-app-border bg-app-surface p-4 text-sm leading-[1.62] text-app-ink shadow-none transition-[border-color,box-shadow,background-color] duration-150 placeholder:text-[var(--app-placeholder)] focus-visible:border-app-border-strong focus-visible:bg-app-surface focus-visible:ring-3 focus-visible:ring-[color-mix(in_srgb,var(--app-ink)_6%,transparent)] max-[600px]:h-26 max-[600px]:min-h-26"
-        value={workNote}
-        onChange={(event) => onWorkNoteChange(event.currentTarget.value)}
-        placeholder="例如：上午推进需求讨论，下午整理方案并同步进展，明天继续跟进剩余问题。"
-        disabled={isLocked}
-      />
+      <TallyaScrollArea className="tallya-textarea-scroll h-26 min-h-26 rounded-xl border border-app-border bg-app-surface shadow-none transition-[border-color,box-shadow,background-color] duration-150 focus-within:border-app-border-strong focus-within:bg-app-surface focus-within:ring-3 focus-within:ring-[color-mix(in_srgb,var(--app-ink)_6%,transparent)] max-[600px]:h-26 max-[600px]:min-h-26">
+        <Textarea
+          className="block min-h-full resize-none overflow-hidden rounded-none border-0 bg-transparent p-3 text-sm leading-6 text-app-ink shadow-none outline-none placeholder:text-[var(--app-placeholder)] focus-visible:border-0 focus-visible:ring-0 disabled:cursor-not-allowed disabled:opacity-50"
+          value={workNote}
+          onChange={(event) => onWorkNoteChange(event.currentTarget.value)}
+          placeholder="例如：上午推进需求讨论，下午整理方案并同步进展，明天继续跟进剩余问题。"
+          disabled={isLocked}
+        />
+      </TallyaScrollArea>
       <div className="flex pt-2.5" aria-label="补充记录项">
         <Button
           variant="ghost"
@@ -183,7 +186,7 @@ export function MemoryEntryForm({
           ) : (
             <Sparkles aria-hidden="true" />
           )}
-          {primaryActionLabel}
+          {isGeneratingMemory ? '整理中...' : primaryActionLabel}
         </Button>
       </div>
     </section>

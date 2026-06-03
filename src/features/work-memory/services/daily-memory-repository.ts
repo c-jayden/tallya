@@ -275,7 +275,7 @@ function normalizeGenerated(value: unknown): DailyMemoryGeneratedContent | null 
       )
     : [];
 
-  if (!summary || completedItems.length === 0) {
+  if (!summary) {
     return null;
   }
 

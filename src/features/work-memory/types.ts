@@ -26,7 +26,13 @@ export type DailyMemorySupplements = {
   extraNote?: string;
 };
 
-export type DailyMemoryGeneratedContent = {
+export type GenerateDailyMemoryInput = {
+  date: string;
+  rawContent: string;
+  supplements?: DailyMemorySupplements;
+};
+
+export type GeneratedDailyMemory = {
   summary: string;
   completedItems: string[];
   keyOutcome?: string;
@@ -34,6 +40,8 @@ export type DailyMemoryGeneratedContent = {
   tomorrowPlan?: string;
   extraNote?: string;
 };
+
+export type DailyMemoryGeneratedContent = GeneratedDailyMemory;
 
 export type DailyMemoryPreviewSection = {
   title: '今日摘要' | '完成事项' | '关键产出' | '遇到问题' | '明日计划' | '补充说明';

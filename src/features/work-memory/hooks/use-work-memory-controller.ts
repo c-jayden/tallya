@@ -7,8 +7,8 @@ import {
   getTodayMemoryState,
   getWeeklySnapshotFromMemories,
 } from '../memory-view-model';
+import { aiService } from '../services/ai/ai-service';
 import { dailyMemoryRepository } from '../services/daily-memory-repository';
-import { mockGenerateDailyMemory } from '../services/mock-generate-daily-memory';
 import type {
   DailyMemory,
   DailyMemoryGeneratedContent,
@@ -146,10 +146,14 @@ export function useWorkMemoryController({ currentDate }: UseWorkMemoryController
     pulseAction(setPrimaryPulse);
 
     try {
-      const generatedContent = await mockGenerateDailyMemory(buildDailyMemoryInput());
+      const generatedContent = await aiService.generateDailyMemory(buildDailyMemoryInput());
 
       setGeneratedPreview(generatedContent);
       setIsPreviewOpen(true);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'AI 生成失败，请稍后重试。';
+
+      toast.error(message);
     } finally {
       setIsGeneratingMemory(false);
     }

@@ -1,5 +1,6 @@
 import { Search, X } from 'lucide-react';
 import type { KeyboardEvent as ReactKeyboardEvent, RefObject } from 'react';
+import { TallyaScrollArea } from '@/components/tallya-scroll-area';
 import { cn } from '@/lib/utils';
 import {
   formatMemoryDate,
@@ -89,7 +90,7 @@ export function SpotlightSearchPanel({
     <div
       data-state={panelState}
       aria-hidden={!open}
-      className="tallya-search-overlay fixed inset-0 z-50 cursor-pointer bg-[color-mix(in_srgb,var(--app-bg)_72%,transparent)] backdrop-blur-[3px]"
+      className="tallya-search-overlay fixed inset-0 z-50 cursor-pointer bg-[color-mix(in_srgb,var(--app-bg)_46%,rgb(15_23_42/0.34))] backdrop-blur-[3px]"
       onMouseDown={onClose}
     >
       <div
@@ -136,7 +137,7 @@ export function SpotlightSearchPanel({
             </span>
           </div>
           {hasKeyword && !isComposing ? (
-            <div className="min-h-0 flex-1 overflow-y-auto p-2">
+            <TallyaScrollArea className="min-h-0 flex-1 p-2">
               {results.length > 0 ? (
                 <div className="grid gap-1">
                   {results.map((memory, index) => {
@@ -184,7 +185,7 @@ export function SpotlightSearchPanel({
                   </p>
                 </div>
               )}
-            </div>
+            </TallyaScrollArea>
           ) : null}
         </div>
       </div>

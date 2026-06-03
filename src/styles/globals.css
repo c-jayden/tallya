@@ -264,7 +264,7 @@
 
 .tallya-memory-overlay {
   animation: none !important;
-  background: color-mix(in srgb, var(--app-bg) 72%, transparent) !important;
+  background: color-mix(in srgb, var(--app-bg) 46%, rgb(15 23 42 / 0.34)) !important;
   opacity: 0;
   pointer-events: none !important;
   backdrop-filter: blur(3px);
@@ -273,6 +273,57 @@
 .tallya-memory-overlay[data-state='open'] {
   opacity: 1;
   pointer-events: auto !important;
+}
+
+.os-theme-tallya {
+  box-sizing: border-box;
+  --os-size: 6px;
+  --os-padding-perpendicular: 0;
+  --os-padding-axis: 0;
+  --os-track-border-radius: 999px;
+  --os-track-bg: transparent;
+  --os-track-bg-hover: transparent;
+  --os-track-bg-active: transparent;
+  --os-track-border: none;
+  --os-track-border-hover: none;
+  --os-track-border-active: none;
+  --os-handle-border-radius: 999px;
+  --os-handle-bg: rgb(15 23 42 / 0.28);
+  --os-handle-bg-hover: rgb(15 23 42 / 0.45);
+  --os-handle-bg-active: rgb(15 23 42 / 0.45);
+  --os-handle-border: none;
+  --os-handle-border-hover: none;
+  --os-handle-border-active: none;
+  --os-handle-min-size: 32px;
+  --os-handle-max-size: none;
+  --os-handle-perpendicular-size: 100%;
+  --os-handle-perpendicular-size-hover: 100%;
+  --os-handle-perpendicular-size-active: 100%;
+  --os-handle-interactive-area-offset: 4px;
+}
+
+.tallya-scroll-area {
+  min-width: 0;
+}
+
+.tallya-scroll-area [data-overlayscrollbars-contents] {
+  min-width: 0;
+}
+
+.tallya-textarea-scroll [data-overlayscrollbars-contents] {
+  min-height: 100%;
+}
+
+.tallya-scroll-area .os-scrollbar-vertical {
+  top: 6px !important;
+  right: 4px;
+  bottom: 6px !important;
+}
+
+.tallya-scroll-area .os-scrollbar-horizontal {
+  right: 6px !important;
+  bottom: 4px;
+  left: 6px !important;
 }
 
 .tallya-motion-panel {
@@ -287,6 +338,7 @@
   animation: none !important;
   opacity: 0;
   pointer-events: none !important;
+  box-shadow: 0 24px 70px rgb(15 23 42 / 0.18);
 }
 
 .tallya-dialog-content[data-state='open'] {

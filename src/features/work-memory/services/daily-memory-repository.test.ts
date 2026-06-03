@@ -98,6 +98,7 @@ describe('LocalStorageDailyMemoryRepository', () => {
       now: () => new Date('2026-06-02T09:00:00+08:00'),
     });
     const generated = await mockGenerateDailyMemory({
+      date: '2026-06-02',
       rawContent: 'Implemented draft save and generated preview.',
       supplements: {
         tomorrowPlan: 'Run build.',

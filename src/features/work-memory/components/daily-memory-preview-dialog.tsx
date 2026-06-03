@@ -1,5 +1,6 @@
 import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { TallyaScrollArea } from '@/components/tallya-scroll-area';
 import {
   Dialog,
   DialogContent,
@@ -30,14 +31,21 @@ export function DailyMemoryPreviewDialog({
 }: DailyMemoryPreviewDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[calc(100vh-72px)] w-[min(620px,calc(100vw-48px))] max-w-none flex-col gap-0 overflow-hidden p-0 sm:max-w-[min(620px,calc(100vw-48px))]">
-        <DialogHeader className="shrink-0 px-6 pt-5 pb-4">
-          <DialogTitle>今日记忆预览</DialogTitle>
-          <DialogDescription>确认后会保存为今天唯一一条工作记忆。</DialogDescription>
+      <DialogContent
+        overlayClassName="tallya-memory-overlay"
+        className="tallya-dialog-content flex max-h-[calc(100vh-56px)] w-[min(620px,calc(100vw-48px))] max-w-none flex-col gap-0 overflow-hidden p-0 shadow-[0_24px_70px_rgb(15_23_42/0.18)] dark:shadow-[0_28px_80px_rgb(0_0_0/0.5)] sm:max-w-[min(620px,calc(100vw-48px))]"
+      >
+        <DialogHeader className="shrink-0 gap-1.5 px-6 pt-5 pb-4">
+          <DialogTitle className="text-lg leading-6 font-semibold tracking-normal text-app-ink">
+            今日记忆预览
+          </DialogTitle>
+          <DialogDescription className="text-[13px] leading-[1.5] text-app-ink-muted">
+            确认后会保存为今天唯一一条工作记忆。
+          </DialogDescription>
         </DialogHeader>
-        <div className="min-h-0 max-h-[calc(100vh-220px)] flex-1 overflow-y-auto px-6 pb-5">
+        <TallyaScrollArea className="min-h-0 max-h-[calc(100vh-190px)] flex-1 px-6 pb-5">
           <MemoryDocument content={content} />
-        </div>
+        </TallyaScrollArea>
         <DialogFooter className="mx-0 mt-0 mb-0 shrink-0 rounded-b-xl border-t border-app-border bg-[color-mix(in_srgb,var(--app-surface)_86%,var(--app-surface-muted))] px-6 py-3 sm:flex-row sm:justify-end">
           <Button
             type="button"
