@@ -19,9 +19,17 @@ type SettingsDialogProps = {
 export function SettingsDialog({ open, onOpenChange, onClearLocalData }: SettingsDialogProps) {
   const settingsState = useSettingsDialogState({ open, onClearLocalData });
 
+  function handleOpenChange(nextOpen: boolean) {
+    if (!nextOpen) {
+      settingsState.resetTransientState();
+    }
+
+    onOpenChange(nextOpen);
+  }
+
   return (
     <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogContent
           overlayClassName="tallya-memory-overlay"
           className="tallya-dialog-content flex h-[min(600px,calc(100vh-4rem))] w-[min(760px,calc(100vw-3rem))] max-w-none flex-col gap-0 overflow-hidden p-0 sm:max-w-[min(760px,calc(100vw-3rem))]"

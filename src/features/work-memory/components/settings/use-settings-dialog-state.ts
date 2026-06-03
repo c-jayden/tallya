@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTheme } from 'next-themes';
 import { toast } from 'sonner';
 import { aiService } from '../../services/ai/ai-service';
@@ -20,8 +20,16 @@ type UseSettingsDialogStateOptions = {
   onClearLocalData: () => Promise<void>;
 };
 
+const initialProviderHealth: ProviderHealth = {
+  status: 'unknown',
+  message: '尚未检测',
+};
+
+const initialTestResult: TestResult = { type: 'idle' };
+
 export function useSettingsDialogState({ open, onClearLocalData }: UseSettingsDialogStateOptions) {
   const { setTheme } = useTheme();
+  const asyncRunId = useRef(0);
   const [activeSection, setActiveSection] = useState<SettingsSection>('ai');
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_APP_SETTINGS);
   const [isLoadingSettings, setIsLoadingSettings] = useState(false);
@@ -29,11 +37,8 @@ export function useSettingsDialogState({ open, onClearLocalData }: UseSettingsDi
   const [isTestingCodex, setIsTestingCodex] = useState(false);
   const [isClearingData, setIsClearingData] = useState(false);
   const [isClearConfirmOpen, setIsClearConfirmOpen] = useState(false);
-  const [providerHealth, setProviderHealth] = useState<ProviderHealth>({
-    status: 'unknown',
-    message: '尚未检测',
-  });
-  const [testResult, setTestResult] = useState<TestResult>({ type: 'idle' });
+  const [providerHealth, setProviderHealth] = useState<ProviderHealth>(initialProviderHealth);
+  const [testResult, setTestResult] = useState<TestResult>(initialTestResult);
 
   useEffect(() => {
     if (!open) {
@@ -82,6 +87,8 @@ export function useSettingsDialogState({ open, onClearLocalData }: UseSettingsDi
   }
 
   async function checkProviderHealth() {
+    const runId = ++asyncRunId.current;
+
     setIsCheckingProvider(true);
     setProviderHealth({ status: 'checking', message: '正在检测连接...' });
 
@@ -89,21 +96,29 @@ export function useSettingsDialogState({ open, onClearLocalData }: UseSettingsDi
       await saveSettings(normalizeCodexCommand(settings));
       const health = await aiService.checkHealth();
 
-      setProviderHealth(health);
+      if (runId === asyncRunId.current) {
+        setProviderHealth(health);
+      }
     } catch {
-      setProviderHealth({
-        status: 'unavailable',
-        message: '检测失败',
-        detail: '请检查当前 AI 服务配置。',
-      });
+      if (runId === asyncRunId.current) {
+        setProviderHealth({
+          status: 'unavailable',
+          message: '检测失败',
+          detail: '请检查当前 AI 服务配置。',
+        });
+      }
     } finally {
-      setIsCheckingProvider(false);
+      if (runId === asyncRunId.current) {
+        setIsCheckingProvider(false);
+      }
     }
   }
 
   async function testGenerate() {
+    const runId = ++asyncRunId.current;
+
     setIsTestingCodex(true);
-    setTestResult({ type: 'idle' });
+    setTestResult(initialTestResult);
 
     try {
       await saveSettings(normalizeCodexCommand(settings));
@@ -112,11 +127,17 @@ export function useSettingsDialogState({ open, onClearLocalData }: UseSettingsDi
         rawContent: testMemoryInput,
         supplements: {},
       });
-      setTestResult({ type: 'success', summary: generated.summary });
+      if (runId === asyncRunId.current) {
+        setTestResult({ type: 'success', summary: generated.summary });
+      }
     } catch (error) {
-      setTestResult({ type: 'error', message: getTestGenerateError(error) });
+      if (runId === asyncRunId.current) {
+        setTestResult({ type: 'error', message: getTestGenerateError(error) });
+      }
     } finally {
-      setIsTestingCodex(false);
+      if (runId === asyncRunId.current) {
+        setIsTestingCodex(false);
+      }
     }
   }
 
@@ -132,6 +153,16 @@ export function useSettingsDialogState({ open, onClearLocalData }: UseSettingsDi
     } finally {
       setIsClearingData(false);
     }
+  }
+
+  function resetTransientState() {
+    asyncRunId.current += 1;
+    setActiveSection('ai');
+    setIsClearConfirmOpen(false);
+    setIsCheckingProvider(false);
+    setIsTestingCodex(false);
+    setProviderHealth(initialProviderHealth);
+    setTestResult(initialTestResult);
   }
 
   return {
@@ -150,6 +181,7 @@ export function useSettingsDialogState({ open, onClearLocalData }: UseSettingsDi
     testGenerate,
     testResult,
     updateSettings,
+    resetTransientState,
   };
 }
 

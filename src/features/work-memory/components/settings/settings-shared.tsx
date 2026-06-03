@@ -13,13 +13,13 @@ export function Field({
   children: ReactNode;
 }) {
   return (
-    <label className="grid gap-2 text-sm">
-      <span className="font-semibold text-app-ink">{label}</span>
+    <div className="grid gap-2 text-sm">
+      <div className="font-semibold text-app-ink">{label}</div>
       {children}
       {description && (
         <span className="text-[13px] leading-5 text-app-ink-subtle">{description}</span>
       )}
-    </label>
+    </div>
   );
 }
 

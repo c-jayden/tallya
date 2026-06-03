@@ -56,10 +56,12 @@ function SettingsSectionContent({
   if (activeSection === 'ai') {
     return (
       <AISettingsSection
+        settings={settings}
         providerHealth={providerHealth}
         testResult={testResult}
         isCheckingProvider={isCheckingProvider}
         isTestingCodex={isTestingCodex}
+        onUpdateSettings={onUpdateSettings}
         onCheckHealth={onCheckHealth}
         onTestGenerate={onTestGenerate}
       />
