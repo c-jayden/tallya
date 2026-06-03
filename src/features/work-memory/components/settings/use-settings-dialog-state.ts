@@ -9,6 +9,7 @@ import {
 } from '../../services/app-settings-repository';
 import { getDailyMemoryDate } from '../../services/daily-memory-repository';
 import { reminderService } from '../../services/reminder-service';
+import { syncWindowBehaviorSettings } from '../../services/window-service';
 import {
   testMemoryInput,
   type ProviderHealth,
@@ -94,6 +95,7 @@ export function useSettingsDialogState({ open, onClearLocalData }: UseSettingsDi
       }
       setTheme(savedSettings.theme);
       void reminderService.reschedule(savedSettings);
+      void syncWindowBehaviorSettings(savedSettings);
 
       return savedSettings;
     } catch {
@@ -143,6 +145,14 @@ export function useSettingsDialogState({ open, onClearLocalData }: UseSettingsDi
 
     if (patch.theme) {
       setTheme(nextSettings.theme);
+    }
+
+    if (
+      patch.closeToTray !== undefined ||
+      patch.startMinimized !== undefined ||
+      patch.launchAtStartup !== undefined
+    ) {
+      void syncWindowBehaviorSettings(nextSettings);
     }
 
     scheduleSettingsSave(nextSettings);

@@ -52,6 +52,7 @@ export function useWorkMemoryController({ currentDate }: UseWorkMemoryController
   const [isMemoryDialogOpen, setIsMemoryDialogOpen] = useState(false);
   const [isMemoryListOpen, setIsMemoryListOpen] = useState(false);
   const [memoryListItems, setMemoryListItems] = useState<DailyMemory[]>([]);
+  const workNoteInputRef = useRef<HTMLTextAreaElement>(null);
   const primaryActionRef = useRef<HTMLButtonElement>(null);
   const pulseTimeoutsRef = useRef<number[]>([]);
 
@@ -258,8 +259,6 @@ export function useWorkMemoryController({ currentDate }: UseWorkMemoryController
     if (currentMemory) {
       applyDailyMemory(currentMemory, memories);
     }
-
-    toast.info('已回到草稿编辑');
   }
 
   async function viewMemoryList() {
@@ -347,6 +346,7 @@ export function useWorkMemoryController({ currentDate }: UseWorkMemoryController
     viewingMemory,
     viewMemoryList,
     weeklySnapshot,
+    workNoteInputRef,
     workNote,
   };
 }

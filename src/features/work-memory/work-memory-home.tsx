@@ -17,6 +17,7 @@ import { SettingsDialog } from './components/settings-dialog';
 import { SpotlightSearchPanel } from './components/spotlight-search-panel';
 import { useHomeWindowSizing } from './hooks/use-home-window-sizing';
 import { useMemorySearch } from './hooks/use-memory-search';
+import { useTrayWindowEvents } from './hooks/use-tray-window-events';
 import { useWorkMemoryController } from './hooks/use-work-memory-controller';
 import { useWorkMemoryShortcuts } from './hooks/use-work-memory-shortcuts';
 import { getStatusVariant } from './memory-view-model';
@@ -42,6 +43,35 @@ export function WorkMemoryHome() {
     onCloseSearch: search.closeSearchPanel,
     onSettleTodayMemory: memory.settleTodayMemory,
     onTriggerSearch: search.openSearchPanel,
+  });
+
+  function closeHomeOverlays() {
+    setIsSettingsOpen(false);
+    search.closeSearchPanel();
+    memory.setIsMemoryDialogOpen(false);
+    memory.setIsMemoryListOpen(false);
+    memory.setIsPreviewOpen(false);
+  }
+
+  useTrayWindowEvents({
+    onFocusEntry: () => {
+      closeHomeOverlays();
+      window.setTimeout(() => memory.workNoteInputRef.current?.focus(), 0);
+    },
+    onOpenSearch: () => {
+      setIsSettingsOpen(false);
+      memory.setIsMemoryDialogOpen(false);
+      memory.setIsMemoryListOpen(false);
+      memory.setIsPreviewOpen(false);
+      search.openSearchPanel();
+    },
+    onOpenSettings: () => {
+      search.closeSearchPanel();
+      memory.setIsMemoryDialogOpen(false);
+      memory.setIsMemoryListOpen(false);
+      memory.setIsPreviewOpen(false);
+      setIsSettingsOpen(true);
+    },
   });
 
   return (
@@ -74,6 +104,7 @@ export function WorkMemoryHome() {
             isSavingDraft={memory.isSavingDraft}
             primaryActionLabel={memory.primaryActionLabel}
             primaryActionRef={memory.primaryActionRef}
+            workNoteInputRef={memory.workNoteInputRef}
             supplementFields={supplementFields}
             supplementPlaceholders={supplementPlaceholders}
             supplementValues={memory.supplementValues}

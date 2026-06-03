@@ -3,20 +3,47 @@ use std::{
     fs,
     io::Write,
     process::{Command, Stdio},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
     thread,
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
-#[cfg(target_os = "windows")]
-use tauri::Manager;
+use tauri::{
+    menu::MenuBuilder,
+    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
+    Emitter, Manager, WindowEvent,
+};
 #[cfg(not(target_os = "windows"))]
 use tauri_plugin_notification::NotificationExt;
 
 const CODEX_CLI_TIMEOUT: Duration = Duration::from_secs(60);
 const CODEX_CLI_CHECK_TIMEOUT: Duration = Duration::from_secs(8);
+const MAIN_WINDOW_LABEL: &str = "main";
+const TRAY_EVENT_FOCUS_ENTRY: &str = "tray://focus-entry";
+const TRAY_EVENT_OPEN_SEARCH: &str = "tray://open-search";
+const TRAY_EVENT_OPEN_SETTINGS: &str = "tray://open-settings";
+const TRAY_EVENT_WINDOW_HIDDEN: &str = "tray://window-hidden";
 #[cfg(target_os = "windows")]
 const TALLYA_NOTIFICATION_APP_ID: &str = "com.tallya";
 #[cfg(target_os = "windows")]
 const TALLYA_NOTIFICATION_APP_NAME: &str = "Tallya";
+
+#[derive(Clone)]
+struct AppWindowState {
+    close_to_tray: Arc<AtomicBool>,
+    is_quitting: Arc<AtomicBool>,
+}
+
+impl Default for AppWindowState {
+    fn default() -> Self {
+        Self {
+            close_to_tray: Arc::new(AtomicBool::new(true)),
+            is_quitting: Arc::new(AtomicBool::new(false)),
+        }
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -84,6 +111,65 @@ fn send_tallya_notification(app: tauri::AppHandle, body: String) -> Result<(), S
     })
 }
 
+#[tauri::command]
+fn set_window_behavior(
+    state: tauri::State<'_, AppWindowState>,
+    close_to_tray: bool,
+) -> Result<(), String> {
+    state
+        .close_to_tray
+        .store(close_to_tray, Ordering::SeqCst);
+    Ok(())
+}
+
+#[tauri::command]
+fn show_main_window(app: tauri::AppHandle) -> Result<(), String> {
+    show_and_focus_main_window(&app);
+    Ok(())
+}
+
+#[tauri::command]
+fn hide_main_window(app: tauri::AppHandle) -> Result<(), String> {
+    let window = app
+        .get_webview_window(MAIN_WINDOW_LABEL)
+        .ok_or_else(|| "未找到主窗口。".to_string())?;
+
+    window.hide().map_err(|error| {
+        eprintln!("Failed to hide main window: {error}");
+        "隐藏主窗口失败，请稍后重试。".to_string()
+    })
+}
+
+#[tauri::command]
+fn toggle_main_window(app: tauri::AppHandle) -> Result<(), String> {
+    toggle_main_window_visibility(&app)
+}
+
+fn toggle_main_window_visibility(app: &tauri::AppHandle) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window(MAIN_WINDOW_LABEL) {
+        let is_visible = window.is_visible().unwrap_or(false);
+        let is_minimized = window.is_minimized().unwrap_or(false);
+        let is_focused = window.is_focused().unwrap_or(false);
+
+        if is_visible && !is_minimized && is_focused {
+            return window.hide().map_err(|error| {
+                eprintln!("Failed to hide main window: {error}");
+                "隐藏主窗口失败，请稍后重试。".to_string()
+            });
+        }
+    }
+
+    show_and_focus_main_window(app);
+    Ok(())
+}
+
+#[tauri::command]
+fn quit_app(app: tauri::AppHandle, state: tauri::State<'_, AppWindowState>) -> Result<(), String> {
+    state.is_quitting.store(true, Ordering::SeqCst);
+    app.exit(0);
+    Ok(())
+}
+
 #[cfg(target_os = "windows")]
 fn send_system_notification(app: tauri::AppHandle, body: String) -> Result<(), String> {
     use tauri_winrt_notification::{Duration as ToastDuration, Scenario, Toast};
@@ -98,7 +184,7 @@ fn send_system_notification(app: tauri::AppHandle, body: String) -> Result<(), S
         .duration(ToastDuration::Short)
         .scenario(Scenario::Reminder)
         .on_activated(move |_| {
-            focus_main_window(&app_for_activation);
+            show_and_focus_main_window(&app_for_activation);
             Ok(())
         })
         .show()
@@ -119,9 +205,8 @@ fn ensure_windows_notification_app_id() -> Result<(), String> {
         .map_err(|error| error.to_string())
 }
 
-#[cfg(target_os = "windows")]
-fn focus_main_window(app: &tauri::AppHandle) {
-    if let Some(window) = app.get_webview_window("main") {
+fn show_and_focus_main_window(app: &tauri::AppHandle) {
+    if let Some(window) = app.get_webview_window(MAIN_WINDOW_LABEL) {
         let _ = window.show();
         let _ = window.unminimize();
         let _ = window.set_focus();
@@ -450,15 +535,108 @@ fn normalize_optional_string(value: Option<String>) -> Option<String> {
         .filter(|item| !item.is_empty())
 }
 
+fn setup_tray(app: &mut tauri::App, state: AppWindowState) -> tauri::Result<()> {
+    let menu = MenuBuilder::new(app)
+        .text("open", "打开 Tallya")
+        .text("record-today", "记录今天")
+        .text("search", "搜索记忆")
+        .text("settings", "设置")
+        .separator()
+        .text("quit", "退出")
+        .build()?;
+    let app_icon = app.default_window_icon().cloned();
+
+    let mut tray = TrayIconBuilder::with_id("main")
+        .menu(&menu)
+        .tooltip("Tallya / 职迹")
+        .show_menu_on_left_click(false);
+
+    if let Some(icon) = app_icon {
+        tray = tray.icon(icon);
+    }
+
+    let menu_state = state.clone();
+
+    tray.on_menu_event(move |app, event| match event.id().as_ref() {
+        "open" => {
+            show_and_focus_main_window(app);
+        }
+        "record-today" => {
+            show_and_focus_main_window(app);
+            let _ = app.emit(TRAY_EVENT_FOCUS_ENTRY, ());
+        }
+        "search" => {
+            show_and_focus_main_window(app);
+            let _ = app.emit(TRAY_EVENT_OPEN_SEARCH, ());
+        }
+        "settings" => {
+            show_and_focus_main_window(app);
+            let _ = app.emit(TRAY_EVENT_OPEN_SETTINGS, ());
+        }
+        "quit" => {
+            menu_state.is_quitting.store(true, Ordering::SeqCst);
+            app.exit(0);
+        }
+        _ => {}
+    })
+    .on_tray_icon_event(|tray, event| {
+        if let TrayIconEvent::Click {
+            button: MouseButton::Left,
+            button_state: MouseButtonState::Up,
+            ..
+        } = event
+        {
+            let _ = toggle_main_window_visibility(tray.app_handle());
+        }
+    })
+    .build(app)?;
+
+    Ok(())
+}
+
+fn setup_close_to_tray(app: &mut tauri::App, state: AppWindowState) {
+    if let Some(window) = app.get_webview_window(MAIN_WINDOW_LABEL) {
+        let app_handle = app.handle().clone();
+        let window_for_close = window.clone();
+
+        window.on_window_event(move |event| {
+            if let WindowEvent::CloseRequested { api, .. } = event {
+                let should_hide = state.close_to_tray.load(Ordering::SeqCst)
+                    && !state.is_quitting.load(Ordering::SeqCst);
+
+                if should_hide {
+                    api.prevent_close();
+                    let _ = window_for_close.hide();
+                    let _ = app_handle.emit(TRAY_EVENT_WINDOW_HIDDEN, ());
+                }
+            }
+        });
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_opener::init())
+        .setup(|app| {
+            let window_state = AppWindowState::default();
+
+            app.manage(window_state.clone());
+            setup_tray(app, window_state.clone())?;
+            setup_close_to_tray(app, window_state);
+
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             check_codex_cli,
             generate_daily_memory_with_codex,
-            send_tallya_notification
+            hide_main_window,
+            quit_app,
+            send_tallya_notification,
+            set_window_behavior,
+            show_main_window,
+            toggle_main_window
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
