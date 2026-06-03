@@ -5,4 +5,12 @@
 
 项目规则：
 - 不要运行 `pnpm tauri dev`。
-- 验证只能运行 `cargo check`、前端 lint 和 type-check；如需查看网页，访问用户已运行的 `http://localhost:1420`。
+
+UI 约束：
+- 所有可点击元素必须有 `cursor-pointer`，disabled 状态使用 `cursor-not-allowed`。
+- Tailwind 4 能用 canonical class 的地方优先不用任意 px class。
+
+验证约束：
+- 不启动新的 dev server；如需查看网页或做浏览器验证，访问用户已运行的 `http://localhost:1420`。
+- 常规验证只运行 `cargo check`、前端 lint 和 type-check。
+- 修改前端逻辑后至少跑 type-check 和 lint。
