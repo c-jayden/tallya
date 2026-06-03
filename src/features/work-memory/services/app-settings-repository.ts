@@ -34,6 +34,8 @@ export type AppSettings = {
 const STORAGE_KEY = 'tallya.app-settings.v1';
 export const DEFAULT_CODEX_COMMAND = 'codex';
 
+// Defaults define the first-run and reset state. Components should go through
+// this repository instead of reading storage directly.
 export const DEFAULT_APP_SETTINGS: AppSettings = {
   aiProviderId: 'ai-codex-cli',
   codexCommand: DEFAULT_CODEX_COMMAND,

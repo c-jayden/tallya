@@ -18,6 +18,7 @@ const providersById = new Map<string, AIProvider>(
   providers.map((provider) => [provider.id, provider]),
 );
 
+// User-facing settings expose only real providers; Mock stays registered for tests and local dev.
 export const currentProviderId = 'ai-codex-cli';
 
 export function createAIService({
@@ -78,6 +79,7 @@ function getProviderForSettings(settings: AppSettings, codexProvider: AIProvider
   const provider = providersById.get(settings.aiProviderId);
 
   if (!provider || provider.id === 'mock') {
+    // Never silently fall back to Mock for user data; failures should be visible and recoverable.
     throw new Error('当前 AI 服务配置异常，请重新选择服务。');
   }
 

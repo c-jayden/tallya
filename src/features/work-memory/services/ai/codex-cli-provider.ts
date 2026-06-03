@@ -5,6 +5,8 @@ import { AIProviderError, type AIProvider, type GenerateDailyMemoryOptions } fro
 type TauriInvoke = typeof invoke;
 
 const CODEX_PROVIDER_ID = 'ai-codex-cli';
+// Health checks include a tiny generation request because `codex --version`
+// cannot prove the user is logged in or that generation can return content.
 const HEALTH_CHECK_INPUT = {
   date: '2026-06-03',
   rawContent: '今天整理了需求讨论内容，确认了优先处理范围，并同步了后续计划。',

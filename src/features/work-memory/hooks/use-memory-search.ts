@@ -44,6 +44,8 @@ export function useMemorySearch({ onOpenMemory }: UseMemorySearchOptions) {
       return;
     }
 
+    // Search follows a Spotlight-style command palette and intentionally reads
+    // only generated memories; drafts stay out of global search.
     void dailyMemoryRepository.searchMemories(keyword).then((results) => {
       if (isMounted) {
         setSearchResults(results);

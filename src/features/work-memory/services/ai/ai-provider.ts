@@ -12,6 +12,8 @@ export type ProviderHealth = {
   detail?: string;
 };
 
+// Keep provider-specific details behind this boundary so Codex CLI can be
+// replaced or joined by other local/user-configured services without UI churn.
 export type AIProvider = {
   id: AIProviderId | 'mock';
   name: string;

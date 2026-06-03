@@ -63,6 +63,7 @@ function HighlightedText({ text, keyword }: HighlightedTextProps) {
 }
 
 function escapeRegExp(value: string) {
+  // Search keywords are user input, so highlighting must escape regex syntax first.
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 

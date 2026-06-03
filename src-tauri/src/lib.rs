@@ -52,11 +52,6 @@ struct GeneratedDailyMemory {
 }
 
 #[tauri::command]
-fn greet(name: &str) -> String {
-    format!("Hello, {}! You've been greeted from Rust!", name)
-}
-
-#[tauri::command]
 async fn check_codex_cli(command: String) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || run_codex_cli_check(command))
         .await
@@ -345,6 +340,8 @@ fn get_command_candidates(command: &str) -> Result<Vec<String>, String> {
 fn build_codex_prompt(input: &GenerateDailyMemoryInput) -> String {
     let input_json = serde_json::to_string(input).unwrap_or_else(|_| "{}".to_string());
 
+    // The frontend stores structured memories, so Codex must return strict JSON
+    // instead of prose that would be hard to validate or recover from.
     format!(
         r#"把输入整理为中文今日工作记忆。只输出合法 JSON，不要 markdown、解释、代码块或工具调用。
 JSON keys: summary:string, completedItems:string[], keyOutcome?:string, problems?:string, tomorrowPlan?:string, extraNote?:string.
@@ -459,7 +456,6 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
-            greet,
             check_codex_cli,
             generate_daily_memory_with_codex,
             send_tallya_notification

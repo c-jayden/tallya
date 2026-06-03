@@ -38,6 +38,7 @@ export function getNextDailyReminderAt(now: Date, time: string) {
 
   next.setHours(hour, minute, 0, 0);
 
+  // Missed reminders are not backfilled on startup; schedule the next future slot.
   if (next <= now) {
     next.setDate(next.getDate() + 1);
   }
@@ -54,6 +55,7 @@ export function getNextWeeklyReminderAt(now: Date, weekday: string, time: string
   next.setDate(next.getDate() + daysUntilTarget);
   next.setHours(hour, minute, 0, 0);
 
+  // If this week's slot already passed, wait for the next same weekday.
   if (next <= now) {
     next.setDate(next.getDate() + 7);
   }
@@ -91,20 +93,10 @@ export class ReminderService {
     const now = this.dependencies.now();
 
     this.clearTimers();
-    console.info('[Tallya reminder] reschedule', {
-      dailyReminderEnabled: nextSettings.dailyReminderEnabled,
-      dailyReminderTime: nextSettings.dailyReminderTime,
-      weeklyReminderEnabled: nextSettings.weeklyReminderEnabled,
-      weeklyReminderWeekday: nextSettings.weeklyReminderWeekday,
-      weeklyReminderTime: nextSettings.weeklyReminderTime,
-    });
 
     if (nextSettings.dailyReminderEnabled) {
       const nextDailyReminderAt = getNextDailyReminderAt(now, nextSettings.dailyReminderTime);
 
-      console.info(
-        `[Tallya reminder] daily scheduled for ${nextDailyReminderAt.toLocaleString()}`,
-      );
       this.dailyTimeout = this.scheduleAt(
         nextDailyReminderAt,
         () => {
@@ -120,9 +112,6 @@ export class ReminderService {
         nextSettings.weeklyReminderTime,
       );
 
-      console.info(
-        `[Tallya reminder] weekly scheduled for ${nextWeeklyReminderAt.toLocaleString()}`,
-      );
       this.weeklyTimeout = this.scheduleAt(
         nextWeeklyReminderAt,
         () => {
@@ -161,18 +150,15 @@ export class ReminderService {
 
   private async handleDailyReminder() {
     try {
-      console.info('[Tallya reminder] daily timer fired');
       const now = this.dependencies.now();
       const todayMemory = await this.dependencies.memoryRepository.getMemoryByDate(
         getDailyMemoryDate(now),
       );
 
+      // Drafts still need a reminder; only a formal generated memory completes the day.
       if (!todayMemory) {
         const settings = await this.dependencies.settingsRepository.getSettings();
         await this.sendSystemNotification(settings.dailyReminderMessage);
-        console.info('[Tallya reminder] daily notification sent');
-      } else {
-        console.info('[Tallya reminder] daily skipped because generated memory exists');
       }
     } catch (error) {
       console.warn('Failed to send daily reminder', error);
@@ -183,11 +169,9 @@ export class ReminderService {
 
   private async handleWeeklyReminder() {
     try {
-      console.info('[Tallya reminder] weekly timer fired');
       const settings = await this.dependencies.settingsRepository.getSettings();
 
       await this.sendSystemNotification(settings.weeklyReminderMessage);
-      console.info('[Tallya reminder] weekly notification sent');
     } catch (error) {
       console.warn('Failed to send weekly reminder', error);
     } finally {

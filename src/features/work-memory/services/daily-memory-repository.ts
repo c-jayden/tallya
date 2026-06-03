@@ -61,6 +61,7 @@ export class LocalStorageDailyMemoryRepository {
   }
 
   async getGeneratedMemories() {
+    // Drafts are editable working state; history and search only expose formal memories.
     return this.readAll()
       .filter(isGeneratedMemory)
       .sort((first, second) => second.date.localeCompare(first.date));
@@ -91,6 +92,8 @@ export class LocalStorageDailyMemoryRepository {
   async saveDraft(input: DailyMemoryDraftInput) {
     const existing = await this.getByDate(input.date);
 
+    // Each date has one record row: drafts can update source text without erasing
+    // an already generated memory for that day.
     return this.upsert({
       ...input,
       generated:

@@ -24,6 +24,7 @@ export function getMemorySummary(memory: DailyMemory) {
 }
 
 export function getGeneratedMemories(memories: DailyMemory[]) {
+  // Only formal memories enter history-like views; drafts remain editable on today's surface.
   return memories
     .filter((memory) => (memory.status === 'generated' || memory.status === 'locked') && memory.generated)
     .sort((first, second) => second.date.localeCompare(first.date));
@@ -145,6 +146,7 @@ export function getTodayMemoryState(
   memory: DailyMemory | null,
   memories: DailyMemory[] = [],
 ): TodayMemoryState {
+  // The home status separates a draft from the single formal memory for the day.
   const hasGeneratedHistory = memories.some(
     (item) => item.status === 'generated' || item.status === 'locked',
   );
