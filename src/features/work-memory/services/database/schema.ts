@@ -1,5 +1,5 @@
 export const DATABASE_PATH = 'sqlite:tallya.db';
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 export const createDailyMemoriesTableSql = `
   CREATE TABLE IF NOT EXISTS daily_memories (
@@ -42,7 +42,24 @@ export const createReportSourcesTableSql = `
 export const createAppSettingsTableSql = `
   CREATE TABLE IF NOT EXISTS app_settings (
     key TEXT PRIMARY KEY,
-    value_json TEXT NOT NULL,
+    ai_provider_id TEXT NOT NULL,
+    codex_command TEXT NOT NULL,
+    openai_base_url TEXT NOT NULL,
+    openai_api_key TEXT NOT NULL,
+    openai_model TEXT NOT NULL,
+    ollama_base_url TEXT NOT NULL,
+    ollama_model TEXT NOT NULL,
+    daily_reminder_enabled INTEGER NOT NULL,
+    daily_reminder_time TEXT NOT NULL,
+    daily_reminder_message TEXT NOT NULL,
+    weekly_reminder_enabled INTEGER NOT NULL,
+    weekly_reminder_weekday TEXT NOT NULL,
+    weekly_reminder_time TEXT NOT NULL,
+    weekly_reminder_message TEXT NOT NULL,
+    theme TEXT NOT NULL,
+    launch_at_startup INTEGER NOT NULL,
+    close_to_tray INTEGER NOT NULL,
+    start_minimized INTEGER NOT NULL,
     updated_at TEXT NOT NULL
   )
 `;
