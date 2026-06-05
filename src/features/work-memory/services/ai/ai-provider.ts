@@ -9,6 +9,7 @@ export type AIProviderId = 'ai-codex-cli' | 'openai-compatible' | 'ollama';
 
 export type GenerateDailyMemoryOptions = {
   codexCommand: string;
+  codexModel: string;
 };
 
 export type AIProviderOptions = GenerateDailyMemoryOptions;

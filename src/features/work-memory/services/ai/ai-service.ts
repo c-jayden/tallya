@@ -52,6 +52,7 @@ export function createAIService({
 
       return provider.generateDailyMemory(input, {
         codexCommand: settings.codexCommand,
+        codexModel: settings.codexModel,
       });
     },
 
@@ -61,6 +62,7 @@ export function createAIService({
 
       return provider.generateWeeklyReport(input, {
         codexCommand: settings.codexCommand,
+        codexModel: settings.codexModel,
       });
     },
 
@@ -78,6 +80,7 @@ export function createAIService({
 
       return provider.checkHealth({
         codexCommand: settings.codexCommand,
+        codexModel: settings.codexModel,
       });
     },
   };

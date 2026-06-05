@@ -132,9 +132,10 @@ async fn check_codex_cli(command: String) -> Result<String, String> {
 async fn generate_daily_memory_with_codex(
     input: GenerateDailyMemoryInput,
     codex_command: String,
+    codex_model: String,
 ) -> Result<GeneratedDailyMemory, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        run_codex_daily_memory_generation(input, codex_command)
+        run_codex_daily_memory_generation(input, codex_command, codex_model)
     })
     .await
     .map_err(|error| {
@@ -147,9 +148,10 @@ async fn generate_daily_memory_with_codex(
 async fn generate_weekly_report_with_codex(
     input: GenerateWeeklyReportInput,
     codex_command: String,
+    codex_model: String,
 ) -> Result<GeneratedReportContent, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        run_codex_weekly_report_generation(input, codex_command)
+        run_codex_weekly_report_generation(input, codex_command, codex_model)
     })
     .await
     .map_err(|error| {
@@ -279,31 +281,42 @@ fn send_system_notification(app: tauri::AppHandle, body: String) -> Result<(), S
 fn run_codex_daily_memory_generation(
     input: GenerateDailyMemoryInput,
     codex_command: String,
+    codex_model: String,
 ) -> Result<GeneratedDailyMemory, String> {
     let prompt = build_codex_prompt(&input);
-    run_codex_prompt_generation(prompt, codex_command, "daily-memory", |raw_output| {
-        parse_generated_daily_memory(raw_output, &input)
-    })
+    run_codex_prompt_generation(
+        prompt,
+        codex_command,
+        codex_model,
+        "daily-memory",
+        |raw_output| parse_generated_daily_memory(raw_output, &input),
+    )
 }
 
 fn run_codex_weekly_report_generation(
     input: GenerateWeeklyReportInput,
     codex_command: String,
+    codex_model: String,
 ) -> Result<GeneratedReportContent, String> {
     let prompt = build_codex_weekly_report_prompt(&input);
-    run_codex_prompt_generation(prompt, codex_command, "weekly-report", |raw_output| {
-        parse_generated_weekly_report(raw_output, &input)
-    })
+    run_codex_prompt_generation(
+        prompt,
+        codex_command,
+        codex_model,
+        "weekly-report",
+        |raw_output| parse_generated_weekly_report(raw_output, &input),
+    )
 }
 
 fn run_codex_prompt_generation<T>(
     prompt: String,
     codex_command: String,
+    codex_model: String,
     output_kind: &str,
     parse_output: impl FnOnce(&str) -> Result<T, String>,
 ) -> Result<T, String> {
     let output_path = create_codex_output_path(output_kind);
-    let mut child = spawn_codex_cli(&codex_command, &output_path)?;
+    let mut child = spawn_codex_cli(&codex_command, &codex_model, &output_path)?;
 
     if let Some(mut stdin) = child.stdin.take() {
         stdin.write_all(prompt.as_bytes()).map_err(|error| {
@@ -357,9 +370,11 @@ fn run_codex_prompt_generation<T>(
 
 fn spawn_codex_cli(
     command: &str,
+    model: &str,
     output_path: &std::path::Path,
 ) -> Result<std::process::Child, String> {
     let mut last_error = None;
+    let codex_model = normalize_codex_model(model);
 
     for command in get_command_candidates(command)? {
         match Command::new(&command)
@@ -369,6 +384,8 @@ fn spawn_codex_cli(
                 "--skip-git-repo-check",
                 "--color",
                 "never",
+                "-m",
+                codex_model.as_str(),
                 "-c",
                 "model_reasoning_effort=\"low\"",
                 "-c",
@@ -399,6 +416,16 @@ fn spawn_codex_cli(
     }
 
     Err("Codex 生成失败，请检查 Codex CLI 是否可用。".to_string())
+}
+
+fn normalize_codex_model(model: &str) -> String {
+    let model = model.trim();
+
+    if model.is_empty() {
+        return "gpt-5.4-mini".to_string();
+    }
+
+    model.to_string()
 }
 
 fn run_codex_cli_check(command: String) -> Result<String, String> {

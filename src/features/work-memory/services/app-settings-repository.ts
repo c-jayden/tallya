@@ -1,4 +1,5 @@
 import type { AIProviderId } from './ai/ai-provider';
+import { DEFAULT_CODEX_MODEL, normalizeProviderModel } from './ai/known-models';
 import type { DatabaseClient } from './database/database';
 import { getDatabase } from './database/database';
 import { createFriendlyError } from './service-error';
@@ -19,6 +20,7 @@ export type OllamaSettings = {
 export type AppSettings = {
   aiProviderId: AIProviderId;
   codexCommand: string;
+  codexModel: string;
   openAICompatible: OpenAICompatibleSettings;
   ollama: OllamaSettings;
   dailyReminderEnabled: boolean;
@@ -35,7 +37,6 @@ export type AppSettings = {
 };
 
 const STORAGE_KEY = 'tallya.app-settings.v1';
-const SETTINGS_ROW_KEY = 'app_settings';
 const LEGACY_MIGRATION_KEY = 'tallya.app-settings.sqlite-migrated.v1';
 export const DEFAULT_CODEX_COMMAND = 'codex';
 
@@ -44,6 +45,7 @@ export const DEFAULT_CODEX_COMMAND = 'codex';
 export const DEFAULT_APP_SETTINGS: AppSettings = {
   aiProviderId: 'ai-codex-cli',
   codexCommand: DEFAULT_CODEX_COMMAND,
+  codexModel: DEFAULT_CODEX_MODEL,
   openAICompatible: {
     baseUrl: '',
     apiKey: '',
@@ -112,40 +114,14 @@ export class LocalStorageAppSettingsRepository {
   }
 }
 
-type AppSettingsColumnRow = {
+type AppSettingsRow = {
   key: string;
-  ai_provider_id: string;
-  codex_command: string;
-  openai_base_url: string;
-  openai_api_key: string;
-  openai_model: string;
-  ollama_base_url: string;
-  ollama_model: string;
-  daily_reminder_enabled: number | boolean;
-  daily_reminder_time: string;
-  daily_reminder_message: string;
-  weekly_reminder_enabled: number | boolean;
-  weekly_reminder_weekday: string;
-  weekly_reminder_time: string;
-  weekly_reminder_message: string;
-  theme: string;
-  launch_at_startup: number | boolean;
-  close_to_tray: number | boolean;
-  start_minimized: number | boolean;
+  value: string;
   updated_at: string;
-};
-
-type LegacyAppSettingsJsonRow = {
-  value_json: string;
-};
-
-type TableNameRow = {
-  name: string;
 };
 
 export class SQLiteAppSettingsRepository {
   private legacyStorage: Storage | null;
-  private didAttemptLegacySQLiteMigration = false;
   private didAttemptLegacyMigration = false;
   private databasePromise: Promise<DatabaseClient> | null;
   private readonly now: () => Date;
@@ -162,12 +138,9 @@ export class SQLiteAppSettingsRepository {
   async getSettings() {
     try {
       const database = await this.getReadyDatabase();
-      const rows = await database.select<AppSettingsColumnRow[]>(
-        'SELECT * FROM app_settings WHERE key = $1 LIMIT 1',
-        [SETTINGS_ROW_KEY],
-      );
+      const rows = await database.select<AppSettingsRow[]>('SELECT key, value FROM app_settings');
 
-      return normalizeAppSettingsRow(rows[0]) ?? DEFAULT_APP_SETTINGS;
+      return rows.length > 0 ? normalizeAppSettings(rowsToAppSettingsInput(rows)) : DEFAULT_APP_SETTINGS;
     } catch (error) {
       console.error('Failed to read app settings from SQLite', error);
 
@@ -199,49 +172,9 @@ export class SQLiteAppSettingsRepository {
 
     const database = await this.databasePromise;
 
-    await this.migrateLegacySQLiteJson(database);
     await this.migrateLegacyLocalStorage(database);
 
     return database;
-  }
-
-  private async migrateLegacySQLiteJson(database: DatabaseClient) {
-    if (this.didAttemptLegacySQLiteMigration) {
-      return;
-    }
-
-    this.didAttemptLegacySQLiteMigration = true;
-
-    try {
-      if (await hasSavedSettings(database)) {
-        return;
-      }
-
-      const legacyTables = await database.select<TableNameRow[]>(
-        "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'app_settings_legacy_json'",
-      );
-
-      if (legacyTables.length === 0) {
-        return;
-      }
-
-      const rows = await database.select<LegacyAppSettingsJsonRow[]>(
-        'SELECT value_json FROM app_settings_legacy_json WHERE key = $1 LIMIT 1',
-        [SETTINGS_ROW_KEY],
-      );
-
-      if (!rows[0]?.value_json) {
-        return;
-      }
-
-      await saveAppSettingsRow(
-        database,
-        normalizeAppSettings(JSON.parse(rows[0].value_json) as unknown),
-        this.now().toISOString(),
-      );
-    } catch (error) {
-      console.warn('Failed to migrate legacy SQLite app settings to columns', error);
-    }
   }
 
   private async migrateLegacyLocalStorage(database: DatabaseClient) {
@@ -279,10 +212,7 @@ export class SQLiteAppSettingsRepository {
 export const appSettingsRepository = new SQLiteAppSettingsRepository();
 
 async function hasSavedSettings(database: DatabaseClient) {
-  const rows = await database.select<AppSettingsColumnRow[]>(
-    'SELECT * FROM app_settings WHERE key = $1 LIMIT 1',
-    [SETTINGS_ROW_KEY],
-  );
+  const rows = await database.select<AppSettingsRow[]>('SELECT key, value FROM app_settings');
 
   return rows.length > 0;
 }
@@ -292,130 +222,76 @@ async function saveAppSettingsRow(
   settings: AppSettings,
   updatedAt: string,
 ) {
-  await database.execute(
-    `
-      INSERT INTO app_settings (
-        key,
-        ai_provider_id,
-        codex_command,
-        openai_base_url,
-        openai_api_key,
-        openai_model,
-        ollama_base_url,
-        ollama_model,
-        daily_reminder_enabled,
-        daily_reminder_time,
-        daily_reminder_message,
-        weekly_reminder_enabled,
-        weekly_reminder_weekday,
-        weekly_reminder_time,
-        weekly_reminder_message,
-        theme,
-        launch_at_startup,
-        close_to_tray,
-        start_minimized,
-        updated_at
-      )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
-      ON CONFLICT(key) DO UPDATE SET
-        ai_provider_id = excluded.ai_provider_id,
-        codex_command = excluded.codex_command,
-        openai_base_url = excluded.openai_base_url,
-        openai_api_key = excluded.openai_api_key,
-        openai_model = excluded.openai_model,
-        ollama_base_url = excluded.ollama_base_url,
-        ollama_model = excluded.ollama_model,
-        daily_reminder_enabled = excluded.daily_reminder_enabled,
-        daily_reminder_time = excluded.daily_reminder_time,
-        daily_reminder_message = excluded.daily_reminder_message,
-        weekly_reminder_enabled = excluded.weekly_reminder_enabled,
-        weekly_reminder_weekday = excluded.weekly_reminder_weekday,
-        weekly_reminder_time = excluded.weekly_reminder_time,
-        weekly_reminder_message = excluded.weekly_reminder_message,
-        theme = excluded.theme,
-        launch_at_startup = excluded.launch_at_startup,
-        close_to_tray = excluded.close_to_tray,
-        start_minimized = excluded.start_minimized,
-        updated_at = excluded.updated_at
-    `,
-    [
-      SETTINGS_ROW_KEY,
-      settings.aiProviderId,
-      settings.codexCommand,
-      settings.openAICompatible.baseUrl,
-      settings.openAICompatible.apiKey,
-      settings.openAICompatible.model,
-      settings.ollama.baseUrl,
-      settings.ollama.model,
-      toSqliteBoolean(settings.dailyReminderEnabled),
-      settings.dailyReminderTime,
-      settings.dailyReminderMessage,
-      toSqliteBoolean(settings.weeklyReminderEnabled),
-      settings.weeklyReminderWeekday,
-      settings.weeklyReminderTime,
-      settings.weeklyReminderMessage,
-      settings.theme,
-      toSqliteBoolean(settings.launchAtStartup),
-      toSqliteBoolean(settings.closeToTray),
-      toSqliteBoolean(settings.startMinimized),
-      updatedAt,
-    ],
-  );
+  for (const [key, value] of Object.entries(appSettingsToRows(settings))) {
+    await database.execute(
+      `
+        INSERT INTO app_settings (key, value, updated_at)
+        VALUES ($1, $2, $3)
+        ON CONFLICT(key) DO UPDATE SET
+          value = excluded.value,
+          updated_at = excluded.updated_at
+      `,
+      [key, value, updatedAt],
+    );
+  }
 }
 
-function normalizeAppSettingsRow(row: AppSettingsColumnRow | undefined) {
-  if (!row) {
-    return null;
-  }
+function appSettingsToRows(settings: AppSettings): Record<string, string> {
+  return {
+    aiProviderId: settings.aiProviderId,
+    codexCommand: settings.codexCommand,
+    codexModel: settings.codexModel,
+    openAICompatibleBaseUrl: settings.openAICompatible.baseUrl,
+    openAICompatibleApiKey: settings.openAICompatible.apiKey,
+    openAICompatibleModel: settings.openAICompatible.model,
+    ollamaBaseUrl: settings.ollama.baseUrl,
+    ollamaModel: settings.ollama.model,
+    dailyReminderEnabled: String(settings.dailyReminderEnabled),
+    dailyReminderTime: settings.dailyReminderTime,
+    dailyReminderMessage: settings.dailyReminderMessage,
+    weeklyReminderEnabled: String(settings.weeklyReminderEnabled),
+    weeklyReminderWeekday: settings.weeklyReminderWeekday,
+    weeklyReminderTime: settings.weeklyReminderTime,
+    weeklyReminderMessage: settings.weeklyReminderMessage,
+    theme: settings.theme,
+    launchAtStartup: String(settings.launchAtStartup),
+    closeToTray: String(settings.closeToTray),
+    startMinimized: String(settings.startMinimized),
+  };
+}
 
-  return normalizeAppSettings({
-    aiProviderId: row.ai_provider_id,
-    codexCommand: row.codex_command,
+function rowsToAppSettingsInput(rows: AppSettingsRow[]) {
+  const values = Object.fromEntries(rows.map((row) => [row.key, row.value]));
+
+  return {
+    aiProviderId: values.aiProviderId,
+    codexCommand: values.codexCommand,
+    codexModel: values.codexModel,
     openAICompatible: {
-      baseUrl: row.openai_base_url,
-      apiKey: row.openai_api_key,
-      model: row.openai_model,
+      baseUrl: values.openAICompatibleBaseUrl,
+      apiKey: values.openAICompatibleApiKey,
+      model: values.openAICompatibleModel,
     },
     ollama: {
-      baseUrl: row.ollama_base_url,
-      model: row.ollama_model,
+      baseUrl: values.ollamaBaseUrl,
+      model: values.ollamaModel,
     },
-    dailyReminderEnabled: getSqliteBoolean(
-      row.daily_reminder_enabled,
-      DEFAULT_APP_SETTINGS.dailyReminderEnabled,
-    ),
-    dailyReminderTime: row.daily_reminder_time,
-    dailyReminderMessage: row.daily_reminder_message,
-    weeklyReminderEnabled: getSqliteBoolean(
-      row.weekly_reminder_enabled,
-      DEFAULT_APP_SETTINGS.weeklyReminderEnabled,
-    ),
-    weeklyReminderWeekday: row.weekly_reminder_weekday,
-    weeklyReminderTime: row.weekly_reminder_time,
-    weeklyReminderMessage: row.weekly_reminder_message,
-    theme: row.theme,
-    launchAtStartup: getSqliteBoolean(
-      row.launch_at_startup,
-      DEFAULT_APP_SETTINGS.launchAtStartup,
-    ),
-    closeToTray: getSqliteBoolean(row.close_to_tray, DEFAULT_APP_SETTINGS.closeToTray),
-    startMinimized: getSqliteBoolean(
-      row.start_minimized,
-      DEFAULT_APP_SETTINGS.startMinimized,
-    ),
-  });
+    dailyReminderEnabled: getBooleanString(values.dailyReminderEnabled),
+    dailyReminderTime: values.dailyReminderTime,
+    dailyReminderMessage: values.dailyReminderMessage,
+    weeklyReminderEnabled: getBooleanString(values.weeklyReminderEnabled),
+    weeklyReminderWeekday: values.weeklyReminderWeekday,
+    weeklyReminderTime: values.weeklyReminderTime,
+    weeklyReminderMessage: values.weeklyReminderMessage,
+    theme: values.theme,
+    launchAtStartup: getBooleanString(values.launchAtStartup),
+    closeToTray: getBooleanString(values.closeToTray),
+    startMinimized: getBooleanString(values.startMinimized),
+  };
 }
 
-function toSqliteBoolean(value: boolean) {
-  return value ? 1 : 0;
-}
-
-function getSqliteBoolean(value: number | boolean, fallback: boolean) {
-  if (typeof value === 'boolean') {
-    return value;
-  }
-
-  return value === 1 ? true : value === 0 ? false : fallback;
+function getBooleanString(value: string | undefined) {
+  return value === 'true' ? true : value === 'false' ? false : undefined;
 }
 
 function normalizeAppSettings(value: unknown): AppSettings {
@@ -428,6 +304,10 @@ function normalizeAppSettings(value: unknown): AppSettings {
   return {
     aiProviderId: getAIProviderId(input.aiProviderId),
     codexCommand: getString(input.codexCommand, DEFAULT_APP_SETTINGS.codexCommand),
+    codexModel: normalizeProviderModel(
+      getAIProviderId(input.aiProviderId),
+      getString(input.codexModel, DEFAULT_APP_SETTINGS.codexModel),
+    ),
     openAICompatible: normalizeOpenAICompatibleSettings(input.openAICompatible),
     ollama: normalizeOllamaSettings(input.ollama),
     dailyReminderEnabled: getBoolean(

@@ -7,14 +7,11 @@ import {
   appSettingsRepository,
   type AppSettings,
 } from '../../services/app-settings-repository';
-import { getDailyMemoryDate } from '../../services/daily-memory-repository';
 import { reminderService } from '../../services/reminder-service';
 import { syncWindowBehaviorSettings } from '../../services/window-service';
 import {
-  testMemoryInput,
   type ProviderHealth,
   type SettingsSection,
-  type TestResult,
 } from './settings-types';
 
 type UseSettingsDialogStateOptions = {
@@ -27,7 +24,6 @@ const initialProviderHealth: ProviderHealth = {
   message: '尚未检测',
 };
 
-const initialTestResult: TestResult = { type: 'idle' };
 const SETTINGS_SAVE_DEBOUNCE_MS = 500;
 
 export function useSettingsDialogState({ open, onClearLocalData }: UseSettingsDialogStateOptions) {
@@ -41,12 +37,10 @@ export function useSettingsDialogState({ open, onClearLocalData }: UseSettingsDi
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_APP_SETTINGS);
   const [isLoadingSettings, setIsLoadingSettings] = useState(false);
   const [isCheckingProvider, setIsCheckingProvider] = useState(false);
-  const [isTestingCodex, setIsTestingCodex] = useState(false);
   const [isSendingTestNotification, setIsSendingTestNotification] = useState(false);
   const [isClearingData, setIsClearingData] = useState(false);
   const [isClearConfirmOpen, setIsClearConfirmOpen] = useState(false);
   const [providerHealth, setProviderHealth] = useState<ProviderHealth>(initialProviderHealth);
-  const [testResult, setTestResult] = useState<TestResult>(initialTestResult);
 
   useEffect(() => {
     if (!open) {
@@ -165,7 +159,7 @@ export function useSettingsDialogState({ open, onClearLocalData }: UseSettingsDi
     setProviderHealth({ status: 'checking', message: '正在检测连接...' });
 
     try {
-      await persistSettings(normalizeCodexCommand(latestSettingsRef.current));
+      await persistSettings(normalizeProviderSettings(latestSettingsRef.current));
       const health = await aiService.checkHealth();
 
       if (runId === asyncRunId.current) {
@@ -182,33 +176,6 @@ export function useSettingsDialogState({ open, onClearLocalData }: UseSettingsDi
     } finally {
       if (runId === asyncRunId.current) {
         setIsCheckingProvider(false);
-      }
-    }
-  }
-
-  async function testGenerate() {
-    const runId = ++asyncRunId.current;
-
-    setIsTestingCodex(true);
-    setTestResult(initialTestResult);
-
-    try {
-      await persistSettings(normalizeCodexCommand(latestSettingsRef.current));
-      const generated = await aiService.generateDailyMemory({
-        date: getDailyMemoryDate(),
-        rawContent: testMemoryInput,
-        supplements: {},
-      });
-      if (runId === asyncRunId.current) {
-        setTestResult({ type: 'success', summary: generated.summary });
-      }
-    } catch (error) {
-      if (runId === asyncRunId.current) {
-        setTestResult({ type: 'error', message: getTestGenerateError(error) });
-      }
-    } finally {
-      if (runId === asyncRunId.current) {
-        setIsTestingCodex(false);
       }
     }
   }
@@ -247,9 +214,7 @@ export function useSettingsDialogState({ open, onClearLocalData }: UseSettingsDi
     setIsClearConfirmOpen(false);
     setIsCheckingProvider(false);
     setIsSendingTestNotification(false);
-    setIsTestingCodex(false);
     setProviderHealth(initialProviderHealth);
-    setTestResult(initialTestResult);
   }
 
   return {
@@ -262,27 +227,18 @@ export function useSettingsDialogState({ open, onClearLocalData }: UseSettingsDi
     isClearingData,
     isLoadingSettings,
     isSendingTestNotification,
-    isTestingCodex,
     setActiveSection,
     setIsClearConfirmOpen,
     settings,
     sendTestNotification,
-    testGenerate,
-    testResult,
     updateSettings,
     resetTransientState,
   };
 }
 
-function normalizeCodexCommand(settings: AppSettings) {
+function normalizeProviderSettings(settings: AppSettings) {
   return {
     ...settings,
     codexCommand: settings.codexCommand.trim() || DEFAULT_APP_SETTINGS.codexCommand,
   };
-}
-
-function getTestGenerateError(error: unknown) {
-  return error instanceof Error && error.message.trim()
-    ? error.message
-    : '测试生成失败，请检查当前 AI 服务配置。';
 }

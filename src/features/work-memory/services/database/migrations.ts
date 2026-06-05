@@ -23,13 +23,26 @@ async function migrateAppSettingsTable(database: DatabaseClient) {
   const columns = await database.select<TableColumnRow[]>('PRAGMA table_info(app_settings)');
   const columnNames = new Set(columns.map((column) => column.name));
 
-  if (columnNames.has('value_json')) {
-    await database.execute('ALTER TABLE app_settings RENAME TO app_settings_legacy_json');
+  if (columnNames.has('value_json') || (columnNames.has('key') && !columnNames.has('value'))) {
+    await database.execute('DROP TABLE app_settings');
     await database.execute(createAppSettingsTableSql);
+    await dropLegacyAppSettingsJsonTable(database);
     return;
   }
 
   if (!columnNames.has('key')) {
     await database.execute(createAppSettingsTableSql);
+  }
+
+  await dropLegacyAppSettingsJsonTable(database);
+}
+
+async function dropLegacyAppSettingsJsonTable(database: DatabaseClient) {
+  try {
+    await database.execute('DROP TABLE IF EXISTS app_settings_legacy_json');
+  } catch (error) {
+    // The legacy cleanup is not required for current reads/writes. SQLite
+    // inspection tools can hold read locks, so cleanup must not block startup.
+    console.warn('Failed to clean up legacy app settings table', error);
   }
 }

@@ -6,21 +6,18 @@ import { AISettingsSection } from './ai-settings-section';
 import { AppSettingsSection } from './app-settings-section';
 import { DataSettingsSection } from './data-settings-section';
 import { NotificationSettingsSection } from './notification-settings-section';
-import type { ProviderHealth, SettingsSection, TestResult } from './settings-types';
+import type { ProviderHealth, SettingsSection } from './settings-types';
 
 export type SettingsContentProps = {
   activeSection: SettingsSection;
   settings: AppSettings;
   isLoadingSettings: boolean;
   providerHealth: ProviderHealth;
-  testResult: TestResult;
   isCheckingProvider: boolean;
   isSendingTestNotification: boolean;
-  isTestingCodex: boolean;
   onUpdateSettings: (patch: Partial<AppSettings>) => void;
   onCheckHealth: () => void;
   onSendTestNotification: () => void;
-  onTestGenerate: () => void;
   onRequestClear: () => void;
 };
 
@@ -47,14 +44,11 @@ function SettingsSectionContent({
   activeSection,
   settings,
   providerHealth,
-  testResult,
   isCheckingProvider,
   isSendingTestNotification,
-  isTestingCodex,
   onUpdateSettings,
   onCheckHealth,
   onSendTestNotification,
-  onTestGenerate,
   onRequestClear,
 }: SettingsContentProps) {
   if (activeSection === 'ai') {
@@ -62,12 +56,9 @@ function SettingsSectionContent({
       <AISettingsSection
         settings={settings}
         providerHealth={providerHealth}
-        testResult={testResult}
         isCheckingProvider={isCheckingProvider}
-        isTestingCodex={isTestingCodex}
         onUpdateSettings={onUpdateSettings}
         onCheckHealth={onCheckHealth}
-        onTestGenerate={onTestGenerate}
       />
     );
   }

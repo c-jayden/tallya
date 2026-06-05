@@ -50,7 +50,7 @@ describe('SQLiteAppSettingsRepository', () => {
     await expect(repository.getSettings()).resolves.toEqual(saved);
   });
 
-  it('writes settings into dedicated columns instead of a single JSON payload', async () => {
+  it('writes settings as individual key-value rows', async () => {
     const database = new RecordingAppSettingsDatabase();
     const repository = new SQLiteAppSettingsRepository(Promise.resolve(database));
 
@@ -61,12 +61,13 @@ describe('SQLiteAppSettingsRepository', () => {
       dailyReminderEnabled: true,
     });
 
-    expect(database.lastSettingsWrite?.query.toLowerCase()).toContain('theme');
-    expect(database.lastSettingsWrite?.query.toLowerCase()).toContain('close_to_tray');
+    expect(database.appSettings.get('theme')?.value).toBe('dark');
+    expect(database.appSettings.get('codexModel')?.value).toBe(DEFAULT_APP_SETTINGS.codexModel);
+    expect(database.appSettings.get('closeToTray')?.value).toBe('false');
+    expect(database.appSettings.get('dailyReminderEnabled')?.value).toBe('true');
+    expect(database.appSettings.has('app_settings')).toBe(false);
+    expect(database.lastSettingsWrite?.query.toLowerCase()).toContain('key, value, updated_at');
     expect(database.lastSettingsWrite?.query.toLowerCase()).not.toContain('value_json');
-    expect(database.lastSettingsWrite?.bindValues).toContain('dark');
-    expect(database.lastSettingsWrite?.bindValues).toContain(0);
-    expect(database.lastSettingsWrite?.bindValues).toContain(1);
   });
 
   it('resets settings back to defaults', async () => {
@@ -173,28 +174,6 @@ describe('SQLiteAppSettingsRepository', () => {
     expect(storage.getItem('tallya.app-settings.sqlite-migrated.v1')).toBe('1');
   });
 
-  it('migrates the previous SQLite value_json row into the column table', async () => {
-    const database = new LegacySQLiteAppSettingsDatabase({
-      ...DEFAULT_APP_SETTINGS,
-      theme: 'dark',
-      closeToTray: false,
-      dailyReminderEnabled: true,
-    });
-    const repository = new SQLiteAppSettingsRepository(Promise.resolve(database), {
-      legacyStorage: null,
-    });
-
-    await expect(repository.getSettings()).resolves.toEqual({
-      ...DEFAULT_APP_SETTINGS,
-      theme: 'dark',
-      closeToTray: false,
-      dailyReminderEnabled: true,
-    });
-    expect(database.appSettings.get('app_settings')?.theme).toBe('dark');
-    expect(database.appSettings.get('app_settings')?.close_to_tray).toBe(0);
-    expect(database.appSettings.get('app_settings')?.daily_reminder_enabled).toBe(1);
-  });
-
   it('does not fail startup reads when legacy settings migration fails', async () => {
     const storage = new MemoryStorage();
     storage.setItem(
@@ -235,31 +214,5 @@ class RecordingAppSettingsDatabase extends TestDatabaseClient {
     }
 
     return super.execute(query, bindValues);
-  }
-}
-
-class LegacySQLiteAppSettingsDatabase extends TestDatabaseClient {
-  constructor(private readonly legacySettings: unknown) {
-    super();
-  }
-
-  override async select<T>(query: string, bindValues: unknown[] = []) {
-    const normalizedQuery = query.toLowerCase();
-
-    if (normalizedQuery.includes("name = 'app_settings_legacy_json'")) {
-      return [{ name: 'app_settings_legacy_json' }] as T;
-    }
-
-    if (normalizedQuery.includes('from app_settings_legacy_json')) {
-      return [
-        {
-          key: String(bindValues[0]),
-          value_json: JSON.stringify(this.legacySettings),
-          updated_at: '2026-06-05T00:00:00.000Z',
-        },
-      ] as T;
-    }
-
-    return super.select<T>(query, bindValues);
   }
 }

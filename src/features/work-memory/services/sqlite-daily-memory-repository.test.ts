@@ -143,11 +143,11 @@ describe('SQLiteDailyMemoryRepository', () => {
     const database = new TestDatabaseClient();
     const repository = createRepository(undefined, database);
 
-    await database.execute('INSERT INTO app_settings (key, value_json, updated_at) VALUES ($1, $2, $3)', [
-      'app_settings',
-      '{"theme":"dark"}',
-      '2026-06-02T01:00:00.000Z',
-    ]);
+    database.appSettings.set('theme', {
+      key: 'theme',
+      value: 'dark',
+      updated_at: '2026-06-02T01:00:00.000Z',
+    });
     await repository.saveDraft({
       date: '2026-06-02',
       rawContent: 'Draft to clear.',
@@ -158,7 +158,7 @@ describe('SQLiteDailyMemoryRepository', () => {
     await expect(repository.getAllMemories()).resolves.toEqual([]);
     expect(database.clearedReports).toBe(true);
     expect(database.clearedReportSources).toBe(true);
-    expect(database.appSettings.has('app_settings')).toBe(true);
+    expect(database.appSettings.has('theme')).toBe(true);
   });
 
   it('migrates legacy localStorage memories without deleting the old value', async () => {

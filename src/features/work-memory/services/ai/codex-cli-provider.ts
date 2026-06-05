@@ -1,17 +1,10 @@
 import { invoke } from '@tauri-apps/api/core';
 import type { GeneratedDailyMemory, GeneratedReportContent } from '../../types';
-import { AIProviderError, type AIProvider, type GenerateDailyMemoryOptions } from './ai-provider';
+import { AIProviderError, type AIProvider } from './ai-provider';
 
 type TauriInvoke = typeof invoke;
 
 const CODEX_PROVIDER_ID = 'ai-codex-cli';
-// Health checks include a tiny generation request because `codex --version`
-// cannot prove the user is logged in or that generation can return content.
-const HEALTH_CHECK_INPUT = {
-  date: '2026-06-03',
-  rawContent: '今天整理了需求讨论内容，确认了优先处理范围，并同步了后续计划。',
-  supplements: {},
-};
 
 export function createCodexCliProvider(invokeCommand: TauriInvoke = invoke): AIProvider {
   return {
@@ -22,6 +15,7 @@ export function createCodexCliProvider(invokeCommand: TauriInvoke = invoke): AIP
         return await invokeCommand<GeneratedDailyMemory>('generate_daily_memory_with_codex', {
           input,
           codexCommand: options.codexCommand,
+          codexModel: options.codexModel,
         });
       } catch (error) {
         throw new AIProviderError(getFriendlyCodexError(error), CODEX_PROVIDER_ID, error);
@@ -32,6 +26,7 @@ export function createCodexCliProvider(invokeCommand: TauriInvoke = invoke): AIP
         return await invokeCommand<GeneratedReportContent>('generate_weekly_report_with_codex', {
           input,
           codexCommand: options.codexCommand,
+          codexModel: options.codexModel,
         });
       } catch (error) {
         throw new AIProviderError(getFriendlyCodexError(error), CODEX_PROVIDER_ID, error);
@@ -40,11 +35,10 @@ export function createCodexCliProvider(invokeCommand: TauriInvoke = invoke): AIP
     async checkHealth(options) {
       try {
         const version = await checkCodexCli(invokeCommand, options.codexCommand);
-        await runCodexHealthGeneration(invokeCommand, options);
 
         return {
           status: 'available',
-          message: '可用',
+          message: '服务可用',
           detail: version,
         };
       } catch (error) {
@@ -78,7 +72,7 @@ function getFriendlyCodexError(error: unknown) {
     return error.message;
   }
 
-  return 'Codex 生成失败，请检查 Codex CLI 是否可用。';
+  return '当前 AI 服务生成失败，请检查服务配置。';
 }
 
 async function checkCodexCli(invokeCommand: TauriInvoke, command: string) {
@@ -86,20 +80,6 @@ async function checkCodexCli(invokeCommand: TauriInvoke, command: string) {
     return await invokeCommand<string>('check_codex_cli', { command });
   } catch (error) {
     throw Object.assign(new Error(getFriendlyCodexCheckError(error)), { cause: error });
-  }
-}
-
-async function runCodexHealthGeneration(
-  invokeCommand: TauriInvoke,
-  options: GenerateDailyMemoryOptions,
-) {
-  try {
-    await invokeCommand<GeneratedDailyMemory>('generate_daily_memory_with_codex', {
-      input: HEALTH_CHECK_INPUT,
-      codexCommand: options.codexCommand,
-    });
-  } catch (error) {
-    throw Object.assign(new Error(getFriendlyCodexError(error)), { cause: error });
   }
 }
 
@@ -112,5 +92,5 @@ function getFriendlyCodexCheckError(error: unknown) {
     return error.message;
   }
 
-  return '未检测到 Codex，请检查命令路径或登录状态。';
+  return '未检测到当前 AI 服务，请检查服务配置。';
 }

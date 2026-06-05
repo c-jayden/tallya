@@ -9,41 +9,44 @@ import {
 } from '@/components/ui/select';
 import type { AppSettings } from '../../services/app-settings-repository';
 import type { AIProviderId } from '../../services/ai/ai-provider';
+import {
+  getDefaultProviderModel,
+  getKnownProviderModels,
+  normalizeProviderModel,
+} from '../../services/ai/known-models';
 import { Field, StatusLine } from './settings-shared';
-import type { ProviderHealth, TestResult } from './settings-types';
+import type { ProviderHealth } from './settings-types';
 
 const visibleProviderOptions: { value: AIProviderId; label: string; description: string }[] = [
   {
     value: 'ai-codex-cli',
     label: 'Codex CLI',
-    description: '通过本机 Codex CLI 整理工作记忆。',
+    description: '使用当前服务整理工作记忆。',
   },
 ];
 
 type AISettingsSectionProps = {
   settings: AppSettings;
   providerHealth: ProviderHealth;
-  testResult: TestResult;
   isCheckingProvider: boolean;
-  isTestingCodex: boolean;
   onUpdateSettings: (patch: Partial<AppSettings>) => void;
   onCheckHealth: () => void;
-  onTestGenerate: () => void;
 };
 
 export function AISettingsSection({
   settings,
   providerHealth,
-  testResult,
   isCheckingProvider,
-  isTestingCodex,
   onUpdateSettings,
   onCheckHealth,
-  onTestGenerate,
 }: AISettingsSectionProps) {
   const selectedProvider =
     visibleProviderOptions.find((option) => option.value === settings.aiProviderId) ??
     visibleProviderOptions[0];
+  const modelOptions = getKnownProviderModels(selectedProvider.value);
+  const selectedModel =
+    normalizeProviderModel(selectedProvider.value, settings.codexModel) ||
+    getDefaultProviderModel(selectedProvider.value);
 
   return (
     <section className="space-y-7" aria-label="AI 配置">
@@ -53,13 +56,43 @@ export function AISettingsSection({
         <Field label="AI 服务" description={selectedProvider.description}>
           <Select
             value={selectedProvider.value}
-            onValueChange={(value) => onUpdateSettings({ aiProviderId: value as AIProviderId })}
+            onValueChange={(value) => {
+              const aiProviderId = value as AIProviderId;
+
+              onUpdateSettings({
+                aiProviderId,
+                codexModel:
+                  normalizeProviderModel(aiProviderId, settings.codexModel) ||
+                  getDefaultProviderModel(aiProviderId),
+              });
+            }}
           >
             <SelectTrigger className="h-10 w-56 bg-app-surface">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               {visibleProviderOptions.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Field>
+
+        <Field
+          label="模型"
+          description="选择当前服务用于整理工作记忆的模型。"
+        >
+          <Select
+            value={selectedModel}
+            onValueChange={(codexModel) => onUpdateSettings({ codexModel })}
+          >
+            <SelectTrigger className="h-10 w-56 bg-app-surface">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {modelOptions.map((option) => (
                 <SelectItem key={option.value} value={option.value}>
                   {option.label}
                 </SelectItem>
@@ -82,30 +115,14 @@ export function AISettingsSection({
                 )}
                 检测连接
               </Button>
-              <Button
-                type="button"
-                variant="outline"
-                disabled={isTestingCodex}
-                onClick={onTestGenerate}
-              >
-                {isTestingCodex && <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />}
-                测试生成
-              </Button>
               <StatusLine health={providerHealth} />
             </div>
+            <p className="text-[13px] leading-5 text-app-ink-subtle">
+              连接检测会快速确认当前服务是否可访问，模型和账号状态会在生成时继续校验。
+            </p>
           </div>
         </Field>
       </div>
-
-      {testResult.type === 'success' && (
-        <div className="rounded-lg border border-app-border bg-app-surface-muted/55 p-3 text-sm">
-          <div className="font-medium text-app-ink">生成成功</div>
-          <div className="mt-1 text-app-ink-muted">摘要：{testResult.summary}</div>
-        </div>
-      )}
-      {testResult.type === 'error' && (
-        <p className="text-sm text-destructive">{testResult.message}</p>
-      )}
     </section>
   );
 }

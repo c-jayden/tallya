@@ -14,24 +14,7 @@ type DailyMemoryRow = {
 
 type AppSettingsRow = {
   key: string;
-  ai_provider_id: string;
-  codex_command: string;
-  openai_base_url: string;
-  openai_api_key: string;
-  openai_model: string;
-  ollama_base_url: string;
-  ollama_model: string;
-  daily_reminder_enabled: number;
-  daily_reminder_time: string;
-  daily_reminder_message: string;
-  weekly_reminder_enabled: number;
-  weekly_reminder_weekday: string;
-  weekly_reminder_time: string;
-  weekly_reminder_message: string;
-  theme: string;
-  launch_at_startup: number;
-  close_to_tray: number;
-  start_minimized: number;
+  value: string;
   updated_at: string;
 };
 
@@ -94,25 +77,8 @@ export class TestDatabaseClient implements DatabaseClient {
     if (normalizedQuery.startsWith('insert into app_settings')) {
       const row: AppSettingsRow = {
         key: String(bindValues[0]),
-        ai_provider_id: String(bindValues[1]),
-        codex_command: String(bindValues[2]),
-        openai_base_url: String(bindValues[3]),
-        openai_api_key: String(bindValues[4]),
-        openai_model: String(bindValues[5]),
-        ollama_base_url: String(bindValues[6]),
-        ollama_model: String(bindValues[7]),
-        daily_reminder_enabled: Number(bindValues[8]),
-        daily_reminder_time: String(bindValues[9]),
-        daily_reminder_message: String(bindValues[10]),
-        weekly_reminder_enabled: Number(bindValues[11]),
-        weekly_reminder_weekday: String(bindValues[12]),
-        weekly_reminder_time: String(bindValues[13]),
-        weekly_reminder_message: String(bindValues[14]),
-        theme: String(bindValues[15]),
-        launch_at_startup: Number(bindValues[16]),
-        close_to_tray: Number(bindValues[17]),
-        start_minimized: Number(bindValues[18]),
-        updated_at: String(bindValues[19]),
+        value: String(bindValues[1]),
+        updated_at: String(bindValues[2]),
       };
 
       this.appSettings.set(row.key, row);
@@ -178,6 +144,16 @@ export class TestDatabaseClient implements DatabaseClient {
       this.clearedReportSources = true;
       return;
     }
+
+    if (normalizedQuery.startsWith('drop table if exists app_settings_legacy_json')) {
+      return;
+    }
+
+    if (normalizedQuery.startsWith('drop table app_settings')) {
+      this.appSettings.clear();
+      this.createdTables.delete('app_settings');
+      return;
+    }
   }
 
   async select<T>(query: string, bindValues: unknown[] = []) {
@@ -199,6 +175,12 @@ export class TestDatabaseClient implements DatabaseClient {
       return this.getTableRows('app_settings') as T;
     }
 
+    if (normalizedQuery.startsWith('pragma table_info(app_settings)')) {
+      return (this.createdTables.has('app_settings')
+        ? [{ name: 'key' }, { name: 'value' }, { name: 'updated_at' }]
+        : []) as T;
+    }
+
     if (normalizedQuery.startsWith('select * from daily_memories where date =')) {
       const row = this.dailyMemories.get(String(bindValues[0]));
       return (row ? [row] : []) as T;
@@ -217,9 +199,8 @@ export class TestDatabaseClient implements DatabaseClient {
         .sort((first, second) => second.date.localeCompare(first.date)) as T;
     }
 
-    if (normalizedQuery.startsWith('select * from app_settings where key =')) {
-      const row = this.appSettings.get(String(bindValues[0]));
-      return (row ? [row] : []) as T;
+    if (normalizedQuery.startsWith('select key, value from app_settings')) {
+      return Array.from(this.appSettings.values()).map(({ key, value }) => ({ key, value })) as T;
     }
 
     if (normalizedQuery.startsWith('select * from reports where type =')) {

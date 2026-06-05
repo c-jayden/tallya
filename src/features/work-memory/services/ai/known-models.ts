@@ -1,0 +1,45 @@
+import type { AIProviderId } from './ai-provider';
+
+export const DEFAULT_CODEX_MODEL = 'gpt-5.4-mini';
+
+export type AIModelOption = {
+  value: string;
+  label: string;
+};
+
+export const knownProviderModels: Record<AIProviderId, AIModelOption[]> = {
+  'ai-codex-cli': [
+    {
+      value: 'gpt-5.5',
+      label: 'GPT-5.5',
+    },
+    {
+      value: 'gpt-5.4',
+      label: 'GPT-5.4',
+    },
+    {
+      value: 'gpt-5.4-mini',
+      label: 'GPT-5.4-Mini',
+    },
+  ],
+  'openai-compatible': [],
+  ollama: [],
+};
+
+export function getKnownProviderModels(providerId: AIProviderId) {
+  return knownProviderModels[providerId] ?? [];
+}
+
+export function normalizeProviderModel(providerId: AIProviderId, model: string) {
+  const models = getKnownProviderModels(providerId);
+
+  return models.some((option) => option.value === model) ? model : (models[0]?.value ?? model);
+}
+
+export function getDefaultProviderModel(providerId: AIProviderId) {
+  if (providerId === 'ai-codex-cli') {
+    return DEFAULT_CODEX_MODEL;
+  }
+
+  return getKnownProviderModels(providerId)[0]?.value ?? '';
+}

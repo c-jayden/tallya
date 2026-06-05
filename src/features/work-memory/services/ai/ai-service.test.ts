@@ -53,6 +53,7 @@ const weeklyGenerated: GeneratedReportContent = {
 const settings: AppSettings = {
   aiProviderId: 'ai-codex-cli',
   codexCommand: 'custom-codex',
+  codexModel: 'gpt-5.4-mini',
   openAICompatible: {
     baseUrl: '',
     apiKey: '',
@@ -95,13 +96,14 @@ describe('createAIService', () => {
     await expect(service.generateDailyMemory(input)).resolves.toEqual(generated);
     expect(generateDailyMemory).toHaveBeenCalledWith(input, {
       codexCommand: 'custom-codex',
+      codexModel: 'gpt-5.4-mini',
     });
   });
 
   it('checks health through the selected provider with saved settings', async () => {
     const checkHealth = vi.fn<NonNullable<AIProvider['checkHealth']>>().mockResolvedValue({
       status: 'available',
-      message: '可用',
+      message: '服务可用',
       detail: 'codex 1.2.3',
     });
     const service = createAIService({
@@ -119,11 +121,12 @@ describe('createAIService', () => {
 
     await expect(service.checkHealth()).resolves.toEqual({
       status: 'available',
-      message: '可用',
+      message: '服务可用',
       detail: 'codex 1.2.3',
     });
     expect(checkHealth).toHaveBeenCalledWith({
       codexCommand: 'custom-codex',
+      codexModel: 'gpt-5.4-mini',
     });
   });
 
@@ -146,6 +149,7 @@ describe('createAIService', () => {
     await expect(service.generateWeeklyReport(weeklyInput)).resolves.toEqual(weeklyGenerated);
     expect(generateWeeklyReport).toHaveBeenCalledWith(weeklyInput, {
       codexCommand: 'custom-codex',
+      codexModel: 'gpt-5.4-mini',
     });
   });
 });

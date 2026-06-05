@@ -53,14 +53,11 @@ export function SettingsDialog({ open, onOpenChange, onClearLocalData }: Setting
               settings={settingsState.settings}
               isLoadingSettings={settingsState.isLoadingSettings}
               providerHealth={settingsState.providerHealth}
-              testResult={settingsState.testResult}
               isCheckingProvider={settingsState.isCheckingProvider}
               isSendingTestNotification={settingsState.isSendingTestNotification}
-              isTestingCodex={settingsState.isTestingCodex}
               onUpdateSettings={settingsState.updateSettings}
               onCheckHealth={settingsState.checkProviderHealth}
               onSendTestNotification={settingsState.sendTestNotification}
-              onTestGenerate={settingsState.testGenerate}
               onRequestClear={() => settingsState.setIsClearConfirmOpen(true)}
             />
           </div>

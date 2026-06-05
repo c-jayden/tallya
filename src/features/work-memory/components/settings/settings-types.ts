@@ -5,11 +5,6 @@ export type SettingsSection = 'ai' | 'notifications' | 'app' | 'data' | 'about';
 
 export type { ProviderHealth };
 
-export type TestResult =
-  | { type: 'idle' }
-  | { type: 'success'; summary: string }
-  | { type: 'error'; message: string };
-
 export const menuItems: { id: SettingsSection; label: string }[] = [
   { id: 'ai', label: 'AI 配置' },
   { id: 'notifications', label: '通知提醒' },
@@ -33,5 +28,3 @@ export const themeOptions: { value: AppTheme; label: string }[] = [
   { value: 'light', label: '浅色' },
   { value: 'dark', label: '深色' },
 ];
-
-export const testMemoryInput = '今天整理了需求讨论内容，确认了优先处理范围，并同步了后续计划。';
