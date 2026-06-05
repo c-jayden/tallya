@@ -5,13 +5,13 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
 import { formatMemoryDate, getMemorySummary, getRelativeMemoryDate } from '../memory-view-model';
 import type { DailyMemory } from '../types';
 import { MemoryDocument } from './memory-document';
+import { TallyaDialogFooter } from './tallya-dialog-footer';
 
 type MemoryListDialogProps = {
   open: boolean;
@@ -64,9 +64,7 @@ export function MemoryListDialog({
             {isDetailMode ? detailTitle : '工作记忆'}
           </DialogTitle>
           <DialogDescription className="text-[13px] leading-[1.5] text-app-ink-muted">
-            {isDetailMode
-              ? '这是当天保存的正式工作记忆。'
-              : '按时间倒序查看你已经沉淀的工作记录。'}
+            {isDetailMode ? '这是当天保存的正式工作记忆。' : '按时间倒序查看你已经沉淀的工作记录。'}
           </DialogDescription>
         </DialogHeader>
         <TallyaScrollArea className="min-h-0 max-h-[calc(100vh-184px)] flex-1 px-6 pb-5">
@@ -93,7 +91,7 @@ export function MemoryListDialog({
           )}
         </TallyaScrollArea>
         {isTodayMemory && selectedMemory ? (
-          <DialogFooter className="mx-0 mt-0 mb-0 shrink-0 rounded-b-xl border-t border-app-border bg-[color-mix(in_srgb,var(--app-surface)_86%,var(--app-surface-muted))] px-6 py-3 sm:flex-row sm:justify-end">
+          <TallyaDialogFooter>
             <Button
               type="button"
               variant="ghost"
@@ -109,7 +107,7 @@ export function MemoryListDialog({
             >
               编辑原始记录
             </Button>
-          </DialogFooter>
+          </TallyaDialogFooter>
         ) : null}
       </DialogContent>
     </Dialog>

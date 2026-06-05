@@ -6,6 +6,7 @@ import { AISettingsSection } from './ai-settings-section';
 import { AppSettingsSection } from './app-settings-section';
 import { DataSettingsSection } from './data-settings-section';
 import { NotificationSettingsSection } from './notification-settings-section';
+import { ReportPreferencesSettingsSection } from './report-preferences-settings-section';
 import type { ProviderHealth, SettingsSection } from './settings-types';
 
 export type SettingsContentProps = {
@@ -70,6 +71,15 @@ function SettingsSectionContent({
         isSendingTestNotification={isSendingTestNotification}
         onUpdateSettings={onUpdateSettings}
         onSendTestNotification={onSendTestNotification}
+      />
+    );
+  }
+
+  if (activeSection === 'reports') {
+    return (
+      <ReportPreferencesSettingsSection
+        settings={settings}
+        onUpdateSettings={onUpdateSettings}
       />
     );
   }

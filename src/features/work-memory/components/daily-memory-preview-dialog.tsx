@@ -5,12 +5,12 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
 import type { DailyMemoryGeneratedContent } from '../types';
 import { MemoryDocument } from './memory-document';
+import { TallyaDialogFooter } from './tallya-dialog-footer';
 
 type DailyMemoryPreviewDialogProps = {
   open: boolean;
@@ -46,7 +46,7 @@ export function DailyMemoryPreviewDialog({
         <TallyaScrollArea className="min-h-0 max-h-[calc(100vh-190px)] flex-1 px-6 pb-5">
           <MemoryDocument content={content} />
         </TallyaScrollArea>
-        <DialogFooter className="mx-0 mt-0 mb-0 shrink-0 rounded-b-xl border-t border-app-border bg-[color-mix(in_srgb,var(--app-surface)_86%,var(--app-surface-muted))] px-6 py-3 sm:flex-row sm:justify-end">
+        <TallyaDialogFooter>
           <Button
             type="button"
             variant="ghost"
@@ -65,7 +65,7 @@ export function DailyMemoryPreviewDialog({
             {isSaving ? <Loader2 className="animate-spin" aria-hidden="true" /> : null}
             {saveLabel}
           </Button>
-        </DialogFooter>
+        </TallyaDialogFooter>
       </DialogContent>
     </Dialog>
   );

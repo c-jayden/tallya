@@ -3,6 +3,7 @@ import { DEFAULT_CODEX_MODEL, normalizeProviderModel } from './ai/known-models';
 import type { DatabaseClient } from './database/database';
 import { getDatabase } from './database/database';
 import { createFriendlyError } from './service-error';
+import type { ReportFocus, ReportLength, ReportTone } from '../types';
 
 export type AppTheme = 'system' | 'light' | 'dark';
 
@@ -30,6 +31,9 @@ export type AppSettings = {
   weeklyReminderWeekday: string;
   weeklyReminderTime: string;
   weeklyReminderMessage: string;
+  reportLength: ReportLength;
+  reportTone: ReportTone;
+  reportFocus: ReportFocus;
   theme: AppTheme;
   launchAtStartup: boolean;
   closeToTray: boolean;
@@ -62,6 +66,9 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   weeklyReminderWeekday: 'friday',
   weeklyReminderTime: '18:30',
   weeklyReminderMessage: '可以整理一下这周的工作脉络了。',
+  reportLength: 'standard',
+  reportTone: 'natural',
+  reportFocus: 'outcomes',
   theme: 'system',
   launchAtStartup: false,
   closeToTray: true,
@@ -253,6 +260,9 @@ function appSettingsToRows(settings: AppSettings): Record<string, string> {
     weeklyReminderWeekday: settings.weeklyReminderWeekday,
     weeklyReminderTime: settings.weeklyReminderTime,
     weeklyReminderMessage: settings.weeklyReminderMessage,
+    reportLength: settings.reportLength,
+    reportTone: settings.reportTone,
+    reportFocus: settings.reportFocus,
     theme: settings.theme,
     launchAtStartup: String(settings.launchAtStartup),
     closeToTray: String(settings.closeToTray),
@@ -283,6 +293,9 @@ function rowsToAppSettingsInput(rows: AppSettingsRow[]) {
     weeklyReminderWeekday: values.weeklyReminderWeekday,
     weeklyReminderTime: values.weeklyReminderTime,
     weeklyReminderMessage: values.weeklyReminderMessage,
+    reportLength: values.reportLength,
+    reportTone: values.reportTone,
+    reportFocus: values.reportFocus,
     theme: values.theme,
     launchAtStartup: getBooleanString(values.launchAtStartup),
     closeToTray: getBooleanString(values.closeToTray),
@@ -335,6 +348,9 @@ function normalizeAppSettings(value: unknown): AppSettings {
       input.weeklyReminderMessage,
       DEFAULT_APP_SETTINGS.weeklyReminderMessage,
     ),
+    reportLength: getReportLength(input.reportLength),
+    reportTone: getReportTone(input.reportTone),
+    reportFocus: getReportFocus(input.reportFocus),
     theme: getTheme(input.theme),
     launchAtStartup: getBoolean(input.launchAtStartup, DEFAULT_APP_SETTINGS.launchAtStartup),
     closeToTray: getBoolean(input.closeToTray, DEFAULT_APP_SETTINGS.closeToTray),
@@ -354,6 +370,24 @@ function getTheme(value: unknown): AppTheme {
   return value === 'system' || value === 'light' || value === 'dark'
     ? value
     : DEFAULT_APP_SETTINGS.theme;
+}
+
+function getReportLength(value: unknown): ReportLength {
+  return value === 'brief' || value === 'standard' || value === 'detailed'
+    ? value
+    : DEFAULT_APP_SETTINGS.reportLength;
+}
+
+function getReportTone(value: unknown): ReportTone {
+  return value === 'natural' || value === 'formal' || value === 'retrospective'
+    ? value
+    : DEFAULT_APP_SETTINGS.reportTone;
+}
+
+function getReportFocus(value: unknown): ReportFocus {
+  return value === 'outcomes' || value === 'completed-items' || value === 'risks'
+    ? value
+    : DEFAULT_APP_SETTINGS.reportFocus;
 }
 
 function getAIProviderId(value: unknown): AIProviderId {

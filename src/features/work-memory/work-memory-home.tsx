@@ -48,10 +48,18 @@ export function WorkMemoryHome() {
     isSearchOpen: search.isSearchOpen,
     onCloseSearch: search.closeSearchPanel,
     onSettleTodayMemory: memory.settleTodayMemory,
-    onTriggerSearch: search.openSearchPanel,
+    onTriggerSearch: () => {
+      if (!weeklyReport.isReportBusy) {
+        search.openSearchPanel();
+      }
+    },
   });
 
   function closeHomeOverlays() {
+    if (weeklyReport.isReportBusy) {
+      return;
+    }
+
     setIsSettingsOpen(false);
     search.closeSearchPanel();
     memory.setIsMemoryDialogOpen(false);
@@ -62,10 +70,18 @@ export function WorkMemoryHome() {
 
   useTrayWindowEvents({
     onFocusEntry: () => {
+      if (weeklyReport.isReportBusy) {
+        return;
+      }
+
       closeHomeOverlays();
       window.setTimeout(() => memory.workNoteInputRef.current?.focus(), 0);
     },
     onOpenSearch: () => {
+      if (weeklyReport.isReportBusy) {
+        return;
+      }
+
       setIsSettingsOpen(false);
       weeklyReport.closeReportDialogs();
       memory.setIsMemoryDialogOpen(false);
@@ -74,6 +90,10 @@ export function WorkMemoryHome() {
       search.openSearchPanel();
     },
     onOpenSettings: () => {
+      if (weeklyReport.isReportBusy) {
+        return;
+      }
+
       search.closeSearchPanel();
       weeklyReport.closeReportDialogs();
       memory.setIsMemoryDialogOpen(false);
@@ -96,8 +116,16 @@ export function WorkMemoryHome() {
             dateTime={today.toISOString()}
             searchButtonRef={search.searchButtonRef}
             weekday={displayWeekday}
-            onSearchClick={search.openSearchPanel}
-            onSettingsClick={() => setIsSettingsOpen(true)}
+            onSearchClick={() => {
+              if (!weeklyReport.isReportBusy) {
+                search.openSearchPanel();
+              }
+            }}
+            onSettingsClick={() => {
+              if (!weeklyReport.isReportBusy) {
+                setIsSettingsOpen(true);
+              }
+            }}
           />
 
           <MemoryHero />
@@ -189,6 +217,7 @@ export function WorkMemoryHome() {
         draft={weeklyReport.weeklyReportDraft}
         isSaving={weeklyReport.isSavingReport}
         onOpenChange={weeklyReport.setIsPreviewDialogOpen}
+        onCopyText={weeklyReport.copyPlainText}
         onCopyMarkdown={weeklyReport.copyMarkdown}
         onSave={weeklyReport.saveWeeklyReport}
       />
@@ -203,6 +232,7 @@ export function WorkMemoryHome() {
         report={weeklyReport.selectedReport}
         isRegenerating={weeklyReport.isGeneratingReport}
         onOpenChange={weeklyReport.setIsReportDetailOpen}
+        onCopyText={weeklyReport.copySavedReportPlainText}
         onCopyMarkdown={weeklyReport.copySavedReportMarkdown}
         onRegenerate={weeklyReport.regenerateSelectedReport}
       />

@@ -84,6 +84,12 @@ struct GenerateWeeklyReportInput {
     start_date: String,
     end_date: String,
     memories: Vec<DailyMemoryForReport>,
+    #[serde(default = "default_report_length")]
+    report_length: String,
+    #[serde(default = "default_report_tone")]
+    report_tone: String,
+    #[serde(default = "default_report_focus")]
+    report_focus: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -116,6 +122,18 @@ struct GeneratedReportContent {
     next_week_plan: Option<String>,
     #[serde(default)]
     markdown: String,
+}
+
+fn default_report_length() -> String {
+    "standard".to_string()
+}
+
+fn default_report_tone() -> String {
+    "natural".to_string()
+}
+
+fn default_report_focus() -> String {
+    "outcomes".to_string()
 }
 
 #[tauri::command]
@@ -539,21 +557,131 @@ JSON keys: summary:string, completedItems:string[], keyOutcome?:string, problems
 
 fn build_codex_weekly_report_prompt(input: &GenerateWeeklyReportInput) -> String {
     let input_json = serde_json::to_string(input).unwrap_or_else(|_| "{}".to_string());
+    let length_instruction = report_length_instruction(&input.report_length);
+    let tone_instruction = report_tone_instruction(&input.report_tone);
+    let focus_instruction = report_focus_instruction(&input.report_focus);
+    let single_memory_instruction = report_single_memory_instruction(input);
 
     format!(
         r#"请根据输入中的 daily memories 整理一份中文本周周报。只输出合法 JSON，不要 markdown code fence、解释、代码块或工具调用。
 JSON keys: title:string, summary:string, highlights:string[], completedItems:string[], problems?:string, nextWeekPlan?:string, markdown:string.
 规则：
 - 只能使用输入里已经存在的工作记忆，不要编造没有做过的事情。
-- 可以做归纳、合并和润色，语气保持克制、清楚、适合工作复盘。
-- highlights 控制在 3-5 条。
+- 可以做归纳、合并和润色，语气遵守 Tallya 的产品性格：温和、克制、清楚，不鸡血、不像任务监督或绩效评价。
+- {length_instruction}
+- {single_memory_instruction}
+- {tone_instruction}
+- {focus_instruction}
 - completedItems 合并相近事项，避免把同一件事拆得过碎。
 - problems 只总结 daily memories 中提到的问题或风险；没有则返回空字符串。
 - nextWeekPlan 根据明日计划、未完成事项和问题保守提炼；没有则返回空字符串。
 - markdown 是一份可直接复制的周报文本，使用中文标题和分节。
+- markdown 不要包含多余空行；section 之间最多一个空行；不要输出空 section；不要用空行撑篇幅。
 输入：{input_json}
 "#
     )
+}
+
+fn report_length_instruction(value: &str) -> &'static str {
+    match value {
+        "brief" => {
+            "报告详略：精简。summary 1 句话；highlights 2-3 条；completedItems 2-3 条；problems 最多 1 句话；nextWeekPlan 最多 1 句话；markdown 控制在 250-450 字。不要为了凑结构强行扩写，合并相近事项。"
+        }
+        "detailed" => {
+            "报告详略：详细。summary 2-3 句话；highlights 4-6 条；completedItems 5-8 条；problems 和 nextWeekPlan 可以适度展开；markdown 控制在 800-1200 字。"
+        }
+        _ => {
+            "报告详略：标准。summary 1-2 句话；highlights 3-5 条；completedItems 3-6 条；problems 和 nextWeekPlan 各 1 段；markdown 控制在 500-800 字。"
+        }
+    }
+}
+
+fn report_single_memory_instruction(input: &GenerateWeeklyReportInput) -> &'static str {
+    if input.report_length == "brief" && input.memories.len() == 1 {
+        return "当前只有 1 条工作记忆，整体进一步压缩：highlights 最多 2 条，completedItems 最多 2 条，problems 和 nextWeekPlan 只保留必要内容，不要把同一条记忆拆成过多项目。";
+    }
+
+    "如果可用工作记忆较少，不要为了篇幅扩写或重复表达。"
+}
+
+fn report_tone_instruction(value: &str) -> &'static str {
+    match value {
+        "formal" => "报告语气：正式。适合发给上级或团队，表达更规范，但不要官样化。",
+        "retrospective" => "报告语气：复盘型。更关注阶段进展、问题和下一步计划，但不要编造反思。",
+        _ => "报告语气：自然。表达自然、清楚，像轻量工作回顾，不要过度正式。",
+    }
+}
+
+fn report_focus_instruction(value: &str) -> &'static str {
+    match value {
+        "completed-items" => "报告重点：完成事项优先。优先突出本周完成的具体事项。",
+        "risks" => "报告重点：问题风险优先。优先突出问题、风险、阻塞和后续跟进。",
+        _ => "报告重点：关键产出优先。优先突出关键产出和阶段性进展。",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn weekly_report_prompt_includes_brief_length_rules() {
+        let input = weekly_input("brief", "natural", "outcomes");
+
+        let prompt = build_codex_weekly_report_prompt(&input);
+
+        assert!(prompt.contains("报告详略：精简"));
+        assert!(prompt.contains("markdown 控制在 250-450 字"));
+        assert!(prompt.contains("highlights 2-3 条"));
+        assert!(prompt.contains("只有 1 条工作记忆"));
+        assert!(prompt.contains("highlights 最多 2 条"));
+    }
+
+    #[test]
+    fn weekly_report_prompt_includes_tone_and_focus_rules() {
+        let input = weekly_input("detailed", "retrospective", "risks");
+
+        let prompt = build_codex_weekly_report_prompt(&input);
+
+        assert!(prompt.contains("报告语气：复盘型"));
+        assert!(prompt.contains("报告重点：问题风险优先"));
+        assert!(prompt.contains("不要编造反思"));
+    }
+
+    fn weekly_input(
+        report_length: &str,
+        report_tone: &str,
+        report_focus: &str,
+    ) -> GenerateWeeklyReportInput {
+        GenerateWeeklyReportInput {
+            start_date: "2026-06-01".to_string(),
+            end_date: "2026-06-07".to_string(),
+            report_length: report_length.to_string(),
+            report_tone: report_tone.to_string(),
+            report_focus: report_focus.to_string(),
+            memories: vec![DailyMemoryForReport {
+                id: "daily-memory-2026-06-01".to_string(),
+                date: "2026-06-01".to_string(),
+                raw_content: "完成 SQLite 迁移。".to_string(),
+                supplements: DailyMemorySupplements {
+                    project_topic: None,
+                    tomorrow_plan: Some("继续整理报告能力。".to_string()),
+                    extra_note: None,
+                },
+                generated: Some(GeneratedDailyMemory {
+                    summary: "完成 SQLite 迁移。".to_string(),
+                    completed_items: vec!["迁移本地存储".to_string()],
+                    key_outcome: None,
+                    problems: None,
+                    tomorrow_plan: Some("继续整理报告能力。".to_string()),
+                    extra_note: None,
+                }),
+                status: "generated".to_string(),
+                created_at: "2026-06-01T01:00:00.000Z".to_string(),
+                updated_at: "2026-06-01T02:00:00.000Z".to_string(),
+            }],
+        }
+    }
 }
 
 fn create_codex_output_path(output_kind: &str) -> std::path::PathBuf {
@@ -676,7 +804,7 @@ fn normalize_generated_weekly_report(
         completed_items,
         problems,
         next_week_plan,
-        markdown: generated.markdown.trim().to_string(),
+        markdown: normalize_report_text(&generated.markdown),
     };
 
     if report.markdown.is_empty() {
@@ -738,6 +866,34 @@ fn build_weekly_report_markdown(
     }
 
     sections.join("\n")
+}
+
+fn normalize_report_text(text: &str) -> String {
+    let mut output = String::new();
+    let mut blank_lines = 0;
+
+    for line in text.replace("\r\n", "\n").lines() {
+        let trimmed_line = line.trim_end();
+
+        if trimmed_line.trim().is_empty() {
+            blank_lines += 1;
+
+            if blank_lines <= 1 && !output.is_empty() {
+                output.push('\n');
+            }
+
+            continue;
+        }
+
+        if !output.is_empty() {
+            output.push('\n');
+        }
+
+        output.push_str(trimmed_line);
+        blank_lines = 0;
+    }
+
+    output.trim().to_string()
 }
 
 fn push_markdown_list(sections: &mut Vec<String>, title: &str, items: &[String]) {

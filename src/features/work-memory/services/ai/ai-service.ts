@@ -2,7 +2,7 @@ import type {
   GeneratedDailyMemory,
   GeneratedReportContent,
   GenerateDailyMemoryInput,
-  GenerateWeeklyReportInput,
+  WeeklyReportSourceInput,
 } from '../../types';
 import { appSettingsRepository, type AppSettings } from '../app-settings-repository';
 import { type AIProvider, type ProviderHealth } from './ai-provider';
@@ -56,14 +56,22 @@ export function createAIService({
       });
     },
 
-    async generateWeeklyReport(input: GenerateWeeklyReportInput): Promise<GeneratedReportContent> {
+    async generateWeeklyReport(input: WeeklyReportSourceInput): Promise<GeneratedReportContent> {
       const settings = await settingsRepository.getSettings();
       const provider = getProviderForSettings(settings, codexProvider);
 
-      return provider.generateWeeklyReport(input, {
-        codexCommand: settings.codexCommand,
-        codexModel: settings.codexModel,
-      });
+      return provider.generateWeeklyReport(
+        {
+          ...input,
+          reportLength: settings.reportLength,
+          reportTone: settings.reportTone,
+          reportFocus: settings.reportFocus,
+        },
+        {
+          codexCommand: settings.codexCommand,
+          codexModel: settings.codexModel,
+        },
+      );
     },
 
     async checkHealth(): Promise<ProviderHealth> {

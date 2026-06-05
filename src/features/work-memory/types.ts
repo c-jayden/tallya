@@ -43,11 +43,25 @@ export type GeneratedDailyMemory = {
 
 export type DailyMemoryGeneratedContent = GeneratedDailyMemory;
 
-export type GenerateWeeklyReportInput = {
+export type ReportLength = 'brief' | 'standard' | 'detailed';
+
+export type ReportTone = 'natural' | 'formal' | 'retrospective';
+
+export type ReportFocus = 'outcomes' | 'completed-items' | 'risks';
+
+export type ReportPreferences = {
+  reportLength: ReportLength;
+  reportTone: ReportTone;
+  reportFocus: ReportFocus;
+};
+
+export type WeeklyReportSourceInput = {
   startDate: string;
   endDate: string;
   memories: DailyMemory[];
 };
+
+export type GenerateWeeklyReportInput = WeeklyReportSourceInput & ReportPreferences;
 
 export type GeneratedReportContent = {
   title: string;

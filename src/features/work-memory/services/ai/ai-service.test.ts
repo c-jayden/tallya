@@ -4,7 +4,7 @@ import type {
   GeneratedDailyMemory,
   GeneratedReportContent,
   GenerateDailyMemoryInput,
-  GenerateWeeklyReportInput,
+  WeeklyReportSourceInput,
 } from '../../types';
 import { createAIService } from './ai-service';
 import type { AIProvider } from './ai-provider';
@@ -20,7 +20,7 @@ const generated: GeneratedDailyMemory = {
   completedItems: ['整理需求讨论内容', '确认优先处理范围', '同步后续计划'],
 };
 
-const weeklyInput: GenerateWeeklyReportInput = {
+const weeklyInput: WeeklyReportSourceInput = {
   startDate: '2026-06-01',
   endDate: '2026-06-07',
   memories: [
@@ -70,6 +70,9 @@ const settings: AppSettings = {
   weeklyReminderWeekday: 'friday',
   weeklyReminderTime: '18:30',
   weeklyReminderMessage: '可以整理一下这周的工作脉络了。',
+  reportLength: 'brief',
+  reportTone: 'retrospective',
+  reportFocus: 'risks',
   theme: 'system',
   launchAtStartup: false,
   closeToTray: true,
@@ -147,9 +150,17 @@ describe('createAIService', () => {
     });
 
     await expect(service.generateWeeklyReport(weeklyInput)).resolves.toEqual(weeklyGenerated);
-    expect(generateWeeklyReport).toHaveBeenCalledWith(weeklyInput, {
-      codexCommand: 'custom-codex',
-      codexModel: 'gpt-5.4-mini',
-    });
+    expect(generateWeeklyReport).toHaveBeenCalledWith(
+      {
+        ...weeklyInput,
+        reportLength: 'brief',
+        reportTone: 'retrospective',
+        reportFocus: 'risks',
+      },
+      {
+        codexCommand: 'custom-codex',
+        codexModel: 'gpt-5.4-mini',
+      },
+    );
   });
 });

@@ -1,5 +1,6 @@
 import type { GeneratedReportContent, Report, ReportStatus, ReportType } from './types';
 import { formatReportDateRange } from './services/report-date';
+import { normalizeReportText } from './services/report-text';
 
 export const reportListEmptyState = {
   title: '还没有保存的报告',
@@ -55,7 +56,7 @@ export function normalizeReportContent(content: unknown): GeneratedReportContent
   const completedItems = getStringList(input.completedItems);
   const problems = getString(input.problems);
   const nextWeekPlan = getString(input.nextWeekPlan);
-  const markdown = getString(input.markdown);
+  const markdown = normalizeReportText(getString(input.markdown));
 
   return {
     title,

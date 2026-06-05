@@ -22,6 +22,9 @@ const generated: GeneratedDailyMemory = {
 const weeklyInput: GenerateWeeklyReportInput = {
   startDate: '2026-06-01',
   endDate: '2026-06-07',
+  reportLength: 'standard',
+  reportTone: 'natural',
+  reportFocus: 'outcomes',
   memories: [
     {
       id: 'daily-memory-2026-06-01',

@@ -1,4 +1,4 @@
-import type { DailyMemory, GeneratedReportContent, Report } from '../types';
+import type { DailyMemory, GeneratedReportContent, Report, WeeklyReportSourceInput } from '../types';
 import { aiService as defaultAIService } from './ai/ai-service';
 import { dailyMemoryRepository as defaultDailyMemoryRepository } from './daily-memory-repository';
 import { reportRepository as defaultReportRepository } from './report-repository';
@@ -20,11 +20,7 @@ export type ReportRepository = {
 };
 
 export type ReportAIService = {
-  generateWeeklyReport(input: {
-    startDate: string;
-    endDate: string;
-    memories: DailyMemory[];
-  }): Promise<GeneratedReportContent>;
+  generateWeeklyReport(input: WeeklyReportSourceInput): Promise<GeneratedReportContent>;
 };
 
 export type ReportServiceOptions = {

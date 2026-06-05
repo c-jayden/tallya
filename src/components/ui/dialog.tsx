@@ -41,10 +41,12 @@ function DialogContent({
   className,
   children,
   overlayClassName,
+  closeButtonDisabled = false,
   showCloseButton = true,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   overlayClassName?: string;
+  closeButtonDisabled?: boolean;
   showCloseButton?: boolean;
 }) {
   return (
@@ -65,6 +67,7 @@ function DialogContent({
               variant="ghost"
               className="absolute top-2 right-2 cursor-pointer hover:bg-muted hover:text-foreground disabled:cursor-not-allowed"
               size="icon-sm"
+              disabled={closeButtonDisabled}
             >
               <XIcon />
               <span className="sr-only">Close</span>

@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import type {
   DailyMemory,
-  GenerateWeeklyReportInput,
   GeneratedReportContent,
   Report,
+  WeeklyReportSourceInput,
 } from '../types';
 import {
   createReportService,
@@ -86,7 +86,7 @@ describe('createReportService', () => {
       startDate: '2026-06-01',
       endDate: '2026-06-07',
       memories: [expect.objectContaining({ date: '2026-06-01' })],
-    } satisfies GenerateWeeklyReportInput);
+    } satisfies WeeklyReportSourceInput);
     expect(saveReport).not.toHaveBeenCalled();
     expect(saveReportSources).not.toHaveBeenCalled();
   });

@@ -4,13 +4,13 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
 import { formatMemoryDate } from '../memory-view-model';
 import type { DailyMemory } from '../types';
 import { MemoryDocument } from './memory-document';
+import { TallyaDialogFooter } from './tallya-dialog-footer';
 
 type MemoryDetailDialogProps = {
   open: boolean;
@@ -50,7 +50,7 @@ export function MemoryDetailDialog({
           <MemoryDocument content={memory?.generated ?? null} />
         </TallyaScrollArea>
         {isTodayMemory ? (
-          <DialogFooter className="mx-0 mt-0 mb-0 shrink-0 rounded-b-xl border-t border-app-border bg-[color-mix(in_srgb,var(--app-surface)_86%,var(--app-surface-muted))] px-6 py-3 sm:flex-row sm:justify-end">
+          <TallyaDialogFooter>
             <Button
               type="button"
               variant="ghost"
@@ -66,7 +66,7 @@ export function MemoryDetailDialog({
             >
               编辑原始记录
             </Button>
-          </DialogFooter>
+          </TallyaDialogFooter>
         ) : null}
       </DialogContent>
     </Dialog>

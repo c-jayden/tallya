@@ -34,6 +34,11 @@ describe('LocalStorageAppSettingsRepository', () => {
     const repository = new LocalStorageAppSettingsRepository(new MemoryStorage());
 
     await expect(repository.getSettings()).resolves.toEqual(DEFAULT_APP_SETTINGS);
+    await expect(repository.getSettings()).resolves.toMatchObject({
+      reportLength: 'standard',
+      reportTone: 'natural',
+      reportFocus: 'outcomes',
+    });
   });
 
   it('saves settings and merges missing fields with defaults on read', async () => {
@@ -87,6 +92,21 @@ describe('LocalStorageAppSettingsRepository', () => {
     await expect(repository.getSettings()).resolves.toEqual({
       ...DEFAULT_APP_SETTINGS,
       codexCommand: 'codex-nightly',
+    });
+
+    storage.setItem(
+      'tallya.app-settings.v1',
+      JSON.stringify({
+        reportLength: 'unknown',
+        reportTone: 'formal',
+        reportFocus: 'risks',
+      }),
+    );
+
+    await expect(repository.getSettings()).resolves.toEqual({
+      ...DEFAULT_APP_SETTINGS,
+      reportTone: 'formal',
+      reportFocus: 'risks',
     });
   });
 

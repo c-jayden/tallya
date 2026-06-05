@@ -65,9 +65,27 @@ describe('SQLiteAppSettingsRepository', () => {
     expect(database.appSettings.get('codexModel')?.value).toBe(DEFAULT_APP_SETTINGS.codexModel);
     expect(database.appSettings.get('closeToTray')?.value).toBe('false');
     expect(database.appSettings.get('dailyReminderEnabled')?.value).toBe('true');
+    expect(database.appSettings.get('reportLength')?.value).toBe('standard');
+    expect(database.appSettings.get('reportTone')?.value).toBe('natural');
+    expect(database.appSettings.get('reportFocus')?.value).toBe('outcomes');
     expect(database.appSettings.has('app_settings')).toBe(false);
     expect(database.lastSettingsWrite?.query.toLowerCase()).toContain('key, value, updated_at');
     expect(database.lastSettingsWrite?.query.toLowerCase()).not.toContain('value_json');
+  });
+
+  it('fills missing report preferences from defaults when reading older settings rows', async () => {
+    const database = new TestDatabaseClient();
+    database.appSettings.set('theme', {
+      key: 'theme',
+      value: 'dark',
+      updated_at: '2026-06-05T01:00:00.000Z',
+    });
+    const repository = new SQLiteAppSettingsRepository(Promise.resolve(database));
+
+    await expect(repository.getSettings()).resolves.toEqual({
+      ...DEFAULT_APP_SETTINGS,
+      theme: 'dark',
+    });
   });
 
   it('resets settings back to defaults', async () => {

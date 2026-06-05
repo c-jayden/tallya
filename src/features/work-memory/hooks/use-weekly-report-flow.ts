@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { copyReportMarkdown } from '../services/report-clipboard';
+import { copyReportMarkdown, copyReportPlainText } from '../services/report-clipboard';
+import { formatReportDateRange } from '../services/report-date';
 import { reportService } from '../services/report-service';
 import type { WeeklyReportContext, WeeklyReportDraft } from '../services/report-service';
 import { normalizeReportContent } from '../report-view-model';
@@ -81,6 +82,10 @@ export function useWeeklyReportFlow() {
   }
 
   function closeReportDialogs() {
+    if (isGeneratingReport || isSavingReport) {
+      return;
+    }
+
     setIsGenerateDialogOpen(false);
     setIsPreviewDialogOpen(false);
     setIsReportListOpen(false);
@@ -101,10 +106,7 @@ export function useWeeklyReportFlow() {
       setIsGenerateDialogOpen(false);
       setIsPreviewDialogOpen(true);
     } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : '周报生成失败，请稍后重试。';
+      const message = error instanceof Error ? error.message : '周报生成失败，请稍后重试。';
 
       toast.error(message);
       await loadContext();
@@ -120,7 +122,24 @@ export function useWeeklyReportFlow() {
 
     try {
       await copyReportMarkdown(weeklyReportDraft.generated.markdown);
-      toast.success('周报已复制');
+      toast.success('已复制 Markdown');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '复制失败，请稍后重试。';
+
+      toast.error(message);
+    }
+  }
+
+  async function copyPlainText() {
+    if (!weeklyReportDraft) {
+      return;
+    }
+
+    try {
+      await copyReportPlainText(weeklyReportDraft.generated, {
+        title: getWeeklyReportCopyTitle(weeklyReportDraft),
+      });
+      toast.success('已复制纯文本');
     } catch (error) {
       const message = error instanceof Error ? error.message : '复制失败，请稍后重试。';
 
@@ -161,7 +180,24 @@ export function useWeeklyReportFlow() {
       const markdown = normalizeReportContent(selectedReport.content).markdown;
 
       await copyReportMarkdown(markdown);
-      toast.success('报告已复制');
+      toast.success('已复制 Markdown');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '复制失败，请稍后重试。';
+
+      toast.error(message);
+    }
+  }
+
+  async function copySavedReportPlainText() {
+    if (!selectedReport) {
+      return;
+    }
+
+    try {
+      await copyReportPlainText(normalizeReportContent(selectedReport.content), {
+        title: getSavedReportCopyTitle(selectedReport),
+      });
+      toast.success('已复制纯文本');
     } catch (error) {
       const message = error instanceof Error ? error.message : '复制失败，请稍后重试。';
 
@@ -183,8 +219,7 @@ export function useWeeklyReportFlow() {
       setIsReportDetailOpen(false);
       setIsPreviewDialogOpen(true);
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : '周报生成失败，请稍后重试。';
+      const message = error instanceof Error ? error.message : '周报生成失败，请稍后重试。';
 
       toast.error(message);
     } finally {
@@ -195,7 +230,9 @@ export function useWeeklyReportFlow() {
   return {
     closeReportDialogs,
     copyMarkdown,
+    copyPlainText,
     copySavedReportMarkdown,
+    copySavedReportPlainText,
     generateWeeklyReport,
     isGenerateDialogOpen,
     isGeneratingReport,
@@ -204,6 +241,7 @@ export function useWeeklyReportFlow() {
     isReportDetailOpen,
     isReportListOpen,
     isSavingReport,
+    isReportBusy: isGeneratingReport || isSavingReport,
     hasSavedReports: reportListItems.length > 0,
     openGenerateDialog,
     openReportDetail,
@@ -219,4 +257,14 @@ export function useWeeklyReportFlow() {
     weeklyReportContext,
     weeklyReportDraft,
   };
+}
+
+function getWeeklyReportCopyTitle(draft: WeeklyReportDraft) {
+  const title = draft.generated.title || '本周周报';
+
+  return `${title}（${formatReportDateRange(draft.startDate, draft.endDate)}）`;
+}
+
+function getSavedReportCopyTitle(report: Report) {
+  return `${report.title || '本周周报'}（${formatReportDateRange(report.startDate, report.endDate)}）`;
 }
