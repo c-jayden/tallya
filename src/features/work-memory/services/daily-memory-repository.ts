@@ -1,11 +1,16 @@
 import type { DailyMemory, DailyMemoryGeneratedContent, DailyMemorySupplements } from '../types';
+import type { DatabaseClient } from './database/database';
+import { getDatabase } from './database/database';
+import { createFriendlyError } from './service-error';
 
 const STORAGE_KEY = 'tallya.daily-memories.v1';
+const LEGACY_MIGRATION_KEY = 'tallya.daily-memories.sqlite-migrated.v1';
 
 type Clock = () => Date;
 
 type RepositoryOptions = {
   now?: Clock;
+  legacyStorage?: Storage | null;
 };
 
 type DailyMemoryDraftInput = {
@@ -170,10 +175,310 @@ export class LocalStorageDailyMemoryRepository {
   }
 }
 
-export const dailyMemoryRepository = new LocalStorageDailyMemoryRepository();
+type DailyMemoryRow = {
+  id: string;
+  date: string;
+  raw_content: string;
+  supplements_json: string | null;
+  generated_json: string | null;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  locked_at: string | null;
+};
+
+export class SQLiteDailyMemoryRepository {
+  private now: Clock;
+  private legacyStorage: Storage | null;
+  private didAttemptLegacyMigration = false;
+  private databasePromise: Promise<DatabaseClient> | null;
+
+  constructor(
+    database?: Promise<DatabaseClient>,
+    options: RepositoryOptions = {},
+  ) {
+    this.databasePromise = database ?? null;
+    this.now = options.now ?? (() => new Date());
+    this.legacyStorage = options.legacyStorage ?? getBrowserStorage();
+  }
+
+  setClock(now: Clock) {
+    this.now = now;
+  }
+
+  async getTodayMemory() {
+    return this.getByDate(getDailyMemoryDate());
+  }
+
+  async getByDate(date: string) {
+    return this.safeRead(async (database) => {
+      const rows = await database.select<DailyMemoryRow[]>(
+        'SELECT * FROM daily_memories WHERE date = $1 LIMIT 1',
+        [date],
+      );
+
+      return normalizeDailyMemoryRow(rows[0]) ?? null;
+    }, null);
+  }
+
+  async list() {
+    return this.getAllMemories();
+  }
+
+  async getAllMemories() {
+    return this.safeRead(async (database) => {
+      const rows = await database.select<DailyMemoryRow[]>(
+        'SELECT * FROM daily_memories ORDER BY date DESC',
+      );
+
+      return rows
+        .map(normalizeDailyMemoryRow)
+        .filter((memory): memory is DailyMemory => memory !== null);
+    }, []);
+  }
+
+  async getGeneratedMemories() {
+    return this.safeRead(async (database) => {
+      const rows = await database.select<DailyMemoryRow[]>(
+        "SELECT * FROM daily_memories WHERE status IN ('generated', 'locked') ORDER BY date DESC",
+      );
+
+      return rows
+        .map(normalizeDailyMemoryRow)
+        .filter((memory): memory is DailyMemory => memory !== null)
+        .filter(isGeneratedMemory);
+    }, []);
+  }
+
+  async getMemoryByDate(date: string) {
+    const memory = await this.getByDate(date);
+
+    return memory && isGeneratedMemory(memory) ? memory : null;
+  }
+
+  async clearAll() {
+    await this.write(async (database) => {
+      await database.execute('DELETE FROM report_sources');
+      await database.execute('DELETE FROM reports');
+      await database.execute('DELETE FROM daily_memories');
+    });
+  }
+
+  async clearLocalData() {
+    await this.clearAll();
+  }
+
+  async searchMemories(keyword: string) {
+    const normalizedKeyword = keyword.trim().toLowerCase();
+
+    if (!normalizedKeyword) {
+      return [];
+    }
+
+    return (await this.getGeneratedMemories()).filter((memory) =>
+      getSearchableMemoryText(memory).includes(normalizedKeyword),
+    );
+  }
+
+  async saveDraft(input: DailyMemoryDraftInput) {
+    const existing = await this.getByDate(input.date);
+
+    return this.upsert({
+      ...input,
+      generated:
+        existing?.status === 'generated' || existing?.status === 'locked'
+          ? existing.generated
+          : null,
+      status:
+        existing?.status === 'generated' || existing?.status === 'locked'
+          ? existing.status
+          : 'draft',
+    });
+  }
+
+  async saveGenerated(input: DailyMemoryGeneratedInput) {
+    return this.upsert({
+      ...input,
+      status: 'generated',
+    });
+  }
+
+  async saveGeneratedMemory(input: DailyMemoryGeneratedInput) {
+    return this.saveGenerated(input);
+  }
+
+  private async upsert(input: Omit<DailyMemory, 'id' | 'createdAt' | 'updatedAt'>) {
+    const existing = await this.getByDate(input.date);
+    const timestamp = this.now().toISOString();
+    const memory: DailyMemory = {
+      id: existing?.id ?? `daily-memory-${input.date}`,
+      createdAt: existing?.createdAt ?? timestamp,
+      updatedAt: timestamp,
+      ...input,
+      supplements: normalizeSupplements(input.supplements),
+      generated: input.generated ? normalizeGenerated(input.generated) : null,
+    };
+
+    await this.write((database) => saveDailyMemoryRow(database, memory));
+
+    return memory;
+  }
+
+  private async safeRead<T>(operation: (database: DatabaseClient) => Promise<T>, fallback: T) {
+    try {
+      const database = await this.getReadyDatabase();
+
+      return await operation(database);
+    } catch (error) {
+      console.error('Failed to read daily memories from SQLite', error);
+
+      return fallback;
+    }
+  }
+
+  private async write(operation: (database: DatabaseClient) => Promise<void>) {
+    try {
+      const database = await this.getReadyDatabase();
+
+      await operation(database);
+    } catch (error) {
+      console.error('Failed to write daily memories to SQLite', error);
+      throw createFriendlyError('本地工作记忆保存失败，请稍后重试。', error);
+    }
+  }
+
+  private async getReadyDatabase() {
+    this.databasePromise ??= getDatabase();
+
+    const database = await this.databasePromise;
+
+    await this.migrateLegacyLocalStorage(database);
+
+    return database;
+  }
+
+  private async migrateLegacyLocalStorage(database: DatabaseClient) {
+    if (this.didAttemptLegacyMigration) {
+      return;
+    }
+
+    this.didAttemptLegacyMigration = true;
+
+    if (
+      !this.legacyStorage ||
+      this.legacyStorage.getItem(LEGACY_MIGRATION_KEY) === '1' ||
+      !this.legacyStorage.getItem(STORAGE_KEY)
+    ) {
+      return;
+    }
+
+    try {
+      const legacyRepository = new LocalStorageDailyMemoryRepository(this.legacyStorage);
+      const legacyMemories = await legacyRepository.list();
+
+      for (const memory of legacyMemories) {
+        const existingRows = await database.select<DailyMemoryRow[]>(
+          'SELECT * FROM daily_memories WHERE date = $1 LIMIT 1',
+          [memory.date],
+        );
+
+        if (existingRows.length === 0) {
+          await saveDailyMemoryRow(database, memory);
+        }
+      }
+
+      this.legacyStorage.setItem(LEGACY_MIGRATION_KEY, '1');
+    } catch (error) {
+      console.warn('Failed to migrate legacy daily memories to SQLite', error);
+    }
+  }
+}
+
+export const dailyMemoryRepository = new SQLiteDailyMemoryRepository();
 
 function isGeneratedMemory(memory: DailyMemory) {
   return (memory.status === 'generated' || memory.status === 'locked') && memory.generated !== null;
+}
+
+async function saveDailyMemoryRow(database: DatabaseClient, memory: DailyMemory) {
+  await database.execute(
+    `
+      INSERT INTO daily_memories (
+        id,
+        date,
+        raw_content,
+        supplements_json,
+        generated_json,
+        status,
+        created_at,
+        updated_at,
+        locked_at
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      ON CONFLICT(date) DO UPDATE SET
+        raw_content = excluded.raw_content,
+        supplements_json = excluded.supplements_json,
+        generated_json = excluded.generated_json,
+        status = excluded.status,
+        updated_at = excluded.updated_at,
+        locked_at = excluded.locked_at
+    `,
+    [
+      memory.id,
+      memory.date,
+      memory.rawContent,
+      JSON.stringify(memory.supplements),
+      memory.generated ? JSON.stringify(memory.generated) : null,
+      memory.status,
+      memory.createdAt,
+      memory.updatedAt,
+      memory.status === 'locked' ? memory.updatedAt : null,
+    ],
+  );
+}
+
+function normalizeDailyMemoryRow(row: DailyMemoryRow | undefined): DailyMemory | null {
+  if (!row) {
+    return null;
+  }
+
+  if (
+    typeof row.id !== 'string' ||
+    typeof row.date !== 'string' ||
+    typeof row.raw_content !== 'string' ||
+    (row.status !== 'draft' && row.status !== 'generated' && row.status !== 'locked') ||
+    typeof row.created_at !== 'string' ||
+    typeof row.updated_at !== 'string'
+  ) {
+    return null;
+  }
+
+  return {
+    id: row.id,
+    date: row.date,
+    rawContent: row.raw_content,
+    supplements: parseJson(row.supplements_json, normalizeSupplements, {}),
+    generated: parseJson(row.generated_json, normalizeGenerated, null),
+    status: row.status,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function parseJson<T>(
+  value: string | null,
+  normalize: (input: unknown) => T | null,
+  fallback: T,
+) {
+  if (!value) {
+    return fallback;
+  }
+
+  try {
+    return normalize(JSON.parse(value)) ?? fallback;
+  } catch {
+    return fallback;
+  }
 }
 
 function getSearchableMemoryText(memory: DailyMemory) {

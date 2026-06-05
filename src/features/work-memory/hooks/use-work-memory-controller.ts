@@ -221,6 +221,10 @@ export function useWorkMemoryController({ currentDate }: UseWorkMemoryController
       setTodayMemory(getTodayMemoryState(memory, memories));
       setWeeklySnapshot(getWeeklySnapshotFromMemories(memories, currentDate));
       toast.success('草稿已保存');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '草稿保存失败，请稍后重试。';
+
+      toast.error(message);
     } finally {
       setIsSavingDraft(false);
     }
@@ -250,6 +254,10 @@ export function useWorkMemoryController({ currentDate }: UseWorkMemoryController
       setWeeklySnapshot(getWeeklySnapshotFromMemories(memories, currentDate));
       setIsPreviewOpen(false);
       toast.success('今日记忆已保存');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '今日记忆保存失败，请稍后重试。';
+
+      toast.error(message);
     } finally {
       setIsSavingGeneratedMemory(false);
     }

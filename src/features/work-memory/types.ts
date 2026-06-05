@@ -58,3 +58,27 @@ export type DailyMemory = {
   createdAt: string;
   updatedAt: string;
 };
+
+export type ReportType = 'weekly' | 'monthly' | 'yearly' | 'custom' | 'performance' | 'handoff';
+
+export type ReportStatus = 'generated' | 'stale' | 'locked';
+
+export type Report = {
+  id: string;
+  type: ReportType;
+  title: string;
+  startDate: string;
+  endDate: string;
+  content: unknown;
+  status: ReportStatus;
+  createdAt: string;
+  updatedAt: string;
+  generatedAt?: string;
+};
+
+export type ReportSource = {
+  id: string;
+  reportId: string;
+  dailyMemoryId: string;
+  dailyMemoryUpdatedAtSnapshot: string;
+};

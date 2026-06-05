@@ -1,4 +1,7 @@
 import type { AIProviderId } from './ai/ai-provider';
+import type { DatabaseClient } from './database/database';
+import { getDatabase } from './database/database';
+import { createFriendlyError } from './service-error';
 
 export type AppTheme = 'system' | 'light' | 'dark';
 
@@ -32,6 +35,8 @@ export type AppSettings = {
 };
 
 const STORAGE_KEY = 'tallya.app-settings.v1';
+const SETTINGS_ROW_KEY = 'app_settings';
+const LEGACY_MIGRATION_KEY = 'tallya.app-settings.sqlite-migrated.v1';
 export const DEFAULT_CODEX_COMMAND = 'codex';
 
 // Defaults define the first-run and reset state. Components should go through
@@ -107,7 +112,130 @@ export class LocalStorageAppSettingsRepository {
   }
 }
 
-export const appSettingsRepository = new LocalStorageAppSettingsRepository();
+type AppSettingsRow = {
+  value_json: string;
+};
+
+export class SQLiteAppSettingsRepository {
+  private legacyStorage: Storage | null;
+  private didAttemptLegacyMigration = false;
+  private databasePromise: Promise<DatabaseClient> | null;
+  private readonly now: () => Date;
+
+  constructor(
+    database?: Promise<DatabaseClient>,
+    options: { legacyStorage?: Storage | null; now?: () => Date } = {},
+  ) {
+    this.databasePromise = database ?? null;
+    this.legacyStorage = options.legacyStorage ?? getBrowserStorage();
+    this.now = options.now ?? (() => new Date());
+  }
+
+  async getSettings() {
+    try {
+      const database = await this.getReadyDatabase();
+      const rows = await database.select<AppSettingsRow[]>(
+        'SELECT value_json FROM app_settings WHERE key = $1 LIMIT 1',
+        [SETTINGS_ROW_KEY],
+      );
+
+      if (!rows[0]?.value_json) {
+        return DEFAULT_APP_SETTINGS;
+      }
+
+      return normalizeAppSettings(JSON.parse(rows[0].value_json) as unknown);
+    } catch (error) {
+      console.error('Failed to read app settings from SQLite', error);
+
+      return DEFAULT_APP_SETTINGS;
+    }
+  }
+
+  async saveSettings(settings: AppSettings) {
+    const normalizedSettings = normalizeAppSettings(settings);
+
+    try {
+      const database = await this.getReadyDatabase();
+
+      await database.execute(
+        `
+          INSERT INTO app_settings (key, value_json, updated_at)
+          VALUES ($1, $2, $3)
+          ON CONFLICT(key) DO UPDATE SET
+            value_json = excluded.value_json,
+            updated_at = excluded.updated_at
+        `,
+        [SETTINGS_ROW_KEY, JSON.stringify(normalizedSettings), this.now().toISOString()],
+      );
+
+      return normalizedSettings;
+    } catch (error) {
+      console.error('Failed to save app settings to SQLite', error);
+      throw createFriendlyError('设置保存失败，请稍后重试。', error);
+    }
+  }
+
+  async resetSettings() {
+    return this.saveSettings(DEFAULT_APP_SETTINGS);
+  }
+
+  private async getReadyDatabase() {
+    this.databasePromise ??= getDatabase();
+
+    const database = await this.databasePromise;
+
+    await this.migrateLegacyLocalStorage(database);
+
+    return database;
+  }
+
+  private async migrateLegacyLocalStorage(database: DatabaseClient) {
+    if (this.didAttemptLegacyMigration) {
+      return;
+    }
+
+    this.didAttemptLegacyMigration = true;
+
+    if (
+      !this.legacyStorage ||
+      this.legacyStorage.getItem(LEGACY_MIGRATION_KEY) === '1' ||
+      !this.legacyStorage.getItem(STORAGE_KEY)
+    ) {
+      return;
+    }
+
+    try {
+      const existingRows = await database.select<AppSettingsRow[]>(
+        'SELECT value_json FROM app_settings WHERE key = $1 LIMIT 1',
+        [SETTINGS_ROW_KEY],
+      );
+
+      if (existingRows.length > 0) {
+        this.legacyStorage.setItem(LEGACY_MIGRATION_KEY, '1');
+        return;
+      }
+
+      const legacyRepository = new LocalStorageAppSettingsRepository(this.legacyStorage);
+      const legacySettings = await legacyRepository.getSettings();
+
+      await database.execute(
+        `
+          INSERT INTO app_settings (key, value_json, updated_at)
+          VALUES ($1, $2, $3)
+          ON CONFLICT(key) DO UPDATE SET
+            value_json = excluded.value_json,
+            updated_at = excluded.updated_at
+        `,
+        [SETTINGS_ROW_KEY, JSON.stringify(legacySettings), this.now().toISOString()],
+      );
+      this.legacyStorage.setItem(LEGACY_MIGRATION_KEY, '1');
+    } catch (error) {
+      console.warn('Failed to migrate legacy app settings to SQLite', error);
+    }
+  }
+}
+
+export const appSettingsRepository = new SQLiteAppSettingsRepository();
 
 function normalizeAppSettings(value: unknown): AppSettings {
   if (!value || typeof value !== 'object') {

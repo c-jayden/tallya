@@ -138,6 +138,8 @@ Tauri 后端。
 - AI 生成通过用户本机配置的 AI 服务进行；
 - 使用 Codex CLI 时，实际数据处理行为取决于本机 Codex 配置。
 
+SQLite 使用 Tauri SQL 插件，当前数据库配置为 `sqlite:tallya.db`。该路径相对 Tauri `BaseDirectory::App`，也就是应用数据目录，不是项目根目录，也不是 `~/.tallya`。Windows 通常位于 `AppData/Roaming/<bundle identifier>/tallya.db`，macOS / Linux 根据 Tauri 应用数据目录规则存放。
+
 ## License
 
 暂未指定。
