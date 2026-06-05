@@ -40,6 +40,79 @@ describe('SQLiteReportRepository', () => {
     );
   });
 
+  it('lists all reports by generated time descending', async () => {
+    const repository = createRepository();
+
+    await repository.saveReport(
+      createReport({
+        id: 'weekly-2026-05-25',
+        startDate: '2026-05-25',
+        endDate: '2026-05-31',
+        generatedAt: '2026-06-01T01:00:00.000Z',
+        createdAt: '2026-06-01T01:00:00.000Z',
+        updatedAt: '2026-06-01T01:00:00.000Z',
+      }),
+    );
+    await repository.saveReport(
+      createReport({
+        id: 'weekly-2026-06-01',
+        startDate: '2026-06-01',
+        endDate: '2026-06-07',
+        generatedAt: '2026-06-08T01:00:00.000Z',
+        createdAt: '2026-06-08T01:00:00.000Z',
+        updatedAt: '2026-06-08T01:00:00.000Z',
+      }),
+    );
+
+    await expect(repository.getAllReports()).resolves.toEqual([
+      expect.objectContaining({ id: 'weekly-2026-06-01' }),
+      expect.objectContaining({ id: 'weekly-2026-05-25' }),
+    ]);
+  });
+
+  it('lists reports by type', async () => {
+    const repository = createRepository();
+
+    await repository.saveReport(createReport({ id: 'weekly-2026-06-01', type: 'weekly' }));
+    await repository.saveReport(
+      createReport({
+        id: 'monthly-2026-06',
+        type: 'monthly',
+        startDate: '2026-06-01',
+        endDate: '2026-06-30',
+      }),
+    );
+
+    await expect(repository.getReportsByType('weekly')).resolves.toEqual([
+      expect.objectContaining({ id: 'weekly-2026-06-01', type: 'weekly' }),
+    ]);
+  });
+
+  it('uses an empty object when report content JSON cannot be parsed', async () => {
+    const database = new TestDatabaseClient();
+    const repository = createRepository(database);
+
+    database.reports.set('bad-report', {
+      id: 'bad-report',
+      type: 'weekly',
+      title: '损坏的周报',
+      start_date: '2026-06-01',
+      end_date: '2026-06-07',
+      content_json: '{bad json',
+      status: 'generated',
+      created_at: '2026-06-08T01:00:00.000Z',
+      updated_at: '2026-06-08T01:00:00.000Z',
+      generated_at: '2026-06-08T01:00:00.000Z',
+    });
+
+    await expect(repository.getReportById('bad-report')).resolves.toEqual(
+      expect.objectContaining({
+        id: 'bad-report',
+        content: {},
+      }),
+    );
+  });
+
   it('writes and replaces report sources for selected daily memories', async () => {
     const repository = createRepository();
     const report = createReport();

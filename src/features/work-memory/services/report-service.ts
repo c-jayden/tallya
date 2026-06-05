@@ -9,8 +9,11 @@ export type ReportDailyMemoryRepository = {
 };
 
 export type ReportRepository = {
+  getAllReports(): Promise<Report[]>;
+  getReportsByType(type: Report['type']): Promise<Report[]>;
   getWeeklyReportByRange(startDate: string, endDate: string): Promise<Report | null>;
   saveReport(report: Report): Promise<void>;
+  updateReport(report: Report): Promise<void>;
   deleteReportSources(reportId: string): Promise<void>;
   saveReportSources(reportId: string, dailyMemories: DailyMemory[]): Promise<void>;
   getReportById(id: string): Promise<Report | null>;
@@ -49,38 +52,33 @@ export function createReportService({
   aiService = defaultAIService,
 }: ReportServiceOptions = {}) {
   return {
+    async getAllReports() {
+      return reportRepository.getAllReports();
+    },
+
     async getCurrentWeeklyReportContext(): Promise<WeeklyReportContext> {
       const { startDate, endDate } = getCurrentWeekRange(now());
-      const [memories, existingReport] = await Promise.all([
-        getFormalMemoriesInRange(dailyMemoryRepository, startDate, endDate),
-        reportRepository.getWeeklyReportByRange(startDate, endDate),
-      ]);
-
-      return {
-        startDate,
-        endDate,
-        memories,
-        existingReport,
-      };
+      return getWeeklyReportContext(dailyMemoryRepository, reportRepository, startDate, endDate);
     },
 
     async generateCurrentWeeklyReport(): Promise<WeeklyReportDraft> {
       const context = await this.getCurrentWeeklyReportContext();
 
-      if (context.memories.length === 0) {
-        throw new Error('这个时间范围内还没有可用于生成报告的工作记忆。');
-      }
+      return generateWeeklyReportDraft(aiService, context);
+    },
 
-      const generated = await aiService.generateWeeklyReport({
-        startDate: context.startDate,
-        endDate: context.endDate,
-        memories: context.memories,
-      });
+    async generateWeeklyReportForRange(report: Report): Promise<WeeklyReportDraft> {
+      const context = await getWeeklyReportContext(
+        dailyMemoryRepository,
+        reportRepository,
+        report.startDate,
+        report.endDate,
+      );
 
-      return {
+      return generateWeeklyReportDraft(aiService, {
         ...context,
-        generated,
-      };
+        existingReport: context.existingReport ?? report,
+      });
     },
 
     async saveWeeklyReport(draft: WeeklyReportDraft): Promise<Report> {
@@ -131,6 +129,45 @@ async function getFormalMemoriesInRange(
         memory.date <= endDate,
     )
     .sort((first, second) => first.date.localeCompare(second.date));
+}
+
+async function getWeeklyReportContext(
+  dailyMemoryRepository: ReportDailyMemoryRepository,
+  reportRepository: ReportRepository,
+  startDate: string,
+  endDate: string,
+): Promise<WeeklyReportContext> {
+  const [memories, existingReport] = await Promise.all([
+    getFormalMemoriesInRange(dailyMemoryRepository, startDate, endDate),
+    reportRepository.getWeeklyReportByRange(startDate, endDate),
+  ]);
+
+  return {
+    startDate,
+    endDate,
+    memories,
+    existingReport,
+  };
+}
+
+async function generateWeeklyReportDraft(
+  aiService: ReportAIService,
+  context: WeeklyReportContext,
+): Promise<WeeklyReportDraft> {
+  if (context.memories.length === 0) {
+    throw new Error('这个时间范围内还没有可用于生成报告的工作记忆。');
+  }
+
+  const generated = await aiService.generateWeeklyReport({
+    startDate: context.startDate,
+    endDate: context.endDate,
+    memories: context.memories,
+  });
+
+  return {
+    ...context,
+    generated,
+  };
 }
 
 function getWeeklyReportId(startDate: string, endDate: string) {

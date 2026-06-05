@@ -11,6 +11,7 @@
     "core:window:allow-set-focus",
     "notification:default",
     "opener:default",
-    "sql:default"
+    "sql:default",
+    "sql:allow-execute"
   ]
 }

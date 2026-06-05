@@ -30,6 +30,38 @@ export class SQLiteReportRepository {
     this.databasePromise = database ?? null;
   }
 
+  async getAllReports() {
+    return this.read(async (database) => {
+      const rows = await database.select<ReportRow[]>(
+        `
+          SELECT * FROM reports
+          ORDER BY COALESCE(generated_at, created_at) DESC, created_at DESC
+        `,
+      );
+
+      return rows
+        .map(normalizeReportRow)
+        .filter((report): report is Report => report !== null);
+    }, []);
+  }
+
+  async getReportsByType(type: ReportType) {
+    return this.read(async (database) => {
+      const rows = await database.select<ReportRow[]>(
+        `
+          SELECT * FROM reports
+          WHERE type = $1
+          ORDER BY COALESCE(generated_at, created_at) DESC, created_at DESC
+        `,
+        [type],
+      );
+
+      return rows
+        .map(normalizeReportRow)
+        .filter((report): report is Report => report !== null);
+    }, []);
+  }
+
   async getWeeklyReportByRange(startDate: string, endDate: string) {
     return this.read(async (database) => {
       const rows = await database.select<ReportRow[]>(
@@ -111,6 +143,10 @@ export class SQLiteReportRepository {
         ],
       );
     });
+  }
+
+  async updateReport(report: Report) {
+    await this.saveReport(report);
   }
 
   async deleteReportSources(reportId: string) {

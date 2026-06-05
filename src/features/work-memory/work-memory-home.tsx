@@ -13,7 +13,9 @@ import { MemoryDetailDialog } from './components/memory-detail-dialog';
 import { MemoryHero } from './components/memory-hero';
 import { MemoryListDialog } from './components/memory-list-dialog';
 import { MemoryStatusCard } from './components/memory-status-card';
+import { ReportDetailDialog } from './components/report-detail-dialog';
 import { ReportGenerateDialog } from './components/report-generate-dialog';
+import { ReportListDialog } from './components/report-list-dialog';
 import { ReportPreviewDialog } from './components/report-preview-dialog';
 import { SettingsDialog } from './components/settings-dialog';
 import { SpotlightSearchPanel } from './components/spotlight-search-panel';
@@ -65,6 +67,7 @@ export function WorkMemoryHome() {
     },
     onOpenSearch: () => {
       setIsSettingsOpen(false);
+      weeklyReport.closeReportDialogs();
       memory.setIsMemoryDialogOpen(false);
       memory.setIsMemoryListOpen(false);
       memory.setIsPreviewOpen(false);
@@ -126,7 +129,9 @@ export function WorkMemoryHome() {
             statusVariant={statusVariant}
             todayMemory={memory.todayMemory}
             weeklySnapshot={memory.weeklySnapshot}
+            hasReports={weeklyReport.hasSavedReports}
             onGenerateReport={weeklyReport.openGenerateDialog}
+            onViewReports={weeklyReport.openReportList}
             onViewDraft={memory.viewDraft}
             onViewMemory={memory.viewMemoryList}
           />
@@ -186,6 +191,20 @@ export function WorkMemoryHome() {
         onOpenChange={weeklyReport.setIsPreviewDialogOpen}
         onCopyMarkdown={weeklyReport.copyMarkdown}
         onSave={weeklyReport.saveWeeklyReport}
+      />
+      <ReportListDialog
+        open={weeklyReport.isReportListOpen}
+        reports={weeklyReport.reportListItems}
+        onOpenChange={weeklyReport.setIsReportListOpen}
+        onOpenReport={weeklyReport.openReportDetail}
+      />
+      <ReportDetailDialog
+        open={weeklyReport.isReportDetailOpen}
+        report={weeklyReport.selectedReport}
+        isRegenerating={weeklyReport.isGeneratingReport}
+        onOpenChange={weeklyReport.setIsReportDetailOpen}
+        onCopyMarkdown={weeklyReport.copySavedReportMarkdown}
+        onRegenerate={weeklyReport.regenerateSelectedReport}
       />
       <SettingsDialog
         open={isSettingsOpen}

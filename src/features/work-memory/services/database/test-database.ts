@@ -190,14 +190,23 @@ export class TestDatabaseClient implements DatabaseClient {
 
     if (normalizedQuery.startsWith('select * from reports where type =')) {
       return Array.from(this.reports.values())
-        .filter(
-          (row) =>
+        .filter((row) => {
+          if (bindValues.length === 1) {
+            return row.type === String(bindValues[0]);
+          }
+
+          return (
             row.type === String(bindValues[0]) &&
             row.start_date === String(bindValues[1]) &&
-            row.end_date === String(bindValues[2]),
-        )
+            row.end_date === String(bindValues[2])
+          );
+        })
         .sort((first, second) => second.updated_at.localeCompare(first.updated_at))
-        .slice(0, 1) as T;
+        .slice(0, bindValues.length === 1 ? undefined : 1) as T;
+    }
+
+    if (normalizedQuery.startsWith('select * from reports order by')) {
+      return Array.from(this.reports.values()).sort(compareReportRowsByGeneratedTimeDesc) as T;
     }
 
     if (normalizedQuery.startsWith('select * from reports where id =')) {
@@ -243,4 +252,11 @@ function normalizeQuery(query: string) {
 
 function toNullableString(value: unknown) {
   return typeof value === 'string' ? value : null;
+}
+
+function compareReportRowsByGeneratedTimeDesc(first: ReportRow, second: ReportRow) {
+  const firstTime = first.generated_at ?? first.created_at;
+  const secondTime = second.generated_at ?? second.created_at;
+
+  return secondTime.localeCompare(firstTime) || second.created_at.localeCompare(first.created_at);
 }

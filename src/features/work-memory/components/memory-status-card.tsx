@@ -6,7 +6,9 @@ type MemoryStatusCardProps = {
   statusVariant: StatusVariant;
   todayMemory: TodayMemoryState;
   weeklySnapshot: WeeklySnapshot;
+  hasReports: boolean;
   onGenerateReport: () => void;
+  onViewReports: () => void;
   onViewDraft: () => void;
   onViewMemory: () => void;
 };
@@ -15,7 +17,9 @@ export function MemoryStatusCard({
   statusVariant,
   todayMemory,
   weeklySnapshot,
+  hasReports,
   onGenerateReport,
+  onViewReports,
   onViewDraft,
   onViewMemory,
 }: MemoryStatusCardProps) {
@@ -74,6 +78,16 @@ export function MemoryStatusCard({
               >
                 查看记忆
               </Button>
+              {hasReports ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className={actionButtonClass}
+                  onClick={onViewReports}
+                >
+                  查看报告
+                </Button>
+              ) : null}
               <Button
                 type="button"
                 variant="ghost"
