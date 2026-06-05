@@ -43,6 +43,22 @@ export type GeneratedDailyMemory = {
 
 export type DailyMemoryGeneratedContent = GeneratedDailyMemory;
 
+export type GenerateWeeklyReportInput = {
+  startDate: string;
+  endDate: string;
+  memories: DailyMemory[];
+};
+
+export type GeneratedReportContent = {
+  title: string;
+  summary: string;
+  highlights: string[];
+  completedItems: string[];
+  problems?: string;
+  nextWeekPlan?: string;
+  markdown: string;
+};
+
 export type DailyMemoryPreviewSection = {
   title: '今日摘要' | '完成事项' | '关键产出' | '遇到问题' | '明日计划' | '补充说明';
   content: string[];

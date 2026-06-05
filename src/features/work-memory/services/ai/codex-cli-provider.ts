@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { GeneratedDailyMemory } from '../../types';
+import type { GeneratedDailyMemory, GeneratedReportContent } from '../../types';
 import { AIProviderError, type AIProvider, type GenerateDailyMemoryOptions } from './ai-provider';
 
 type TauriInvoke = typeof invoke;
@@ -20,6 +20,16 @@ export function createCodexCliProvider(invokeCommand: TauriInvoke = invoke): AIP
     async generateDailyMemory(input, options) {
       try {
         return await invokeCommand<GeneratedDailyMemory>('generate_daily_memory_with_codex', {
+          input,
+          codexCommand: options.codexCommand,
+        });
+      } catch (error) {
+        throw new AIProviderError(getFriendlyCodexError(error), CODEX_PROVIDER_ID, error);
+      }
+    },
+    async generateWeeklyReport(input, options) {
+      try {
+        return await invokeCommand<GeneratedReportContent>('generate_weekly_report_with_codex', {
           input,
           codexCommand: options.codexCommand,
         });

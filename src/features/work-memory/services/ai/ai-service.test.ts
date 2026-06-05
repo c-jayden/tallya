@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { AppSettings } from '../app-settings-repository';
-import type { GeneratedDailyMemory, GenerateDailyMemoryInput } from '../../types';
+import type {
+  GeneratedDailyMemory,
+  GeneratedReportContent,
+  GenerateDailyMemoryInput,
+  GenerateWeeklyReportInput,
+} from '../../types';
 import { createAIService } from './ai-service';
 import type { AIProvider } from './ai-provider';
 
@@ -15,9 +20,39 @@ const generated: GeneratedDailyMemory = {
   completedItems: ['整理需求讨论内容', '确认优先处理范围', '同步后续计划'],
 };
 
+const weeklyInput: GenerateWeeklyReportInput = {
+  startDate: '2026-06-01',
+  endDate: '2026-06-07',
+  memories: [
+    {
+      id: 'daily-memory-2026-06-01',
+      date: '2026-06-01',
+      rawContent: 'Finished SQLite migration.',
+      supplements: {},
+      generated: {
+        summary: 'Finished SQLite migration.',
+        completedItems: ['Migrated local storage to SQLite'],
+      },
+      status: 'generated',
+      createdAt: '2026-06-01T01:00:00.000Z',
+      updatedAt: '2026-06-01T02:00:00.000Z',
+    },
+  ],
+};
+
+const weeklyGenerated: GeneratedReportContent = {
+  title: '本周周报',
+  summary: '本周完成 SQLite 存储迁移。',
+  highlights: ['完成 SQLite 存储迁移'],
+  completedItems: ['迁移本地存储'],
+  problems: '',
+  nextWeekPlan: '',
+  markdown: '# 本周周报\n\n本周完成 SQLite 存储迁移。',
+};
+
 const settings: AppSettings = {
   aiProviderId: 'ai-codex-cli',
-  codexCommand: 'C:\\Tools\\codex.cmd',
+  codexCommand: 'custom-codex',
   openAICompatible: {
     baseUrl: '',
     apiKey: '',
@@ -53,12 +88,13 @@ describe('createAIService', () => {
         id: 'ai-codex-cli',
         name: 'Codex CLI',
         generateDailyMemory,
+        generateWeeklyReport: vi.fn(),
       },
     });
 
     await expect(service.generateDailyMemory(input)).resolves.toEqual(generated);
     expect(generateDailyMemory).toHaveBeenCalledWith(input, {
-      codexCommand: 'C:\\Tools\\codex.cmd',
+      codexCommand: 'custom-codex',
     });
   });
 
@@ -76,6 +112,7 @@ describe('createAIService', () => {
         id: 'ai-codex-cli',
         name: 'Codex CLI',
         generateDailyMemory: vi.fn(),
+        generateWeeklyReport: vi.fn(),
         checkHealth,
       },
     });
@@ -86,7 +123,29 @@ describe('createAIService', () => {
       detail: 'codex 1.2.3',
     });
     expect(checkHealth).toHaveBeenCalledWith({
-      codexCommand: 'C:\\Tools\\codex.cmd',
+      codexCommand: 'custom-codex',
+    });
+  });
+
+  it('reads saved settings before generating a weekly report', async () => {
+    const generateWeeklyReport = vi
+      .fn<AIProvider['generateWeeklyReport']>()
+      .mockResolvedValue(weeklyGenerated);
+    const service = createAIService({
+      settingsRepository: {
+        getSettings: vi.fn().mockResolvedValue(settings),
+      },
+      codexProvider: {
+        id: 'ai-codex-cli',
+        name: 'Codex CLI',
+        generateDailyMemory: vi.fn(),
+        generateWeeklyReport,
+      },
+    });
+
+    await expect(service.generateWeeklyReport(weeklyInput)).resolves.toEqual(weeklyGenerated);
+    expect(generateWeeklyReport).toHaveBeenCalledWith(weeklyInput, {
+      codexCommand: 'custom-codex',
     });
   });
 });

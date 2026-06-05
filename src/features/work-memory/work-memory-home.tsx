@@ -13,11 +13,14 @@ import { MemoryDetailDialog } from './components/memory-detail-dialog';
 import { MemoryHero } from './components/memory-hero';
 import { MemoryListDialog } from './components/memory-list-dialog';
 import { MemoryStatusCard } from './components/memory-status-card';
+import { ReportGenerateDialog } from './components/report-generate-dialog';
+import { ReportPreviewDialog } from './components/report-preview-dialog';
 import { SettingsDialog } from './components/settings-dialog';
 import { SpotlightSearchPanel } from './components/spotlight-search-panel';
 import { useHomeWindowSizing } from './hooks/use-home-window-sizing';
 import { useMemorySearch } from './hooks/use-memory-search';
 import { useTrayWindowEvents } from './hooks/use-tray-window-events';
+import { useWeeklyReportFlow } from './hooks/use-weekly-report-flow';
 import { useWorkMemoryController } from './hooks/use-work-memory-controller';
 import { useWorkMemoryShortcuts } from './hooks/use-work-memory-shortcuts';
 import { getStatusVariant } from './memory-view-model';
@@ -36,6 +39,7 @@ export function WorkMemoryHome() {
   const contentRef = useHomeWindowSizing();
   const memory = useWorkMemoryController({ currentDate });
   const search = useMemorySearch({ onOpenMemory: memory.openMemoryDetail });
+  const weeklyReport = useWeeklyReportFlow();
   const statusVariant = getStatusVariant(memory.todayMemory, memory.isLocked);
 
   useWorkMemoryShortcuts({
@@ -51,6 +55,7 @@ export function WorkMemoryHome() {
     memory.setIsMemoryDialogOpen(false);
     memory.setIsMemoryListOpen(false);
     memory.setIsPreviewOpen(false);
+    weeklyReport.closeReportDialogs();
   }
 
   useTrayWindowEvents({
@@ -67,6 +72,7 @@ export function WorkMemoryHome() {
     },
     onOpenSettings: () => {
       search.closeSearchPanel();
+      weeklyReport.closeReportDialogs();
       memory.setIsMemoryDialogOpen(false);
       memory.setIsMemoryListOpen(false);
       memory.setIsPreviewOpen(false);
@@ -120,7 +126,7 @@ export function WorkMemoryHome() {
             statusVariant={statusVariant}
             todayMemory={memory.todayMemory}
             weeklySnapshot={memory.weeklySnapshot}
-            onGenerateReport={memory.showReportPlaceholder}
+            onGenerateReport={weeklyReport.openGenerateDialog}
             onViewDraft={memory.viewDraft}
             onViewMemory={memory.viewMemoryList}
           />
@@ -164,6 +170,22 @@ export function WorkMemoryHome() {
         currentDate={currentDate}
         onOpenChange={memory.setIsMemoryDialogOpen}
         onEditOriginal={memory.editOriginalRecord}
+      />
+      <ReportGenerateDialog
+        open={weeklyReport.isGenerateDialogOpen}
+        context={weeklyReport.weeklyReportContext}
+        isLoading={weeklyReport.isLoadingContext}
+        isGenerating={weeklyReport.isGeneratingReport}
+        onOpenChange={weeklyReport.setIsGenerateDialogOpen}
+        onGenerate={weeklyReport.generateWeeklyReport}
+      />
+      <ReportPreviewDialog
+        open={weeklyReport.isPreviewDialogOpen}
+        draft={weeklyReport.weeklyReportDraft}
+        isSaving={weeklyReport.isSavingReport}
+        onOpenChange={weeklyReport.setIsPreviewDialogOpen}
+        onCopyMarkdown={weeklyReport.copyMarkdown}
+        onSave={weeklyReport.saveWeeklyReport}
       />
       <SettingsDialog
         open={isSettingsOpen}

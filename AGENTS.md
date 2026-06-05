@@ -7,6 +7,7 @@
 项目规则：
 
 - 不要运行 `pnpm tauri dev`。
+- Tallya 面向 Windows 和 macOS 双平台；项目脚本、文档示例和测试命令必须保持跨平台，不要写入 `cmd /c`、`powershell`、`.bat`、`.cmd`、`where.exe` 等只能在单一平台运行的命令，除非代码里有明确的平台条件分支。
 - 开发前先阅读 `DESIGN.md`。
 - 修改 UI 时必须遵守 `DESIGN.md`。
 - 不要未经要求大改首页布局。

@@ -1,10 +1,17 @@
-import type { GeneratedDailyMemory, GenerateDailyMemoryInput } from '../../types';
+import type {
+  GeneratedDailyMemory,
+  GeneratedReportContent,
+  GenerateDailyMemoryInput,
+  GenerateWeeklyReportInput,
+} from '../../types';
 
 export type AIProviderId = 'ai-codex-cli' | 'openai-compatible' | 'ollama';
 
 export type GenerateDailyMemoryOptions = {
   codexCommand: string;
 };
+
+export type AIProviderOptions = GenerateDailyMemoryOptions;
 
 export type ProviderHealth = {
   status: 'unknown' | 'checking' | 'available' | 'unavailable';
@@ -19,9 +26,13 @@ export type AIProvider = {
   name: string;
   generateDailyMemory(
     input: GenerateDailyMemoryInput,
-    options: GenerateDailyMemoryOptions,
+    options: AIProviderOptions,
   ): Promise<GeneratedDailyMemory>;
-  checkHealth?(options: GenerateDailyMemoryOptions): Promise<ProviderHealth>;
+  generateWeeklyReport(
+    input: GenerateWeeklyReportInput,
+    options: AIProviderOptions,
+  ): Promise<GeneratedReportContent>;
+  checkHealth?(options: AIProviderOptions): Promise<ProviderHealth>;
 };
 
 export class AIProviderError extends Error {

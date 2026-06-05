@@ -314,10 +314,6 @@ export function useWorkMemoryController({ currentDate }: UseWorkMemoryController
     setIsMemoryDialogOpen(false);
   }
 
-  function showReportPlaceholder() {
-    toast.info('周报功能稍后接入');
-  }
-
   return {
     activeSupplementFields,
     clearLocalData,
@@ -344,7 +340,6 @@ export function useWorkMemoryController({ currentDate }: UseWorkMemoryController
     setIsPreviewOpen,
     setWorkNote,
     settleTodayMemory,
-    showReportPlaceholder,
     supplementValues,
     todayMemory,
     toggleSupplementField,

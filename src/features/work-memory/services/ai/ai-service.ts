@@ -1,4 +1,9 @@
-import type { GeneratedDailyMemory, GenerateDailyMemoryInput } from '../../types';
+import type {
+  GeneratedDailyMemory,
+  GeneratedReportContent,
+  GenerateDailyMemoryInput,
+  GenerateWeeklyReportInput,
+} from '../../types';
 import { appSettingsRepository, type AppSettings } from '../app-settings-repository';
 import { type AIProvider, type ProviderHealth } from './ai-provider';
 import { codexCliProvider } from './codex-cli-provider';
@@ -46,6 +51,15 @@ export function createAIService({
       const provider = getProviderForSettings(settings, codexProvider);
 
       return provider.generateDailyMemory(input, {
+        codexCommand: settings.codexCommand,
+      });
+    },
+
+    async generateWeeklyReport(input: GenerateWeeklyReportInput): Promise<GeneratedReportContent> {
+      const settings = await settingsRepository.getSettings();
+      const provider = getProviderForSettings(settings, codexProvider);
+
+      return provider.generateWeeklyReport(input, {
         codexCommand: settings.codexCommand,
       });
     },

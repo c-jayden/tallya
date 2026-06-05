@@ -78,6 +78,46 @@ struct GeneratedDailyMemory {
     extra_note: Option<String>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct GenerateWeeklyReportInput {
+    start_date: String,
+    end_date: String,
+    memories: Vec<DailyMemoryForReport>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DailyMemoryForReport {
+    id: String,
+    date: String,
+    raw_content: String,
+    supplements: DailyMemorySupplements,
+    generated: Option<GeneratedDailyMemory>,
+    status: String,
+    created_at: String,
+    updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct GeneratedReportContent {
+    #[serde(default)]
+    title: String,
+    #[serde(default)]
+    summary: String,
+    #[serde(default)]
+    highlights: Vec<String>,
+    #[serde(default)]
+    completed_items: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    problems: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    next_week_plan: Option<String>,
+    #[serde(default)]
+    markdown: String,
+}
+
 #[tauri::command]
 async fn check_codex_cli(command: String) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || run_codex_cli_check(command))
@@ -104,6 +144,21 @@ async fn generate_daily_memory_with_codex(
 }
 
 #[tauri::command]
+async fn generate_weekly_report_with_codex(
+    input: GenerateWeeklyReportInput,
+    codex_command: String,
+) -> Result<GeneratedReportContent, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        run_codex_weekly_report_generation(input, codex_command)
+    })
+    .await
+    .map_err(|error| {
+        eprintln!("Codex weekly report task join failed: {error}");
+        "Codex 生成失败，请检查 Codex CLI 是否可用。".to_string()
+    })?
+}
+
+#[tauri::command]
 fn send_tallya_notification(app: tauri::AppHandle, body: String) -> Result<(), String> {
     send_system_notification(app, body).map_err(|error| {
         eprintln!("Failed to send Tallya notification: {error}");
@@ -116,9 +171,7 @@ fn set_window_behavior(
     state: tauri::State<'_, AppWindowState>,
     close_to_tray: bool,
 ) -> Result<(), String> {
-    state
-        .close_to_tray
-        .store(close_to_tray, Ordering::SeqCst);
+    state.close_to_tray.store(close_to_tray, Ordering::SeqCst);
     Ok(())
 }
 
@@ -228,7 +281,28 @@ fn run_codex_daily_memory_generation(
     codex_command: String,
 ) -> Result<GeneratedDailyMemory, String> {
     let prompt = build_codex_prompt(&input);
-    let output_path = create_codex_output_path();
+    run_codex_prompt_generation(prompt, codex_command, "daily-memory", |raw_output| {
+        parse_generated_daily_memory(raw_output, &input)
+    })
+}
+
+fn run_codex_weekly_report_generation(
+    input: GenerateWeeklyReportInput,
+    codex_command: String,
+) -> Result<GeneratedReportContent, String> {
+    let prompt = build_codex_weekly_report_prompt(&input);
+    run_codex_prompt_generation(prompt, codex_command, "weekly-report", |raw_output| {
+        parse_generated_weekly_report(raw_output, &input)
+    })
+}
+
+fn run_codex_prompt_generation<T>(
+    prompt: String,
+    codex_command: String,
+    output_kind: &str,
+    parse_output: impl FnOnce(&str) -> Result<T, String>,
+) -> Result<T, String> {
+    let output_path = create_codex_output_path(output_kind);
     let mut child = spawn_codex_cli(&codex_command, &output_path)?;
 
     if let Some(mut stdin) = child.stdin.take() {
@@ -262,7 +336,7 @@ fn run_codex_daily_memory_generation(
                     .unwrap_or_else(|| String::from_utf8_lossy(&output.stdout).to_string());
                 let _ = fs::remove_file(&output_path);
 
-                return parse_generated_daily_memory(&raw_output, &input);
+                return parse_output(&raw_output);
             }
             Ok(None) => {
                 thread::sleep(Duration::from_millis(100));
@@ -436,7 +510,26 @@ JSON keys: summary:string, completedItems:string[], keyOutcome?:string, problems
     )
 }
 
-fn create_codex_output_path() -> std::path::PathBuf {
+fn build_codex_weekly_report_prompt(input: &GenerateWeeklyReportInput) -> String {
+    let input_json = serde_json::to_string(input).unwrap_or_else(|_| "{}".to_string());
+
+    format!(
+        r#"请根据输入中的 daily memories 整理一份中文本周周报。只输出合法 JSON，不要 markdown code fence、解释、代码块或工具调用。
+JSON keys: title:string, summary:string, highlights:string[], completedItems:string[], problems?:string, nextWeekPlan?:string, markdown:string.
+规则：
+- 只能使用输入里已经存在的工作记忆，不要编造没有做过的事情。
+- 可以做归纳、合并和润色，语气保持克制、清楚、适合工作复盘。
+- highlights 控制在 3-5 条。
+- completedItems 合并相近事项，避免把同一件事拆得过碎。
+- problems 只总结 daily memories 中提到的问题或风险；没有则返回空字符串。
+- nextWeekPlan 根据明日计划、未完成事项和问题保守提炼；没有则返回空字符串。
+- markdown 是一份可直接复制的周报文本，使用中文标题和分节。
+输入：{input_json}
+"#
+    )
+}
+
+fn create_codex_output_path(output_kind: &str) -> std::path::PathBuf {
     let timestamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|duration| duration.as_millis())
@@ -445,7 +538,7 @@ fn create_codex_output_path() -> std::path::PathBuf {
     let _ = fs::create_dir_all(&output_dir);
 
     output_dir.join(format!(
-        "tallya-codex-daily-memory-{}-{timestamp}.json",
+        "tallya-codex-{output_kind}-{}-{timestamp}.json",
         std::process::id()
     ))
 }
@@ -515,6 +608,119 @@ fn normalize_generated_daily_memory(
         tomorrow_plan: normalize_optional_string(generated.tomorrow_plan),
         extra_note: normalize_optional_string(generated.extra_note),
     })
+}
+
+fn parse_generated_weekly_report(
+    raw_output: &str,
+    input: &GenerateWeeklyReportInput,
+) -> Result<GeneratedReportContent, String> {
+    let raw_output = raw_output.trim();
+
+    if raw_output.is_empty() {
+        return Err("AI 没有返回有效报告内容，请重试。".to_string());
+    }
+
+    let parsed = serde_json::from_str::<GeneratedReportContent>(raw_output).map_err(|error| {
+        eprintln!("Codex weekly report output is not valid JSON: {error}");
+        "AI 返回内容不是合法 JSON，请重试。".to_string()
+    })?;
+
+    normalize_generated_weekly_report(parsed, input)
+}
+
+fn normalize_generated_weekly_report(
+    generated: GeneratedReportContent,
+    input: &GenerateWeeklyReportInput,
+) -> Result<GeneratedReportContent, String> {
+    let title = if generated.title.trim().is_empty() {
+        "本周周报".to_string()
+    } else {
+        generated.title.trim().to_string()
+    };
+    let summary = generated.summary.trim().to_string();
+    let highlights = normalize_string_list(generated.highlights, Some(5));
+    let completed_items = normalize_string_list(generated.completed_items, None);
+    let problems = normalize_optional_string(generated.problems);
+    let next_week_plan = normalize_optional_string(generated.next_week_plan);
+    let mut report = GeneratedReportContent {
+        title,
+        summary,
+        highlights,
+        completed_items,
+        problems,
+        next_week_plan,
+        markdown: generated.markdown.trim().to_string(),
+    };
+
+    if report.markdown.is_empty() {
+        report.markdown = build_weekly_report_markdown(&report, input);
+    }
+
+    if report.summary.is_empty()
+        && report.highlights.is_empty()
+        && report.completed_items.is_empty()
+        && report.markdown.trim().is_empty()
+    {
+        return Err("AI 没有返回有效报告内容，请重试。".to_string());
+    }
+
+    Ok(report)
+}
+
+fn normalize_string_list(values: Vec<String>, limit: Option<usize>) -> Vec<String> {
+    let values = values
+        .into_iter()
+        .map(|item| item.trim().to_string())
+        .filter(|item| !item.is_empty());
+
+    match limit {
+        Some(limit) => values.take(limit).collect(),
+        None => values.collect(),
+    }
+}
+
+fn build_weekly_report_markdown(
+    report: &GeneratedReportContent,
+    input: &GenerateWeeklyReportInput,
+) -> String {
+    let mut sections = vec![
+        format!("# {}", report.title),
+        String::new(),
+        format!("时间范围：{} - {}", input.start_date, input.end_date),
+    ];
+
+    if !report.summary.is_empty() {
+        sections.push(String::new());
+        sections.push("## 总结".to_string());
+        sections.push(report.summary.clone());
+    }
+
+    push_markdown_list(&mut sections, "本周重点", &report.highlights);
+    push_markdown_list(&mut sections, "完成事项", &report.completed_items);
+
+    if let Some(problems) = &report.problems {
+        sections.push(String::new());
+        sections.push("## 问题与风险".to_string());
+        sections.push(problems.clone());
+    }
+
+    if let Some(next_week_plan) = &report.next_week_plan {
+        sections.push(String::new());
+        sections.push("## 下周计划".to_string());
+        sections.push(next_week_plan.clone());
+    }
+
+    sections.join("\n")
+}
+
+fn push_markdown_list(sections: &mut Vec<String>, title: &str, items: &[String]) {
+    if items.is_empty() {
+        return;
+    }
+
+    sections.push(String::new());
+    sections.push(format!("## {title}"));
+    sections.extend(items.iter().map(|item| format!("- {item}")));
 }
 
 fn summarize_raw_content(raw_content: &str) -> String {
@@ -632,6 +838,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             check_codex_cli,
             generate_daily_memory_with_codex,
+            generate_weekly_report_with_codex,
             hide_main_window,
             quit_app,
             send_tallya_notification,

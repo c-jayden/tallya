@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { GeneratedDailyMemory, GenerateDailyMemoryInput } from '../../types';
+import type {
+  GeneratedDailyMemory,
+  GeneratedReportContent,
+  GenerateDailyMemoryInput,
+  GenerateWeeklyReportInput,
+} from '../../types';
 import { AIProviderError } from './ai-provider';
 import { createCodexCliProvider, createCodexCliTools } from './codex-cli-provider';
 
@@ -14,18 +19,48 @@ const generated: GeneratedDailyMemory = {
   completedItems: ['整理需求讨论内容', '确认优先处理范围', '同步后续计划'],
 };
 
+const weeklyInput: GenerateWeeklyReportInput = {
+  startDate: '2026-06-01',
+  endDate: '2026-06-07',
+  memories: [
+    {
+      id: 'daily-memory-2026-06-01',
+      date: '2026-06-01',
+      rawContent: '完成 SQLite 迁移。',
+      supplements: {},
+      generated: {
+        summary: '完成 SQLite 迁移。',
+        completedItems: ['迁移本地存储到 SQLite'],
+      },
+      status: 'generated',
+      createdAt: '2026-06-01T01:00:00.000Z',
+      updatedAt: '2026-06-01T02:00:00.000Z',
+    },
+  ],
+};
+
+const weeklyGenerated: GeneratedReportContent = {
+  title: '本周周报',
+  summary: '本周完成 SQLite 存储迁移。',
+  highlights: ['完成 SQLite 存储迁移'],
+  completedItems: ['迁移本地存储'],
+  problems: '',
+  nextWeekPlan: '',
+  markdown: '# 本周周报\n\n本周完成 SQLite 存储迁移。',
+};
+
 describe('createCodexCliProvider', () => {
   it('passes the configured command to the Tauri generation command', async () => {
     const invoke = vi.fn().mockResolvedValue(generated);
     const provider = createCodexCliProvider(invoke);
 
     await expect(
-      provider.generateDailyMemory(input, { codexCommand: 'C:\\Tools\\codex.cmd' }),
+      provider.generateDailyMemory(input, { codexCommand: 'custom-codex' }),
     ).resolves.toEqual(generated);
 
     expect(invoke).toHaveBeenCalledWith('generate_daily_memory_with_codex', {
       input,
-      codexCommand: 'C:\\Tools\\codex.cmd',
+      codexCommand: 'custom-codex',
     });
   });
 
@@ -37,6 +72,35 @@ describe('createCodexCliProvider', () => {
     ).rejects.toMatchObject({
       cause: 'raw spawn failure',
       message: 'raw spawn failure',
+      name: 'AIProviderError',
+      providerId: 'ai-codex-cli',
+    } satisfies AIProviderError & { cause: string });
+  });
+
+  it('passes weekly report input to the Tauri Codex command', async () => {
+    const invoke = vi.fn().mockResolvedValue(weeklyGenerated);
+    const provider = createCodexCliProvider(invoke);
+
+    await expect(
+      provider.generateWeeklyReport(weeklyInput, { codexCommand: 'custom-codex' }),
+    ).resolves.toEqual(weeklyGenerated);
+
+    expect(invoke).toHaveBeenCalledWith('generate_weekly_report_with_codex', {
+      input: weeklyInput,
+      codexCommand: 'custom-codex',
+    });
+  });
+
+  it('wraps weekly report failures in a friendly provider error', async () => {
+    const provider = createCodexCliProvider(
+      vi.fn().mockRejectedValue('AI 返回内容不是合法 JSON，请重试。'),
+    );
+
+    await expect(
+      provider.generateWeeklyReport(weeklyInput, { codexCommand: 'codex' }),
+    ).rejects.toMatchObject({
+      cause: 'AI 返回内容不是合法 JSON，请重试。',
+      message: 'AI 返回内容不是合法 JSON，请重试。',
       name: 'AIProviderError',
       providerId: 'ai-codex-cli',
     } satisfies AIProviderError & { cause: string });

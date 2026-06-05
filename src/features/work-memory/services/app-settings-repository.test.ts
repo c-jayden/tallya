@@ -43,7 +43,7 @@ describe('LocalStorageAppSettingsRepository', () => {
     await repository.saveSettings({
       ...DEFAULT_APP_SETTINGS,
       aiProviderId: 'ai-codex-cli',
-      codexCommand: 'C:\\Tools\\codex.cmd',
+      codexCommand: 'custom-codex',
       openAICompatible: {
         baseUrl: 'https://api.example.com/v1',
         apiKey: 'test-key',
@@ -60,7 +60,7 @@ describe('LocalStorageAppSettingsRepository', () => {
 
     await expect(repository.getSettings()).resolves.toEqual({
       ...DEFAULT_APP_SETTINGS,
-      codexCommand: 'C:\\Tools\\codex.cmd',
+      codexCommand: 'custom-codex',
       openAICompatible: {
         baseUrl: 'https://api.example.com/v1',
         apiKey: 'test-key',
