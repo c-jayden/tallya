@@ -1,23 +1,22 @@
 import { useEffect } from 'react';
-import { useTheme } from 'next-themes';
 import { appSettingsRepository } from '../../services/app-settings-repository';
+import { applyAppTheme, getAppThemeRevision } from '../../services/app-theme';
 
 export function AppThemeBootstrap() {
-  const { setTheme } = useTheme();
-
   useEffect(() => {
     let isMounted = true;
+    const loadThemeRevision = getAppThemeRevision();
 
     void appSettingsRepository.getSettings().then((settings) => {
-      if (isMounted) {
-        setTheme(settings.theme);
+      if (isMounted && loadThemeRevision === getAppThemeRevision()) {
+        applyAppTheme(settings.theme);
       }
     });
 
     return () => {
       isMounted = false;
     };
-  }, [setTheme]);
+  }, []);
 
   return null;
 }

@@ -1,6 +1,6 @@
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
-import type { AppSettings, AppTheme } from '../../services/app-settings-repository';
+import type { AppSettings } from '../../services/app-settings-repository';
 import { SwitchField } from './settings-shared';
 import { themeOptions } from './settings-types';
 
@@ -30,7 +30,9 @@ export function AppSettingsSection({ settings, onUpdateSettings }: AppSettingsSe
                       isActive &&
                         'bg-white font-semibold text-app-ink shadow-[0_1px_1px_rgb(15_23_42/0.04)] dark:bg-app-surface dark:text-app-ink',
                     )}
-                    onClick={() => onUpdateSettings({ theme: option.value as AppTheme })}
+                    onClick={() => {
+                      onUpdateSettings({ theme: option.value });
+                    }}
                   >
                     {option.label}
                   </button>

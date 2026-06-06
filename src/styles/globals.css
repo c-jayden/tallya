@@ -30,6 +30,9 @@
   --app-shadow-focus: 0 0 0 3px rgb(24 24 27 / 0.025);
   --app-accent: #18181b;
   --app-accent-ink: #fafafa;
+  --app-scrollbar-thumb: rgb(15 23 42 / 0.28);
+  --app-scrollbar-thumb-hover: rgb(15 23 42 / 0.45);
+  --app-scrollbar-thumb-active: rgb(15 23 42 / 0.55);
 
   --background: var(--app-surface);
   --foreground: var(--app-ink);
@@ -65,6 +68,55 @@
   --sidebar-ring: var(--app-ink);
 }
 
+.light {
+  color-scheme: light;
+
+  --app-bg: #fefefe;
+  --app-surface: #ffffff;
+  --app-surface-muted: #f3f4f6;
+  --app-surface-raised: #ffffff;
+  --app-border: #e5e7eb;
+  --app-border-strong: #cbd5e1;
+  --app-ink: #0f172a;
+  --app-ink-muted: #334155;
+  --app-ink-subtle: #94a3b8;
+  --app-placeholder: #94a3b8;
+  --app-shadow-soft: 0 8px 22px rgb(24 24 27 / 0.045);
+  --app-shadow-focus: 0 0 0 3px rgb(24 24 27 / 0.025);
+  --app-accent: #18181b;
+  --app-accent-ink: #fafafa;
+  --app-scrollbar-thumb: rgb(15 23 42 / 0.28);
+  --app-scrollbar-thumb-hover: rgb(15 23 42 / 0.45);
+  --app-scrollbar-thumb-active: rgb(15 23 42 / 0.55);
+
+  --background: var(--app-surface);
+  --foreground: var(--app-ink);
+  --card: var(--app-surface);
+  --card-foreground: var(--app-ink);
+  --popover: var(--app-surface);
+  --popover-foreground: var(--app-ink);
+  --primary: var(--app-accent);
+  --primary-foreground: var(--app-accent-ink);
+  --secondary: var(--app-surface-muted);
+  --secondary-foreground: var(--app-ink);
+  --muted: var(--app-surface-muted);
+  --muted-foreground: var(--app-ink-muted);
+  --accent: var(--app-surface-muted);
+  --accent-foreground: var(--app-ink);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: var(--app-border);
+  --input: var(--app-border);
+  --ring: var(--app-ink);
+  --sidebar: var(--app-surface);
+  --sidebar-foreground: var(--app-ink);
+  --sidebar-primary: var(--app-accent);
+  --sidebar-primary-foreground: var(--app-accent-ink);
+  --sidebar-accent: var(--app-surface-muted);
+  --sidebar-accent-foreground: var(--app-ink);
+  --sidebar-border: var(--app-border);
+  --sidebar-ring: var(--app-ink);
+}
+
 .dark {
   color-scheme: dark;
 
@@ -82,6 +134,9 @@
   --app-shadow-focus: 0 0 0 3px rgb(255 255 255 / 0.035);
   --app-accent: #f5f5f5;
   --app-accent-ink: #18181b;
+  --app-scrollbar-thumb: rgb(245 245 245 / 0.34);
+  --app-scrollbar-thumb-hover: rgb(245 245 245 / 0.52);
+  --app-scrollbar-thumb-active: rgb(245 245 245 / 0.62);
 
   --background: var(--app-surface);
   --foreground: var(--app-ink);
@@ -109,54 +164,6 @@
   --sidebar-accent-foreground: var(--app-ink);
   --sidebar-border: var(--app-border);
   --sidebar-ring: var(--app-ink);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not(.light) {
-    color-scheme: dark;
-
-    --app-bg: #161616;
-    --app-surface: #1d1d1f;
-    --app-surface-muted: #27272a;
-    --app-surface-raised: #232326;
-    --app-border: #343438;
-    --app-border-strong: #52525b;
-    --app-ink: #f5f5f5;
-    --app-ink-muted: #b4b4bb;
-    --app-ink-subtle: #85858d;
-    --app-placeholder: #777780;
-    --app-shadow-soft: 0 18px 42px rgb(0 0 0 / 0.26);
-    --app-shadow-focus: 0 0 0 3px rgb(255 255 255 / 0.035);
-    --app-accent: #f5f5f5;
-    --app-accent-ink: #18181b;
-
-    --background: var(--app-surface);
-    --foreground: var(--app-ink);
-    --card: var(--app-surface);
-    --card-foreground: var(--app-ink);
-    --popover: var(--app-surface);
-    --popover-foreground: var(--app-ink);
-    --primary: var(--app-accent);
-    --primary-foreground: var(--app-accent-ink);
-    --secondary: var(--app-surface-muted);
-    --secondary-foreground: var(--app-ink);
-    --muted: var(--app-surface-muted);
-    --muted-foreground: var(--app-ink-muted);
-    --accent: var(--app-surface-muted);
-    --accent-foreground: var(--app-ink);
-    --destructive: oklch(0.704 0.191 22.216);
-    --border: var(--app-border);
-    --input: var(--app-border);
-    --ring: var(--app-ink);
-    --sidebar: var(--app-surface);
-    --sidebar-foreground: var(--app-ink);
-    --sidebar-primary: var(--app-accent);
-    --sidebar-primary-foreground: var(--app-accent-ink);
-    --sidebar-accent: var(--app-surface-muted);
-    --sidebar-accent-foreground: var(--app-ink);
-    --sidebar-border: var(--app-border);
-    --sidebar-ring: var(--app-ink);
-  }
 }
 
 @theme inline {
@@ -226,6 +233,8 @@
     margin: 0;
     overflow: clip;
     background: var(--app-bg);
+    scrollbar-color: var(--app-scrollbar-thumb) transparent;
+    scrollbar-width: thin;
   }
 
   body {
@@ -249,6 +258,31 @@
   [aria-disabled='true'],
   [data-disabled] {
     cursor: not-allowed;
+  }
+
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    min-height: 32px;
+    border: 2px solid transparent;
+    border-radius: 999px;
+    background-color: var(--app-scrollbar-thumb);
+    background-clip: content-box;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: var(--app-scrollbar-thumb-hover);
+  }
+
+  *::-webkit-scrollbar-thumb:active {
+    background-color: var(--app-scrollbar-thumb-active);
   }
 }
 
@@ -288,9 +322,9 @@
   --os-track-border-hover: none;
   --os-track-border-active: none;
   --os-handle-border-radius: 999px;
-  --os-handle-bg: rgb(15 23 42 / 0.28);
-  --os-handle-bg-hover: rgb(15 23 42 / 0.45);
-  --os-handle-bg-active: rgb(15 23 42 / 0.45);
+  --os-handle-bg: var(--app-scrollbar-thumb);
+  --os-handle-bg-hover: var(--app-scrollbar-thumb-hover);
+  --os-handle-bg-active: var(--app-scrollbar-thumb-active);
   --os-handle-border: none;
   --os-handle-border-hover: none;
   --os-handle-border-active: none;

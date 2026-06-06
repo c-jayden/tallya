@@ -151,11 +151,14 @@ export function ReportGenerateDialog({
             {dialogState.showPrimary ? (
               <Button
                 type="button"
-                className="cursor-pointer bg-app-accent text-app-accent-ink hover:bg-[color-mix(in_srgb,var(--app-accent)_86%,var(--app-surface-muted))] disabled:cursor-not-allowed"
+                className="h-9 min-w-24 cursor-pointer gap-2 rounded-xl bg-app-accent px-3.5 text-app-accent-ink hover:bg-[color-mix(in_srgb,var(--app-accent)_86%,var(--app-surface-muted))] disabled:cursor-not-allowed disabled:bg-app-surface-muted disabled:text-app-ink-muted disabled:opacity-100 disabled:hover:bg-app-surface-muted"
                 onClick={handleGenerateClick}
                 disabled={dialogState.primaryDisabled}
+                aria-busy={isGenerating}
               >
-                {isGenerating ? <Loader2 className="animate-spin" aria-hidden="true" /> : null}
+                {isGenerating ? (
+                  <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden="true" />
+                ) : null}
                 {dialogState.primaryLabel}
               </Button>
             ) : null}

@@ -6,11 +6,13 @@ export type SettingsSection = 'ai' | 'notifications' | 'reports' | 'app' | 'data
 
 export type { ProviderHealth };
 
+export const defaultSettingsSection: SettingsSection = 'app';
+
 export const menuItems: { id: SettingsSection; label: string }[] = [
-  { id: 'ai', label: 'AI 配置' },
-  { id: 'notifications', label: '通知提醒' },
-  { id: 'reports', label: '报告偏好' },
   { id: 'app', label: '应用设置' },
+  { id: 'ai', label: 'AI 配置' },
+  { id: 'reports', label: '报告偏好' },
+  { id: 'notifications', label: '通知提醒' },
   { id: 'data', label: '数据管理' },
   { id: 'about', label: '关于' },
 ];

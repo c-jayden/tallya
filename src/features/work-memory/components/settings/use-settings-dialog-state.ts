@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import { useTheme } from 'next-themes';
 import { toast } from 'sonner';
 import { aiService } from '../../services/ai/ai-service';
 import {
@@ -7,9 +6,11 @@ import {
   appSettingsRepository,
   type AppSettings,
 } from '../../services/app-settings-repository';
+import { applyAppTheme } from '../../services/app-theme';
 import { reminderService } from '../../services/reminder-service';
 import { syncWindowBehaviorSettings } from '../../services/window-service';
 import {
+  defaultSettingsSection,
   type ProviderHealth,
   type SettingsSection,
 } from './settings-types';
@@ -27,13 +28,12 @@ const initialProviderHealth: ProviderHealth = {
 const SETTINGS_SAVE_DEBOUNCE_MS = 500;
 
 export function useSettingsDialogState({ open, onClearLocalData }: UseSettingsDialogStateOptions) {
-  const { setTheme } = useTheme();
   const asyncRunId = useRef(0);
   const settingsSaveRunId = useRef(0);
   const latestSettingsRef = useRef<AppSettings>(DEFAULT_APP_SETTINGS);
   const pendingSettingsRef = useRef<AppSettings | null>(null);
   const saveTimeoutRef = useRef<number | null>(null);
-  const [activeSection, setActiveSection] = useState<SettingsSection>('ai');
+  const [activeSection, setActiveSection] = useState<SettingsSection>(defaultSettingsSection);
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_APP_SETTINGS);
   const [isLoadingSettings, setIsLoadingSettings] = useState(false);
   const [isCheckingProvider, setIsCheckingProvider] = useState(false);
@@ -48,17 +48,24 @@ export function useSettingsDialogState({ open, onClearLocalData }: UseSettingsDi
     }
 
     let isMounted = true;
+    const loadSaveRunId = settingsSaveRunId.current;
 
     clearPendingSettingsSave();
 
     void appSettingsRepository
       .getSettings()
       .then((savedSettings) => {
-        if (isMounted) {
+        // A slow SQLite read can finish after a local edit; do not replay stale
+        // persisted values over the user's current selection.
+        if (
+          isMounted &&
+          loadSaveRunId === settingsSaveRunId.current &&
+          pendingSettingsRef.current === null
+        ) {
           latestSettingsRef.current = savedSettings;
           pendingSettingsRef.current = null;
           setSettings(savedSettings);
-          setTheme(savedSettings.theme);
+          applyAppTheme(savedSettings.theme);
         }
       })
       .finally(() => {
@@ -70,7 +77,7 @@ export function useSettingsDialogState({ open, onClearLocalData }: UseSettingsDi
     return () => {
       isMounted = false;
     };
-  }, [open, setTheme]);
+  }, [open]);
 
   async function persistSettings(nextSettings: AppSettings) {
     clearPendingSettingsSave();
@@ -87,7 +94,7 @@ export function useSettingsDialogState({ open, onClearLocalData }: UseSettingsDi
         pendingSettingsRef.current = null;
         setSettings(savedSettings);
       }
-      setTheme(savedSettings.theme);
+      applyAppTheme(savedSettings.theme);
       void reminderService.reschedule(savedSettings);
       void syncWindowBehaviorSettings(savedSettings);
 
@@ -138,7 +145,7 @@ export function useSettingsDialogState({ open, onClearLocalData }: UseSettingsDi
     setSettings(nextSettings);
 
     if (patch.theme) {
-      setTheme(nextSettings.theme);
+      applyAppTheme(nextSettings.theme);
     }
 
     if (
@@ -210,7 +217,7 @@ export function useSettingsDialogState({ open, onClearLocalData }: UseSettingsDi
   function resetTransientState() {
     flushPendingSettingsSave();
     asyncRunId.current += 1;
-    setActiveSection('ai');
+    setActiveSection(defaultSettingsSection);
     setIsClearConfirmOpen(false);
     setIsCheckingProvider(false);
     setIsSendingTestNotification(false);
