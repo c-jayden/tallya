@@ -7,6 +7,7 @@ import {
   type AppSettings,
 } from '../../services/app-settings-repository';
 import { applyAppTheme } from '../../services/app-theme';
+import { backupService, type BackupPayload } from '../../services/backup-service';
 import { reminderService } from '../../services/reminder-service';
 import { syncWindowBehaviorSettings } from '../../services/window-service';
 import {
@@ -18,6 +19,7 @@ import {
 type UseSettingsDialogStateOptions = {
   open: boolean;
   onClearLocalData: () => Promise<void>;
+  onDataRestored?: () => Promise<void>;
 };
 
 const initialProviderHealth: ProviderHealth = {
@@ -27,7 +29,11 @@ const initialProviderHealth: ProviderHealth = {
 
 const SETTINGS_SAVE_DEBOUNCE_MS = 500;
 
-export function useSettingsDialogState({ open, onClearLocalData }: UseSettingsDialogStateOptions) {
+export function useSettingsDialogState({
+  open,
+  onClearLocalData,
+  onDataRestored,
+}: UseSettingsDialogStateOptions) {
   const asyncRunId = useRef(0);
   const settingsSaveRunId = useRef(0);
   const latestSettingsRef = useRef<AppSettings>(DEFAULT_APP_SETTINGS);
@@ -37,9 +43,15 @@ export function useSettingsDialogState({ open, onClearLocalData }: UseSettingsDi
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_APP_SETTINGS);
   const [isLoadingSettings, setIsLoadingSettings] = useState(false);
   const [isCheckingProvider, setIsCheckingProvider] = useState(false);
+  const [isExportingBackup, setIsExportingBackup] = useState(false);
+  const [isSelectingBackupFile, setIsSelectingBackupFile] = useState(false);
+  const [isImportingBackup, setIsImportingBackup] = useState(false);
+  const [isOpeningDataDirectory, setIsOpeningDataDirectory] = useState(false);
   const [isSendingTestNotification, setIsSendingTestNotification] = useState(false);
   const [isClearingData, setIsClearingData] = useState(false);
   const [isClearConfirmOpen, setIsClearConfirmOpen] = useState(false);
+  const [isImportConfirmOpen, setIsImportConfirmOpen] = useState(false);
+  const [pendingBackupPayload, setPendingBackupPayload] = useState<BackupPayload | null>(null);
   const [providerHealth, setProviderHealth] = useState<ProviderHealth>(initialProviderHealth);
 
   useEffect(() => {
@@ -94,9 +106,7 @@ export function useSettingsDialogState({ open, onClearLocalData }: UseSettingsDi
         pendingSettingsRef.current = null;
         setSettings(savedSettings);
       }
-      applyAppTheme(savedSettings.theme);
-      void reminderService.reschedule(savedSettings);
-      void syncWindowBehaviorSettings(savedSettings);
+      applyPersistedSettings(savedSettings);
 
       return savedSettings;
     } catch {
@@ -126,7 +136,7 @@ export function useSettingsDialogState({ open, onClearLocalData }: UseSettingsDi
     }, SETTINGS_SAVE_DEBOUNCE_MS);
   }
 
-  function flushPendingSettingsSave() {
+  async function flushPendingSettingsSave() {
     const pendingSettings = pendingSettingsRef.current;
 
     if (!pendingSettings) {
@@ -134,7 +144,7 @@ export function useSettingsDialogState({ open, onClearLocalData }: UseSettingsDi
     }
 
     clearPendingSettingsSave();
-    void persistSettings(pendingSettings);
+    await persistSettings(pendingSettings);
   }
 
   function updateSettings(patch: Partial<AppSettings>) {
@@ -201,6 +211,93 @@ export function useSettingsDialogState({ open, onClearLocalData }: UseSettingsDi
     }
   }
 
+  async function exportBackup() {
+    setIsExportingBackup(true);
+
+    try {
+      await flushPendingSettingsSave();
+      const result = await backupService.exportBackupToFile();
+
+      if (result.status === 'exported') {
+        toast.success('备份已导出');
+      }
+    } catch {
+      toast.error('导出备份失败，请稍后重试');
+    } finally {
+      setIsExportingBackup(false);
+    }
+  }
+
+  async function requestImportBackup() {
+    setIsSelectingBackupFile(true);
+
+    try {
+      const payload = await backupService.selectBackupFile();
+
+      if (payload) {
+        setPendingBackupPayload(payload);
+        setIsImportConfirmOpen(true);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '备份文件格式不正确';
+
+      toast.error(message);
+    } finally {
+      setIsSelectingBackupFile(false);
+    }
+  }
+
+  async function confirmImportBackup() {
+    if (!pendingBackupPayload || isImportingBackup) {
+      return;
+    }
+
+    setIsImportingBackup(true);
+
+    try {
+      clearPendingSettingsSave();
+      pendingSettingsRef.current = null;
+
+      const savedSettings = await backupService.restoreBackupPayload(pendingBackupPayload);
+
+      latestSettingsRef.current = savedSettings;
+      setSettings(savedSettings);
+      applyPersistedSettings(savedSettings);
+      await onDataRestored?.();
+      toast.success('备份已导入');
+      setPendingBackupPayload(null);
+      setIsImportConfirmOpen(false);
+    } catch {
+      toast.error('导入备份失败，请稍后重试');
+    } finally {
+      setIsImportingBackup(false);
+    }
+  }
+
+  function updateImportConfirmOpen(nextOpen: boolean) {
+    if (isImportingBackup) {
+      return;
+    }
+
+    setIsImportConfirmOpen(nextOpen);
+
+    if (!nextOpen) {
+      setPendingBackupPayload(null);
+    }
+  }
+
+  async function openDataDirectory() {
+    setIsOpeningDataDirectory(true);
+
+    try {
+      await backupService.openDataDirectory();
+    } catch {
+      toast.error('打开数据目录失败');
+    } finally {
+      setIsOpeningDataDirectory(false);
+    }
+  }
+
   async function sendTestNotification() {
     setIsSendingTestNotification(true);
 
@@ -215,27 +312,42 @@ export function useSettingsDialogState({ open, onClearLocalData }: UseSettingsDi
   }
 
   function resetTransientState() {
-    flushPendingSettingsSave();
+    void flushPendingSettingsSave();
     asyncRunId.current += 1;
     setActiveSection(defaultSettingsSection);
     setIsClearConfirmOpen(false);
+    setIsImportConfirmOpen(false);
     setIsCheckingProvider(false);
+    setIsExportingBackup(false);
+    setIsSelectingBackupFile(false);
+    setIsImportingBackup(false);
+    setIsOpeningDataDirectory(false);
     setIsSendingTestNotification(false);
+    setPendingBackupPayload(null);
     setProviderHealth(initialProviderHealth);
   }
 
   return {
     activeSection,
     checkProviderHealth,
+    confirmImportBackup,
     clearLocalData,
+    exportBackup,
     providerHealth,
     isCheckingProvider,
     isClearConfirmOpen,
     isClearingData,
+    isExportingBackup,
+    isImportConfirmOpen,
+    isImportingBackup: isSelectingBackupFile || isImportingBackup,
     isLoadingSettings,
+    isOpeningDataDirectory,
     isSendingTestNotification,
+    openDataDirectory,
+    requestImportBackup,
     setActiveSection,
     setIsClearConfirmOpen,
+    setIsImportConfirmOpen: updateImportConfirmOpen,
     settings,
     sendTestNotification,
     updateSettings,
@@ -248,4 +360,10 @@ function normalizeProviderSettings(settings: AppSettings) {
     ...settings,
     codexCommand: settings.codexCommand.trim() || DEFAULT_APP_SETTINGS.codexCommand,
   };
+}
+
+function applyPersistedSettings(settings: AppSettings) {
+  applyAppTheme(settings.theme);
+  void reminderService.reschedule(settings);
+  void syncWindowBehaviorSettings(settings);
 }

@@ -315,6 +315,7 @@ export function useWeeklyReportFlow() {
     openGenerateDialog,
     openReportDetail,
     openReportList,
+    reloadReports: loadReports,
     regenerateSelectedReport,
     reportListItems,
     reportContext,

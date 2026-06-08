@@ -6,6 +6,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { ClearDataConfirmDialog } from './settings/clear-data-confirm-dialog';
+import { ImportBackupConfirmDialog } from './settings/import-backup-confirm-dialog';
 import { SettingsContent } from './settings/settings-content';
 import { SettingsMenu } from './settings/settings-menu';
 import { useSettingsDialogState } from './settings/use-settings-dialog-state';
@@ -14,10 +15,16 @@ type SettingsDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onClearLocalData: () => Promise<void>;
+  onDataRestored?: () => Promise<void>;
 };
 
-export function SettingsDialog({ open, onOpenChange, onClearLocalData }: SettingsDialogProps) {
-  const settingsState = useSettingsDialogState({ open, onClearLocalData });
+export function SettingsDialog({
+  open,
+  onOpenChange,
+  onClearLocalData,
+  onDataRestored,
+}: SettingsDialogProps) {
+  const settingsState = useSettingsDialogState({ open, onClearLocalData, onDataRestored });
 
   function handleOpenChange(nextOpen: boolean) {
     if (!nextOpen) {
@@ -54,9 +61,15 @@ export function SettingsDialog({ open, onOpenChange, onClearLocalData }: Setting
               isLoadingSettings={settingsState.isLoadingSettings}
               providerHealth={settingsState.providerHealth}
               isCheckingProvider={settingsState.isCheckingProvider}
+              isExportingBackup={settingsState.isExportingBackup}
+              isImportingBackup={settingsState.isImportingBackup}
+              isOpeningDataDirectory={settingsState.isOpeningDataDirectory}
               isSendingTestNotification={settingsState.isSendingTestNotification}
               onUpdateSettings={settingsState.updateSettings}
               onCheckHealth={settingsState.checkProviderHealth}
+              onExportBackup={settingsState.exportBackup}
+              onImportBackup={settingsState.requestImportBackup}
+              onOpenDataDirectory={settingsState.openDataDirectory}
               onSendTestNotification={settingsState.sendTestNotification}
               onRequestClear={() => settingsState.setIsClearConfirmOpen(true)}
             />
@@ -69,6 +82,12 @@ export function SettingsDialog({ open, onOpenChange, onClearLocalData }: Setting
         isClearingData={settingsState.isClearingData}
         onOpenChange={settingsState.setIsClearConfirmOpen}
         onConfirm={settingsState.clearLocalData}
+      />
+      <ImportBackupConfirmDialog
+        open={settingsState.isImportConfirmOpen}
+        isImportingBackup={settingsState.isImportingBackup}
+        onOpenChange={settingsState.setIsImportConfirmOpen}
+        onConfirm={settingsState.confirmImportBackup}
       />
     </>
   );

@@ -259,6 +259,12 @@ export class TestDatabaseClient implements DatabaseClient {
         .sort((first, second) => first.id.localeCompare(second.id)) as T;
     }
 
+    if (normalizedQuery.startsWith('select * from report_sources order by')) {
+      return Array.from(this.reportSources.values()).sort((first, second) =>
+        first.report_id.localeCompare(second.report_id) || first.id.localeCompare(second.id),
+      ) as T;
+    }
+
     if (normalizedQuery.startsWith('select * from report_sources where daily_memory_id =')) {
       const rows = Array.from(this.reportSources.values())
         .filter((row) => row.daily_memory_id === String(bindValues[0]))

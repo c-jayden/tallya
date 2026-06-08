@@ -169,6 +169,18 @@ export function useWorkMemoryController({ currentDate, todayDate }: UseWorkMemor
     pulseTimeoutsRef.current.push(timeoutId);
   }, []);
 
+  const loadCurrentDateData = useCallback(async () => {
+    const [memory, memories] = await Promise.all([
+      dailyMemoryRepository.getByDate(currentDate),
+      dailyMemoryRepository.list(),
+    ]);
+    const isReferenced = memory
+      ? await reportRepository.hasReportsUsingDailyMemory(memory.id)
+      : false;
+
+    return { memory, memories, isReferenced };
+  }, [currentDate]);
+
   const settleTodayMemory = useCallback(async () => {
     if (isLocked || isGeneratingMemory || isSavingDraft || isFutureMemoryDate(currentDate, todayDate)) {
       return;
@@ -210,15 +222,7 @@ export function useWorkMemoryController({ currentDate, todayDate }: UseWorkMemor
 
     // Initial load restores today's editable state and also reads history for
     // the status card without exposing storage details to the component.
-    void Promise.all([dailyMemoryRepository.getByDate(currentDate), dailyMemoryRepository.list()])
-      .then(async ([memory, memories]) => {
-        const isReferenced = memory
-          ? await reportRepository.hasReportsUsingDailyMemory(memory.id)
-          : false;
-
-        return { memory, memories, isReferenced };
-      })
-      .then(({ memory, memories, isReferenced }) => {
+    void loadCurrentDateData().then(({ memory, memories, isReferenced }) => {
       if (isMounted) {
         setIsCurrentMemoryReferenced(isReferenced);
         setGeneratedPreview(null);
@@ -231,7 +235,7 @@ export function useWorkMemoryController({ currentDate, todayDate }: UseWorkMemor
     return () => {
       isMounted = false;
     };
-  }, [applyDailyMemory, currentDate]);
+  }, [applyDailyMemory, loadCurrentDateData]);
 
   useEffect(() => {
     return () => {
@@ -391,6 +395,20 @@ export function useWorkMemoryController({ currentDate, todayDate }: UseWorkMemor
     applyDailyMemory(null, []);
   }
 
+  async function reloadCurrentDate() {
+    const { memory, memories, isReferenced } = await loadCurrentDateData();
+
+    setIsCurrentMemoryReferenced(isReferenced);
+    setGeneratedPreview(null);
+    setViewingMemory(null);
+    setMemoryListItems(getGeneratedMemories(memories));
+    setIsPreviewOpen(false);
+    setIsMemoryDialogOpen(false);
+    setIsMemoryListOpen(false);
+    setPendingReferencedSaveAction(null);
+    applyDailyMemory(memory, memories);
+  }
+
   function openMemoryDetail(memory: DailyMemory) {
     if (!memory.generated) {
       return;
@@ -435,6 +453,7 @@ export function useWorkMemoryController({ currentDate, todayDate }: UseWorkMemor
     primaryActionLabel,
     primaryActionRef,
     primaryPulse,
+    reloadCurrentDate,
     saveDraft,
     saveGeneratedLabel,
     saveGeneratedMemory,

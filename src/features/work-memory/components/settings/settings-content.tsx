@@ -15,9 +15,15 @@ export type SettingsContentProps = {
   isLoadingSettings: boolean;
   providerHealth: ProviderHealth;
   isCheckingProvider: boolean;
+  isExportingBackup: boolean;
+  isImportingBackup: boolean;
+  isOpeningDataDirectory: boolean;
   isSendingTestNotification: boolean;
   onUpdateSettings: (patch: Partial<AppSettings>) => void;
   onCheckHealth: () => void;
+  onExportBackup: () => void;
+  onImportBackup: () => void;
+  onOpenDataDirectory: () => void;
   onSendTestNotification: () => void;
   onRequestClear: () => void;
 };
@@ -46,9 +52,15 @@ function SettingsSectionContent({
   settings,
   providerHealth,
   isCheckingProvider,
+  isExportingBackup,
+  isImportingBackup,
+  isOpeningDataDirectory,
   isSendingTestNotification,
   onUpdateSettings,
   onCheckHealth,
+  onExportBackup,
+  onImportBackup,
+  onOpenDataDirectory,
   onSendTestNotification,
   onRequestClear,
 }: SettingsContentProps) {
@@ -89,7 +101,17 @@ function SettingsSectionContent({
   }
 
   if (activeSection === 'data') {
-    return <DataSettingsSection onRequestClear={onRequestClear} />;
+    return (
+      <DataSettingsSection
+        isExportingBackup={isExportingBackup}
+        isImportingBackup={isImportingBackup}
+        isOpeningDataDirectory={isOpeningDataDirectory}
+        onExportBackup={onExportBackup}
+        onImportBackup={onImportBackup}
+        onOpenDataDirectory={onOpenDataDirectory}
+        onRequestClear={onRequestClear}
+      />
+    );
   }
 
   return <AboutSettingsSection />;

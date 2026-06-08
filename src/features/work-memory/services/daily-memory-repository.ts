@@ -82,6 +82,14 @@ export class LocalStorageDailyMemoryRepository {
     this.writeAll([]);
   }
 
+  async replaceAll(memories: DailyMemory[]) {
+    this.writeAll(
+      memories
+        .map(normalizeDailyMemory)
+        .filter((memory): memory is DailyMemory => memory !== null),
+    );
+  }
+
   async searchMemories(keyword: string) {
     const normalizedKeyword = keyword.trim().toLowerCase();
 
@@ -266,6 +274,20 @@ export class SQLiteDailyMemoryRepository {
 
   async clearLocalData() {
     await this.clearAll();
+  }
+
+  async replaceAll(memories: DailyMemory[]) {
+    await this.write(async (database) => {
+      await database.execute('DELETE FROM daily_memories');
+
+      for (const memory of memories) {
+        const normalizedMemory = normalizeDailyMemory(memory);
+
+        if (normalizedMemory) {
+          await saveDailyMemoryRow(database, normalizedMemory);
+        }
+      }
+    });
   }
 
   async searchMemories(keyword: string) {

@@ -301,6 +301,10 @@ export function WorkMemoryHome() {
         open={isSettingsOpen}
         onOpenChange={setIsSettingsOpen}
         onClearLocalData={memory.clearLocalData}
+        onDataRestored={async () => {
+          await memory.reloadCurrentDate();
+          await weeklyReport.reloadReports();
+        }}
       />
       <AlertDialog
         open={memory.isReferenceConfirmOpen}

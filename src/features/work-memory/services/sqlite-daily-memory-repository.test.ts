@@ -161,6 +161,37 @@ describe('SQLiteDailyMemoryRepository', () => {
     expect(database.appSettings.has('theme')).toBe(true);
   });
 
+  it('replaces all daily memories during backup restore', async () => {
+    const repository = createRepository();
+
+    await repository.saveDraft({
+      date: '2026-06-01',
+      rawContent: 'Old draft.',
+      supplements: {},
+    });
+
+    await repository.replaceAll([
+      {
+        id: 'daily-memory-2026-06-08',
+        date: '2026-06-08',
+        rawContent: 'Restored memory.',
+        supplements: {},
+        generated: {
+          summary: 'Restored memory.',
+          completedItems: ['Restored one memory.'],
+        },
+        status: 'generated',
+        createdAt: '2026-06-08T01:00:00.000Z',
+        updatedAt: '2026-06-08T02:00:00.000Z',
+      },
+    ]);
+
+    await expect(repository.getAllMemories()).resolves.toEqual([
+      expect.objectContaining({ date: '2026-06-08', status: 'generated' }),
+    ]);
+    await expect(repository.getByDate('2026-06-01')).resolves.toBeNull();
+  });
+
   it('migrates legacy localStorage memories without deleting the old value', async () => {
     const storage = new MemoryStorage();
     storage.setItem(

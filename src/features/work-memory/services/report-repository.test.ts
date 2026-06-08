@@ -232,6 +232,51 @@ describe('SQLiteReportRepository', () => {
     await expect(repository.getReportSources(firstReport.id)).resolves.toHaveLength(1);
     await expect(repository.getReportSources(secondReport.id)).resolves.toHaveLength(1);
   });
+
+  it('reads every report source for backups', async () => {
+    const repository = createRepository();
+    const firstReport = createReport({ id: 'weekly-2026-06-01' });
+    const secondReport = createReport({ id: 'weekly-2026-06-08' });
+    const firstMemory = createDailyMemory('2026-06-01');
+    const secondMemory = createDailyMemory('2026-06-08');
+
+    await repository.saveReport(firstReport);
+    await repository.saveReport(secondReport);
+    await repository.saveReportSources(firstReport.id, [firstMemory]);
+    await repository.saveReportSources(secondReport.id, [secondMemory]);
+
+    await expect(repository.getAllReportSources()).resolves.toEqual([
+      expect.objectContaining({ reportId: firstReport.id, dailyMemoryId: firstMemory.id }),
+      expect.objectContaining({ reportId: secondReport.id, dailyMemoryId: secondMemory.id }),
+    ]);
+  });
+
+  it('replaces all reports and report sources during backup restore', async () => {
+    const repository = createRepository();
+    const oldReport = createReport({ id: 'weekly-2026-05-25' });
+    const nextReport = createReport({ id: 'weekly-2026-06-01' });
+    const nextMemory = createDailyMemory('2026-06-01');
+
+    await repository.saveReport(oldReport);
+    await repository.saveReportSources(oldReport.id, [createDailyMemory('2026-05-25')]);
+
+    await repository.replaceAll([nextReport], [
+      {
+        id: 'report-source-weekly-2026-06-01-daily-memory-2026-06-01',
+        reportId: nextReport.id,
+        dailyMemoryId: nextMemory.id,
+        dailyMemoryUpdatedAtSnapshot: nextMemory.updatedAt,
+      },
+    ]);
+
+    await expect(repository.getAllReports()).resolves.toEqual([
+      expect.objectContaining({ id: nextReport.id }),
+    ]);
+    await expect(repository.getReportById(oldReport.id)).resolves.toBeNull();
+    await expect(repository.getAllReportSources()).resolves.toEqual([
+      expect.objectContaining({ reportId: nextReport.id, dailyMemoryId: nextMemory.id }),
+    ]);
+  });
 });
 
 function createRepository(database = new TestDatabaseClient()) {
