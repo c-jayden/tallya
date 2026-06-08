@@ -359,6 +359,15 @@ function normalizeProviderSettings(settings: AppSettings) {
   return {
     ...settings,
     codexCommand: settings.codexCommand.trim() || DEFAULT_APP_SETTINGS.codexCommand,
+    openAICompatible: {
+      baseUrl:
+        settings.openAICompatible.baseUrl.trim() ||
+        DEFAULT_APP_SETTINGS.openAICompatible.baseUrl,
+      apiKey: settings.openAICompatible.apiKey.trim(),
+      model:
+        settings.openAICompatible.model.trim() ||
+        DEFAULT_APP_SETTINGS.openAICompatible.model,
+    },
   };
 }
 

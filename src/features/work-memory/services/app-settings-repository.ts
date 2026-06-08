@@ -1,5 +1,9 @@
 import type { AIProviderId } from './ai/ai-provider';
-import { DEFAULT_CODEX_MODEL, normalizeProviderModel } from './ai/known-models';
+import {
+  DEFAULT_CODEX_MODEL,
+  DEFAULT_OPENAI_COMPATIBLE_MODEL,
+  normalizeProviderModel,
+} from './ai/known-models';
 import type { DatabaseClient } from './database/database';
 import { getDatabase } from './database/database';
 import { createFriendlyError } from './service-error';
@@ -51,9 +55,9 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   codexCommand: DEFAULT_CODEX_COMMAND,
   codexModel: DEFAULT_CODEX_MODEL,
   openAICompatible: {
-    baseUrl: '',
+    baseUrl: 'https://api.openai.com/v1',
     apiKey: '',
-    model: '',
+    model: DEFAULT_OPENAI_COMPATIBLE_MODEL,
   },
   ollama: {
     baseUrl: 'http://localhost:11434',

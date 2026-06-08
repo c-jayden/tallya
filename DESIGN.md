@@ -107,7 +107,7 @@ It does not rush users, create pressure, use exaggerated language, or turn work 
 
 ## Data And AI
 
-- User-visible AI provider is Codex CLI only until multiple real providers exist.
+- User-visible AI providers are Codex CLI and OpenAI Compatible. Do not expose Mock or unfinished providers.
 - Structure AI settings as provider management first, provider-specific configuration second.
 - Do not expose Mock or development-only providers in user-facing settings.
 - Settings persistence must go through repository/service modules, not direct component storage access.

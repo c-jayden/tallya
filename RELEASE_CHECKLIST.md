@@ -22,8 +22,11 @@
 - Confirm the workflow reads `package.json` version and uses `vX.Y.Z`.
 - Confirm the workflow creates the tag if it was manually triggered and the tag did not already exist.
 - Confirm the GitHub Release is created as a draft by default.
-- Confirm the Windows NSIS installer is uploaded to the Release and workflow artifacts.
-- Download the Windows installer.
+- Confirm GitHub Release assets directly include the NSIS `.exe` installer.
+- Confirm GitHub Release assets directly include the MSI `.msi` installer.
+- Confirm GitHub Release assets directly include the portable `.zip`.
+- Confirm users do not need to download and unzip workflow artifacts to find the installer.
+- Download the Windows installer from GitHub Release assets.
 - Run install and overwrite-install checks from this checklist.
 
 ## Install
@@ -79,7 +82,9 @@
 - Confirm SQLite data was not cleared.
 - Confirm tray behavior still works.
 - Confirm test notification still works.
-- Confirm Codex detection still works.
+- Confirm Codex CLI Provider detection still works.
+- Confirm OpenAI Compatible Provider can detect a valid API service.
+- Confirm OpenAI Compatible Provider shows a friendly error for invalid API Key.
 - Confirm memory search still works.
 
 ## Uninstall
@@ -90,8 +95,9 @@
 
 ## Known Requirements
 
-- AI generation currently depends on the user's local Codex CLI.
-- Users should install and sign in to Codex CLI before using AI generation.
+- AI generation can use the user's local Codex CLI or an OpenAI Compatible API service.
+- Codex CLI users should install and sign in to Codex CLI before using AI generation.
+- OpenAI Compatible users should configure Base URL, API Key, and model in Settings > AI.
 
 ## Known TODO
 

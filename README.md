@@ -110,27 +110,31 @@ pnpm check:release
 pnpm tauri build
 ```
 
-当前 Windows 第一版优先生成 NSIS 安装包，产物通常位于：
+当前 Windows 第一版优先生成 NSIS / MSI 安装包和 portable zip，产物通常位于：
 
 ```text
 src-tauri/target/release/bundle/nsis/
+src-tauri/target/release/bundle/msi/
 ```
 
 Windows 打包机需要可用的 NSIS / `makensis`。如果 Tauri 已生成 release exe 但 bundling 失败，先安装 NSIS 后再重新运行发布检查。
 
 如果本机缺少打包工具链，可以使用 GitHub Actions 的 `Release` workflow。它会读取 `package.json` 的 `version`，使用 `v{version}` 作为 tag；手动触发时如果 tag 不存在会自动创建 tag，然后在 Windows runner 上运行检查、构建 NSIS 安装包，并创建 draft GitHub Release。
 
-常规提交和 PR 会运行 `CI` workflow，覆盖 typecheck、lint、Vitest、Rust test/check 和前端 build。发布时手动触发 `Release` workflow 即可，安装包会上传到 GitHub Releases；当前 Windows 安装包未配置代码签名，Windows 可能提示未知发布者。
+常规提交和 PR 会运行 `CI` workflow，覆盖 typecheck、lint、Vitest、Rust test/check 和前端 build。发布时手动触发 `Release` workflow 即可，安装包会直接上传到 GitHub Releases，Release 页面会提供 Windows exe / msi / portable zip；workflow artifact 仅用于调试，不是最终分发入口。当前 Windows 安装包未配置代码签名，Windows 可能提示未知发布者。
 
 发布前按 [RELEASE_CHECKLIST.md](./RELEASE_CHECKLIST.md) 做安装、覆盖安装、托盘、通知、Codex CLI、SQLite 数据保留和备份恢复检查。
 
 Tallya 当前 AI 生成依赖本机 Codex CLI。SQLite 数据库使用 Tauri SQL 插件保存到应用数据目录，配置为 `sqlite:tallya.db`；覆盖安装不应清空工作记忆、报告或设置。
 
-## Codex CLI
+## AI 服务
 
-Tallya 当前使用本机 Codex CLI 生成工作记忆。请确保本机已安装并登录 Codex CLI。
+Tallya 当前支持两种用户可见 AI 服务：
 
-设置页中的 AI 服务当前只展示 Codex CLI。Mock Provider 仅用于测试和开发，不会在用户界面中暴露。
+- Codex CLI：适合本机已安装并登录 Codex CLI 的用户，生成通过本机 Codex CLI 执行。
+- OpenAI Compatible：适合使用 API Key、OpenAI API 兼容服务、中转服务、DeepSeek、Kimi 或 OpenRouter 的用户。
+
+使用 OpenAI Compatible 时，需要在设置页填写 Base URL、API Key 和模型。生成所需的工作记录内容会发送到用户配置的 API 服务；API Key 和设置保存在本机，不会用于云同步。Mock Provider 仅用于测试和开发，不会在用户界面中暴露。
 
 ## 项目结构
 

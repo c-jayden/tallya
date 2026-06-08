@@ -97,6 +97,24 @@ describe('LocalStorageAppSettingsRepository', () => {
     storage.setItem(
       'tallya.app-settings.v1',
       JSON.stringify({
+        aiProviderId: 'openai-compatible',
+        openAICompatible: {},
+      }),
+    );
+
+    await expect(repository.getSettings()).resolves.toEqual({
+      ...DEFAULT_APP_SETTINGS,
+      aiProviderId: 'openai-compatible',
+      openAICompatible: {
+        baseUrl: 'https://api.openai.com/v1',
+        apiKey: '',
+        model: 'gpt-4.1-mini',
+      },
+    });
+
+    storage.setItem(
+      'tallya.app-settings.v1',
+      JSON.stringify({
         reportLength: 'unknown',
         reportTone: 'formal',
         reportFocus: 'risks',

@@ -63,9 +63,9 @@ const settings: AppSettings = {
   codexCommand: 'custom-codex',
   codexModel: 'gpt-5.4-mini',
   openAICompatible: {
-    baseUrl: '',
+    baseUrl: 'https://api.openai.com/v1',
     apiKey: '',
-    model: '',
+    model: 'gpt-4.1-mini',
   },
   ollama: {
     baseUrl: 'http://localhost:11434',
@@ -109,6 +109,7 @@ describe('createAIService', () => {
     expect(generateDailyMemory).toHaveBeenCalledWith(input, {
       codexCommand: 'custom-codex',
       codexModel: 'gpt-5.4-mini',
+      openAICompatible: settings.openAICompatible,
     });
   });
 
@@ -140,6 +141,7 @@ describe('createAIService', () => {
     expect(checkHealth).toHaveBeenCalledWith({
       codexCommand: 'custom-codex',
       codexModel: 'gpt-5.4-mini',
+      openAICompatible: settings.openAICompatible,
     });
   });
 
@@ -172,6 +174,7 @@ describe('createAIService', () => {
       {
         codexCommand: 'custom-codex',
         codexModel: 'gpt-5.4-mini',
+        openAICompatible: settings.openAICompatible,
       },
     );
   });
@@ -204,7 +207,53 @@ describe('createAIService', () => {
       {
         codexCommand: 'custom-codex',
         codexModel: 'gpt-5.4-mini',
+        openAICompatible: settings.openAICompatible,
       },
     );
+  });
+
+  it('uses the OpenAI Compatible provider when selected in settings', async () => {
+    const generateDailyMemory = vi
+      .fn<AIProvider['generateDailyMemory']>()
+      .mockResolvedValue(generated);
+    const openAICompatibleProvider: AIProvider = {
+      id: 'openai-compatible',
+      name: 'OpenAI Compatible',
+      generateDailyMemory,
+      generateWeeklyReport: vi.fn(),
+      generateRangeReport: vi.fn(),
+    };
+    const service = createAIService({
+      settingsRepository: {
+        getSettings: vi.fn().mockResolvedValue({
+          ...settings,
+          aiProviderId: 'openai-compatible',
+          openAICompatible: {
+            baseUrl: 'https://api.example.com/v1',
+            apiKey: 'secret',
+            model: 'gpt-test',
+          },
+        }),
+      },
+      codexProvider: {
+        id: 'ai-codex-cli',
+        name: 'Codex CLI',
+        generateDailyMemory: vi.fn(),
+        generateWeeklyReport: vi.fn(),
+        generateRangeReport: vi.fn(),
+      },
+      openAICompatibleProvider,
+    });
+
+    await expect(service.generateDailyMemory(input)).resolves.toEqual(generated);
+    expect(generateDailyMemory).toHaveBeenCalledWith(input, {
+      codexCommand: 'custom-codex',
+      codexModel: 'gpt-5.4-mini',
+      openAICompatible: {
+        baseUrl: 'https://api.example.com/v1',
+        apiKey: 'secret',
+        model: 'gpt-test',
+      },
+    });
   });
 });

@@ -9,6 +9,7 @@ import { appSettingsRepository, type AppSettings } from '../app-settings-reposit
 import { type AIProvider, type ProviderHealth } from './ai-provider';
 import { codexCliProvider } from './codex-cli-provider';
 import { mockProvider } from './mock-provider';
+import { openAICompatibleProvider } from './openai-compatible-provider';
 
 type SettingsRepository = {
   getSettings: typeof appSettingsRepository.getSettings;
@@ -17,9 +18,10 @@ type SettingsRepository = {
 type CreateAIServiceOptions = {
   settingsRepository?: SettingsRepository;
   codexProvider?: AIProvider;
+  openAICompatibleProvider?: AIProvider;
 };
 
-const providers = [codexCliProvider, mockProvider];
+const providers = [codexCliProvider, openAICompatibleProvider, mockProvider];
 const providersById = new Map<string, AIProvider>(
   providers.map((provider) => [provider.id, provider]),
 );
@@ -30,10 +32,14 @@ export const currentProviderId = 'ai-codex-cli';
 export function createAIService({
   settingsRepository = appSettingsRepository,
   codexProvider = codexCliProvider,
+  openAICompatibleProvider: configuredOpenAICompatibleProvider = openAICompatibleProvider,
 }: CreateAIServiceOptions = {}) {
   async function generateRangeReport(input: RangeReportSourceInput): Promise<GeneratedReportContent> {
     const settings = await settingsRepository.getSettings();
-    const provider = getProviderForSettings(settings, codexProvider);
+    const provider = getProviderForSettings(settings, {
+      codexProvider,
+      openAICompatibleProvider: configuredOpenAICompatibleProvider,
+    });
 
     return provider.generateRangeReport(
       {
@@ -42,10 +48,7 @@ export function createAIService({
         reportTone: settings.reportTone,
         reportFocus: settings.reportFocus,
       },
-      {
-        codexCommand: settings.codexCommand,
-        codexModel: settings.codexModel,
-      },
+      getProviderOptions(settings),
     );
   }
 
@@ -56,7 +59,11 @@ export function createAIService({
 
     getProviderById(providerId: string): AIProvider {
       const provider =
-        providerId === currentProviderId ? codexProvider : providersById.get(providerId);
+        providerId === currentProviderId
+          ? codexProvider
+          : providerId === openAICompatibleProvider.id
+            ? configuredOpenAICompatibleProvider
+            : providersById.get(providerId);
 
       if (!provider) {
         throw new Error(`AI Provider "${providerId}" is not registered.`);
@@ -67,12 +74,12 @@ export function createAIService({
 
     async generateDailyMemory(input: GenerateDailyMemoryInput): Promise<GeneratedDailyMemory> {
       const settings = await settingsRepository.getSettings();
-      const provider = getProviderForSettings(settings, codexProvider);
-
-      return provider.generateDailyMemory(input, {
-        codexCommand: settings.codexCommand,
-        codexModel: settings.codexModel,
+      const provider = getProviderForSettings(settings, {
+        codexProvider,
+        openAICompatibleProvider: configuredOpenAICompatibleProvider,
       });
+
+      return provider.generateDailyMemory(input, getProviderOptions(settings));
     },
 
     async generateWeeklyReport(input: WeeklyReportSourceInput): Promise<GeneratedReportContent> {
@@ -86,7 +93,10 @@ export function createAIService({
 
     async checkHealth(): Promise<ProviderHealth> {
       const settings = await settingsRepository.getSettings();
-      const provider = getProviderForSettings(settings, codexProvider);
+      const provider = getProviderForSettings(settings, {
+        codexProvider,
+        openAICompatibleProvider: configuredOpenAICompatibleProvider,
+      });
 
       if (!provider.checkHealth) {
         return {
@@ -96,19 +106,26 @@ export function createAIService({
         };
       }
 
-      return provider.checkHealth({
-        codexCommand: settings.codexCommand,
-        codexModel: settings.codexModel,
-      });
+      return provider.checkHealth(getProviderOptions(settings));
     },
   };
 }
 
 export const aiService = createAIService();
 
-function getProviderForSettings(settings: AppSettings, codexProvider: AIProvider) {
+function getProviderForSettings(
+  settings: AppSettings,
+  providers: {
+    codexProvider: AIProvider;
+    openAICompatibleProvider: AIProvider;
+  },
+) {
   if (settings.aiProviderId === currentProviderId) {
-    return codexProvider;
+    return providers.codexProvider;
+  }
+
+  if (settings.aiProviderId === openAICompatibleProvider.id) {
+    return providers.openAICompatibleProvider;
   }
 
   const provider = providersById.get(settings.aiProviderId);
@@ -119,4 +136,12 @@ function getProviderForSettings(settings: AppSettings, codexProvider: AIProvider
   }
 
   return provider;
+}
+
+function getProviderOptions(settings: AppSettings) {
+  return {
+    codexCommand: settings.codexCommand,
+    codexModel: settings.codexModel,
+    openAICompatible: settings.openAICompatible,
+  };
 }

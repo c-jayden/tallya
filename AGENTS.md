@@ -72,8 +72,8 @@ Provider 规则：
 
 - 不要向用户暴露 Mock Provider。
 - Mock Provider 只用于测试和开发。
-- 当前用户可见 AI 服务是 Codex CLI。
-- Provider 结构要为 OpenAI Compatible 和 Ollama 预留扩展。
+- 当前用户可见 AI 服务是 Codex CLI 和 OpenAI Compatible。
+- Provider 结构要继续为 Ollama 等后续服务预留扩展。
 - 不要把未来 Provider 假设写死进 UI。
 
 目录边界：

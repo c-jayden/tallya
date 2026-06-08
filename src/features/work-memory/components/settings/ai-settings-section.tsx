@@ -1,5 +1,6 @@
 import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
@@ -21,7 +22,13 @@ const visibleProviderOptions: { value: AIProviderId; label: string; description:
   {
     value: 'ai-codex-cli',
     label: 'Codex CLI',
-    description: '使用当前服务整理工作记忆。',
+    description: '通过本机 Codex CLI 整理工作记忆。',
+  },
+  {
+    value: 'openai-compatible',
+    label: 'OpenAI Compatible',
+    description:
+      '用于兼容 OpenAI 格式的 API 服务，可填写 OpenAI、DeepSeek、Kimi、OpenRouter 或其他中转服务商的地址和模型。',
   },
 ];
 
@@ -43,10 +50,11 @@ export function AISettingsSection({
   const selectedProvider =
     visibleProviderOptions.find((option) => option.value === settings.aiProviderId) ??
     visibleProviderOptions[0];
-  const modelOptions = getKnownProviderModels(selectedProvider.value);
-  const selectedModel =
-    normalizeProviderModel(selectedProvider.value, settings.codexModel) ||
-    getDefaultProviderModel(selectedProvider.value);
+  const isCodexProvider = selectedProvider.value === 'ai-codex-cli';
+  const codexModelOptions = getKnownProviderModels('ai-codex-cli');
+  const selectedCodexModel =
+    normalizeProviderModel('ai-codex-cli', settings.codexModel) ||
+    getDefaultProviderModel('ai-codex-cli');
 
   return (
     <section className="space-y-7" aria-label="AI 配置">
@@ -62,8 +70,10 @@ export function AISettingsSection({
               onUpdateSettings({
                 aiProviderId,
                 codexModel:
-                  normalizeProviderModel(aiProviderId, settings.codexModel) ||
-                  getDefaultProviderModel(aiProviderId),
+                  aiProviderId === 'ai-codex-cli'
+                    ? normalizeProviderModel(aiProviderId, settings.codexModel) ||
+                      getDefaultProviderModel(aiProviderId)
+                    : settings.codexModel,
               });
             }}
           >
@@ -80,26 +90,74 @@ export function AISettingsSection({
           </Select>
         </Field>
 
-        <Field
-          label="模型"
-          description="选择当前服务用于整理工作记忆的模型。"
-        >
-          <Select
-            value={selectedModel}
-            onValueChange={(codexModel) => onUpdateSettings({ codexModel })}
-          >
-            <SelectTrigger className="h-10 w-56 bg-app-surface">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {modelOptions.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Field>
+        {isCodexProvider ? (
+          <Field label="模型" description="选择 Codex CLI 用于整理工作记忆的模型。">
+            <Select
+              value={selectedCodexModel}
+              onValueChange={(codexModel) => onUpdateSettings({ codexModel })}
+            >
+              <SelectTrigger className="h-10 w-56 bg-app-surface">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {codexModelOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+        ) : (
+          <div className="space-y-5">
+            <Field label="Base URL">
+              <Input
+                value={settings.openAICompatible.baseUrl}
+                onChange={(event) =>
+                  onUpdateSettings({
+                    openAICompatible: {
+                      ...settings.openAICompatible,
+                      baseUrl: event.target.value,
+                    },
+                  })
+                }
+                placeholder="https://api.openai.com/v1"
+              />
+            </Field>
+
+            <Field label="API Key">
+              <Input
+                type="password"
+                value={settings.openAICompatible.apiKey}
+                onChange={(event) =>
+                  onUpdateSettings({
+                    openAICompatible: {
+                      ...settings.openAICompatible,
+                      apiKey: event.target.value,
+                    },
+                  })
+                }
+                placeholder="sk-..."
+                autoComplete="off"
+              />
+            </Field>
+
+            <Field label="模型">
+              <Input
+                value={settings.openAICompatible.model}
+                onChange={(event) =>
+                  onUpdateSettings({
+                    openAICompatible: {
+                      ...settings.openAICompatible,
+                      model: event.target.value,
+                    },
+                  })
+                }
+                placeholder="gpt-4.1-mini"
+              />
+            </Field>
+          </div>
+        )}
 
         <Field label="服务状态">
           <div className="space-y-2.5">
@@ -118,7 +176,7 @@ export function AISettingsSection({
               <StatusLine health={providerHealth} />
             </div>
             <p className="text-[13px] leading-5 text-app-ink-subtle">
-              连接检测会快速确认当前服务是否可访问，模型和账号状态会在生成时继续校验。
+              连接检测会确认当前 AI 服务是否可访问，模型和账号状态会在生成时继续校验。
             </p>
           </div>
         </Field>
