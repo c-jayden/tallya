@@ -1,0 +1,210 @@
+﻿import { describe, expect, it, vi } from 'vitest';
+import type { AppSettings } from '../../app-settings-repository';
+import type {
+  GeneratedDailyMemory,
+  GeneratedReportContent,
+  GenerateDailyMemoryInput,
+  RangeReportSourceInput,
+  WeeklyReportSourceInput,
+} from '../../../types';
+import { createAIService } from '../ai-service';
+import type { AIProvider } from '../ai-provider';
+
+const input: GenerateDailyMemoryInput = {
+  date: '2026-06-03',
+  rawContent: '今天整理了需求讨论内容，确认了优先处理范围，并同步了后续计划。',
+  supplements: {},
+};
+
+const generated: GeneratedDailyMemory = {
+  summary: '整理需求讨论并同步后续计划。',
+  completedItems: ['整理需求讨论内容', '确认优先处理范围', '同步后续计划'],
+};
+
+const weeklyInput: WeeklyReportSourceInput = {
+  startDate: '2026-06-01',
+  endDate: '2026-06-07',
+  memories: [
+    {
+      id: 'daily-memory-2026-06-01',
+      date: '2026-06-01',
+      rawContent: 'Finished SQLite migration.',
+      supplements: {},
+      generated: {
+        summary: 'Finished SQLite migration.',
+        completedItems: ['Migrated local storage to SQLite'],
+      },
+      status: 'generated',
+      createdAt: '2026-06-01T01:00:00.000Z',
+      updatedAt: '2026-06-01T02:00:00.000Z',
+    },
+  ],
+};
+
+const customInput: RangeReportSourceInput = {
+  reportType: 'custom',
+  startDate: '2026-06-01',
+  endDate: '2026-06-03',
+  memories: weeklyInput.memories,
+};
+
+const weeklyGenerated: GeneratedReportContent = {
+  title: '本周周报',
+  summary: '本周完成 SQLite 存储迁移。',
+  highlights: ['完成 SQLite 存储迁移'],
+  completedItems: ['迁移本地存储'],
+  problems: '',
+  nextWeekPlan: '',
+  markdown: '# 本周周报\n\n本周完成 SQLite 存储迁移。',
+};
+
+const settings: AppSettings = {
+  aiProviderId: 'ai-codex-cli',
+  codexCommand: 'custom-codex',
+  codexModel: 'gpt-5.4-mini',
+  openAICompatible: {
+    baseUrl: '',
+    apiKey: '',
+    model: '',
+  },
+  ollama: {
+    baseUrl: 'http://localhost:11434',
+    model: '',
+  },
+  dailyReminderEnabled: false,
+  dailyReminderTime: '18:00',
+  dailyReminderMessage: '可以花一分钟沉淀一下今天的工作。',
+  weeklyReminderEnabled: false,
+  weeklyReminderWeekday: 'friday',
+  weeklyReminderTime: '18:30',
+  weeklyReminderMessage: '可以整理一下这周的工作脉络了。',
+  reportLength: 'brief',
+  reportTone: 'retrospective',
+  reportFocus: 'risks',
+  theme: 'system',
+  launchAtStartup: false,
+  closeToTray: true,
+  startMinimized: false,
+};
+
+describe('createAIService', () => {
+  it('reads the saved Codex command before generating a daily memory', async () => {
+    const generateDailyMemory = vi
+      .fn<AIProvider['generateDailyMemory']>()
+      .mockResolvedValue(generated);
+    const service = createAIService({
+      settingsRepository: {
+        getSettings: vi.fn().mockResolvedValue(settings),
+      },
+      codexProvider: {
+        id: 'ai-codex-cli',
+        name: 'Codex CLI',
+        generateDailyMemory,
+        generateWeeklyReport: vi.fn(),
+        generateRangeReport: vi.fn(),
+      },
+    });
+
+    await expect(service.generateDailyMemory(input)).resolves.toEqual(generated);
+    expect(generateDailyMemory).toHaveBeenCalledWith(input, {
+      codexCommand: 'custom-codex',
+      codexModel: 'gpt-5.4-mini',
+    });
+  });
+
+  it('checks health through the selected provider with saved settings', async () => {
+    const checkHealth = vi.fn<NonNullable<AIProvider['checkHealth']>>().mockResolvedValue({
+      status: 'available',
+      message: '服务可用',
+      detail: 'codex 1.2.3',
+    });
+    const service = createAIService({
+      settingsRepository: {
+        getSettings: vi.fn().mockResolvedValue(settings),
+      },
+      codexProvider: {
+        id: 'ai-codex-cli',
+        name: 'Codex CLI',
+        generateDailyMemory: vi.fn(),
+        generateWeeklyReport: vi.fn(),
+        generateRangeReport: vi.fn(),
+        checkHealth,
+      },
+    });
+
+    await expect(service.checkHealth()).resolves.toEqual({
+      status: 'available',
+      message: '服务可用',
+      detail: 'codex 1.2.3',
+    });
+    expect(checkHealth).toHaveBeenCalledWith({
+      codexCommand: 'custom-codex',
+      codexModel: 'gpt-5.4-mini',
+    });
+  });
+
+  it('reads saved settings before generating a weekly report', async () => {
+    const generateRangeReport = vi
+      .fn<AIProvider['generateRangeReport']>()
+      .mockResolvedValue(weeklyGenerated);
+    const service = createAIService({
+      settingsRepository: {
+        getSettings: vi.fn().mockResolvedValue(settings),
+      },
+      codexProvider: {
+        id: 'ai-codex-cli',
+        name: 'Codex CLI',
+        generateDailyMemory: vi.fn(),
+        generateWeeklyReport: vi.fn(),
+        generateRangeReport,
+      },
+    });
+
+    await expect(service.generateWeeklyReport(weeklyInput)).resolves.toEqual(weeklyGenerated);
+    expect(generateRangeReport).toHaveBeenCalledWith(
+      {
+        reportType: 'weekly',
+        ...weeklyInput,
+        reportLength: 'brief',
+        reportTone: 'retrospective',
+        reportFocus: 'risks',
+      },
+      {
+        codexCommand: 'custom-codex',
+        codexModel: 'gpt-5.4-mini',
+      },
+    );
+  });
+
+  it('reads saved report preferences before generating a custom range report', async () => {
+    const generateRangeReport = vi
+      .fn<AIProvider['generateRangeReport']>()
+      .mockResolvedValue(weeklyGenerated);
+    const service = createAIService({
+      settingsRepository: {
+        getSettings: vi.fn().mockResolvedValue(settings),
+      },
+      codexProvider: {
+        id: 'ai-codex-cli',
+        name: 'Codex CLI',
+        generateDailyMemory: vi.fn(),
+        generateWeeklyReport: vi.fn(),
+        generateRangeReport,
+      },
+    });
+
+    await expect(service.generateRangeReport(customInput)).resolves.toEqual(weeklyGenerated);
+    expect(generateRangeReport).toHaveBeenCalledWith(
+      {
+        ...customInput,
+        reportLength: 'brief',
+        reportTone: 'retrospective',
+        reportFocus: 'risks',
+      },
+      {
+        codexCommand: 'custom-codex',
+        codexModel: 'gpt-5.4-mini',
+      },
+    );
+  });
+});

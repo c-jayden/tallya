@@ -54,6 +54,20 @@ UI 约束：
 - 设置存储逻辑放到 `app-settings-repository`。
 - 记忆存储逻辑放到 `daily-memory-repository`。
 
+测试组织规则：
+
+- 业务测试放在所属模块的 `__tests__` 目录。
+- `components` 测试放到 `src/features/work-memory/components/__tests__`。
+- `components/settings` 测试放到 `src/features/work-memory/components/settings/__tests__`。
+- `hooks` 测试放到 `src/features/work-memory/hooks/__tests__`。
+- `services` 测试放到 `src/features/work-memory/services/__tests__`。
+- AI 测试放到 `src/features/work-memory/services/ai/__tests__`。
+- database 测试放到 `src/features/work-memory/services/database/__tests__`。
+- feature 根级 view model / home 测试放到 `src/features/work-memory/__tests__`。
+- 不要把大量 `.test.ts` / `.test.tsx` 文件平铺在业务目录。
+- 不要把 feature 测试集中到项目根 `tests` 目录。
+- 移动测试文件时必须修正 import，并运行测试。
+
 Provider 规则：
 
 - 不要向用户暴露 Mock Provider。
