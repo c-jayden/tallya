@@ -15,8 +15,10 @@ import { TallyaDialogFooter } from './tallya-dialog-footer';
 type DailyMemoryPreviewDialogProps = {
   open: boolean;
   content: DailyMemoryGeneratedContent | null;
+  description: string;
   isSaving: boolean;
   saveLabel: string;
+  title: string;
   onOpenChange: (open: boolean) => void;
   onSave: () => void;
 };
@@ -24,8 +26,10 @@ type DailyMemoryPreviewDialogProps = {
 export function DailyMemoryPreviewDialog({
   open,
   content,
+  description,
   isSaving,
   saveLabel,
+  title,
   onOpenChange,
   onSave,
 }: DailyMemoryPreviewDialogProps) {
@@ -37,10 +41,10 @@ export function DailyMemoryPreviewDialog({
       >
         <DialogHeader className="shrink-0 gap-1.5 px-6 pt-5 pb-4">
           <DialogTitle className="text-lg leading-6 font-semibold tracking-normal text-app-ink">
-            今日记忆预览
+            {title}
           </DialogTitle>
           <DialogDescription className="text-[13px] leading-[1.5] text-app-ink-muted">
-            确认后会保存为今天唯一一条工作记忆。
+            {description}
           </DialogDescription>
         </DialogHeader>
         <TallyaScrollArea className="min-h-0 max-h-[calc(100vh-190px)] flex-1 px-6 pb-5">

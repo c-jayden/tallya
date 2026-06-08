@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 import { copyReportMarkdown, copyReportPlainText } from '../services/report-clipboard';
 import {
   formatReportDateRange,
+  getCurrentWeekRange,
   getDefaultCustomReportRange,
   isValidReportDateRange,
 } from '../services/report-date';
@@ -27,6 +28,13 @@ export function useWeeklyReportFlow() {
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
   const [isReportListOpen, setIsReportListOpen] = useState(false);
   const [isReportDetailOpen, setIsReportDetailOpen] = useState(false);
+  const currentWeekRange = getCurrentWeekRange();
+  const hasCurrentWeekReport = reportListItems.some(
+    (report) =>
+      report.type === 'weekly' &&
+      report.startDate === currentWeekRange.startDate &&
+      report.endDate === currentWeekRange.endDate,
+  );
 
   const loadContext = useCallback(async (
     nextReportType: ReportGenerationType = reportType,
@@ -303,6 +311,7 @@ export function useWeeklyReportFlow() {
     isSavingReport,
     isReportBusy: isGeneratingReport || isSavingReport,
     hasSavedReports: reportListItems.length > 0,
+    hasCurrentWeekReport,
     openGenerateDialog,
     openReportDetail,
     openReportList,

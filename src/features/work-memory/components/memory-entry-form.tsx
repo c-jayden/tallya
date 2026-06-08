@@ -16,6 +16,7 @@ type MemoryEntryFormProps = {
   isPrimaryPulsing: boolean;
   isSavingDraft: boolean;
   primaryActionLabel: string;
+  placeholder: string;
   primaryActionRef: Ref<HTMLButtonElement>;
   workNoteInputRef: Ref<HTMLTextAreaElement>;
   supplementFields: readonly SupplementField[];
@@ -39,6 +40,7 @@ export function MemoryEntryForm({
   isPrimaryPulsing,
   isSavingDraft,
   primaryActionLabel,
+  placeholder,
   primaryActionRef,
   workNoteInputRef,
   supplementFields,
@@ -66,7 +68,7 @@ export function MemoryEntryForm({
           className="block min-h-full resize-none overflow-hidden rounded-none border-0 bg-transparent p-3 text-sm leading-6 text-app-ink shadow-none outline-none placeholder:text-[var(--app-placeholder)] focus-visible:border-0 focus-visible:ring-0 disabled:cursor-not-allowed disabled:opacity-50"
           value={workNote}
           onChange={(event) => onWorkNoteChange(event.currentTarget.value)}
-          placeholder="例如：上午推进需求讨论，下午整理方案并同步进展，明天继续跟进剩余问题。"
+          placeholder={placeholder}
           disabled={isLocked}
         />
       </TallyaScrollArea>

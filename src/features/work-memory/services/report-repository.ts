@@ -106,6 +106,17 @@ export class SQLiteReportRepository {
     }, []);
   }
 
+  async hasReportSourceForDailyMemory(dailyMemoryId: string) {
+    return this.read(async (database) => {
+      const rows = await database.select<ReportSourceRow[]>(
+        'SELECT * FROM report_sources WHERE daily_memory_id = $1 LIMIT 1',
+        [dailyMemoryId],
+      );
+
+      return rows.length > 0;
+    }, false);
+  }
+
   async saveReport(report: Report) {
     await this.write(async (database) => {
       await database.execute(

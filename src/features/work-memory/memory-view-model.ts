@@ -2,6 +2,7 @@ import type {
   DailyMemory,
   DailyMemoryGeneratedContent,
   DailyMemoryPreviewSection,
+  MemoryStatusSummary,
   StatusVariant,
   TodayMemoryState,
   WeeklySnapshot,
@@ -47,7 +48,7 @@ export function formatMemoryDate(date: string) {
 export function getRelativeMemoryDate(date: string, currentDate: string) {
   const memoryDate = getMemoryDate(date);
   const current = getMemoryDate(currentDate);
-  const dayDiff = Math.round((current.getTime() - memoryDate.getTime()) / 86_400_000);
+  const dayDiff = getDateDiffInDays(memoryDate, current);
 
   if (dayDiff === 0) {
     return '今天';
@@ -118,8 +119,29 @@ export function getFallbackWeeklySnapshot(): WeeklySnapshot {
   return {
     settledDays: 0,
     lastMemoryDate: '',
-    lastMemorySummary: '',
   };
+}
+
+export function formatRecentMemoryDate(date: string, currentDate: string) {
+  return formatMemoryDateLabel(date, currentDate);
+}
+
+export function formatMemoryDateLabel(date: string, currentDate: string) {
+  const memoryDate = getMemoryDate(date);
+  const current = getMemoryDate(currentDate);
+  const dayDiff = getDateDiffInDays(memoryDate, current);
+
+  if (dayDiff === 0) {
+    return '今天';
+  }
+
+  if (dayDiff === 1) {
+    return '昨天';
+  }
+
+  const weekdays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+
+  return `${memoryDate.getMonth() + 1}月${memoryDate.getDate()}日 ${weekdays[memoryDate.getDay()]}`;
 }
 
 export function getWeeklySnapshotFromMemories(
@@ -127,19 +149,180 @@ export function getWeeklySnapshotFromMemories(
   currentDate: string,
 ): WeeklySnapshot {
   const generatedMemories = memories
-    .filter((memory) => memory.status === 'generated' || memory.status === 'locked')
+    .filter(isFormalMemory)
     .sort((first, second) => second.date.localeCompare(first.date));
   const lastMemory = generatedMemories[0];
 
   if (!lastMemory) {
     return getFallbackWeeklySnapshot();
   }
+  const weekRange = getWeekDateRange(currentDate);
+  const settledDates = new Set(
+    generatedMemories
+      .filter((memory) => memory.date >= weekRange.startDate && memory.date <= weekRange.endDate)
+      .map((memory) => memory.date),
+  );
 
   return {
-    settledDays: generatedMemories.length,
-    lastMemoryDate: lastMemory.date === currentDate ? '今天' : '昨天',
-    lastMemorySummary: getMemorySummary(lastMemory),
+    settledDays: settledDates.size,
+    lastMemoryDate: formatRecentMemoryDate(lastMemory.date, currentDate),
   };
+}
+
+function isFormalMemory(memory: DailyMemory) {
+  return (
+    (memory.status === 'generated' || memory.status === 'locked') &&
+    memory.generated !== null
+  );
+}
+
+export function getMemoryStatusSummary({
+  selectedDate,
+  todayDate,
+  selectedDateMemory,
+  memories,
+  hasReports,
+  hasCurrentWeekReport = false,
+}: {
+  selectedDate: string;
+  todayDate: string;
+  selectedDateMemory: DailyMemory | null;
+  memories: DailyMemory[];
+  hasReports: boolean;
+  hasCurrentWeekReport?: boolean;
+}): MemoryStatusSummary {
+  const formalMemories = memories
+    .filter(isFormalMemory)
+    .sort((first, second) => second.date.localeCompare(first.date));
+  const hasFormalMemories = formalMemories.length > 0;
+  const selectedDateHasDraft = selectedDateMemory?.status === 'draft';
+  const selectedDateHasFormalMemory = selectedDateMemory ? isFormalMemory(selectedDateMemory) : false;
+  const todayHasDraft = memories.some((memory) => memory.date === todayDate && memory.status === 'draft');
+  const isSelectedDateToday = selectedDate === todayDate;
+  const selectedDateLabel = formatMemoryDateLabel(selectedDate, todayDate);
+  const weeklySnapshot = getWeeklySnapshotFromMemories(memories, todayDate);
+  const baseActions = {
+    canViewDraft: false,
+    canViewMemory: hasFormalMemories,
+    canViewReports: hasFormalMemories && hasReports,
+    canGenerateReport: hasFormalMemories,
+  };
+
+  if (!hasFormalMemories && !todayHasDraft && !selectedDateHasDraft) {
+    return {
+      title: '还没有工作记忆',
+      description: '整理第一条记录后，这里会显示你的沉淀进度。',
+      actions: {
+        canViewDraft: false,
+        canViewMemory: false,
+        canViewReports: false,
+        canGenerateReport: false,
+      },
+    };
+  }
+
+  if (selectedDateHasDraft && !selectedDateHasFormalMemory) {
+    return {
+      title: isSelectedDateToday ? '今日草稿已保存' : '这天草稿已保存',
+      description: isSelectedDateToday
+        ? '整理成今日记录后，会开始沉淀你的工作记忆。'
+        : '整理成这天记录后，会沉淀为对应日期的工作记忆。',
+      actions: {
+        ...baseActions,
+        canViewDraft: true,
+      },
+    };
+  }
+
+  if (!hasFormalMemories) {
+    return {
+      title: '还没有工作记忆',
+      description: '整理第一条记录后，这里会显示你的沉淀进度。',
+      actions: {
+        canViewDraft: false,
+        canViewMemory: false,
+        canViewReports: false,
+        canGenerateReport: false,
+      },
+    };
+  }
+
+  if (isSelectedDateToday && selectedDateHasFormalMemory) {
+    return {
+      title: '今日记忆已沉淀',
+      description: '你可以继续补充内容并重新整理。',
+      actions: baseActions,
+    };
+  }
+
+  if (!isSelectedDateToday && selectedDateHasFormalMemory) {
+    return {
+      title: '这天记忆已沉淀',
+      description: `当前正在查看/编辑 ${selectedDateLabel} 的工作记忆。`,
+      actions: baseActions,
+    };
+  }
+
+  if (!isSelectedDateToday && hasFormalMemories) {
+    return {
+      title: '这天还没有工作记忆',
+      description: `写下几句后，可以沉淀为 ${selectedDateLabel} 的记录。`,
+      actions: baseActions,
+    };
+  }
+
+  if (hasCurrentWeekReport && weeklySnapshot.settledDays === 0) {
+    return {
+      title: '本周周报已生成',
+      description: '可以查看已保存的报告，或在更新记忆后重新生成。',
+      actions: baseActions,
+    };
+  }
+
+  if (weeklySnapshot.settledDays > 0) {
+    return {
+      title: `本周已沉淀 ${weeklySnapshot.settledDays} 天`,
+      description: `最近记录：${weeklySnapshot.lastMemoryDate}`,
+      actions: baseActions,
+    };
+  }
+
+  return {
+    title: '历史记忆已沉淀',
+    description: `最近记录：${weeklySnapshot.lastMemoryDate}`,
+    actions: baseActions,
+  };
+}
+
+function getWeekDateRange(currentDate: string) {
+  const current = getMemoryDate(currentDate);
+  const day = current.getDay();
+  const mondayOffset = day === 0 ? -6 : 1 - day;
+  const start = new Date(current);
+  const end = new Date(current);
+
+  start.setDate(current.getDate() + mondayOffset);
+  end.setDate(start.getDate() + 6);
+
+  return {
+    startDate: formatMemoryDateKey(start),
+    endDate: formatMemoryDateKey(end),
+  };
+}
+
+function getDateDiffInDays(first: Date, second: Date) {
+  const firstTime = Date.UTC(first.getFullYear(), first.getMonth(), first.getDate());
+  const secondTime = Date.UTC(second.getFullYear(), second.getMonth(), second.getDate());
+
+  return Math.round((secondTime - firstTime) / 86_400_000);
+}
+
+function formatMemoryDateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, '0');
+  const day = `${date.getDate()}`.padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
 }
 
 export function getTodayMemoryState(

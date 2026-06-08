@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Loader2 } from 'lucide-react';
+import { CalendarDays, Loader2 } from 'lucide-react';
 import { TallyaScrollArea } from '@/components/tallya-scroll-area';
 import { Button } from '@/components/ui/button';
 import {
@@ -27,6 +27,7 @@ import {
   preventReportDialogDismissWhenBusy,
   shouldAllowReportDialogOpenChange,
 } from './report-dialog-state';
+import { DatePickerPopover } from './date-picker-popover';
 import { TallyaDialogFooter } from './tallya-dialog-footer';
 
 type ReportGenerateDialogProps = {
@@ -127,47 +128,50 @@ export function ReportGenerateDialog({
               从已沉淀的工作记忆中整理一份报告。
             </DialogDescription>
           </DialogHeader>
-          <TallyaScrollArea className="min-h-0 flex-1 px-6 pb-5">
-            <div className="grid gap-5">
-              <div className="grid gap-2">
-                <span className="text-sm leading-5 font-semibold text-app-ink">报告类型</span>
-                <div className="inline-flex w-fit rounded-xl bg-app-surface-muted p-1">
-                  <ReportTypeButton
-                    active={reportType === 'weekly'}
-                    label="本周周报"
-                    onClick={() => onReportTypeChange('weekly')}
-                  />
-                  <ReportTypeButton
-                    active={reportType === 'custom'}
-                    label="自定义范围报告"
-                    onClick={() => onReportTypeChange('custom')}
-                  />
-                </div>
-              </div>
-              {reportType === 'custom' ? (
-                <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid shrink-0 gap-3.5 px-6 pb-4">
+            <div className="inline-flex w-fit rounded-xl bg-app-surface-muted p-1">
+              <ReportTypeButton
+                active={reportType === 'weekly'}
+                label="本周周报"
+                onClick={() => onReportTypeChange('weekly')}
+              />
+              <ReportTypeButton
+                active={reportType === 'custom'}
+                label="自定义范围"
+                onClick={() => onReportTypeChange('custom')}
+              />
+            </div>
+            {reportType === 'custom' ? (
+              <div className="grid gap-2.5">
+                <span className="text-sm leading-5 font-semibold text-app-ink">时间范围</span>
+                <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2.5">
                   <ReportDateInput
-                    label="开始日期"
+                    ariaLabel="选择开始日期"
                     value={customStartDate}
                     onChange={onCustomStartDateChange}
                   />
+                  <span className="text-[13px] text-app-ink-subtle">至</span>
                   <ReportDateInput
-                    label="结束日期"
+                    ariaLabel="选择结束日期"
                     value={customEndDate}
                     onChange={onCustomEndDateChange}
                   />
                 </div>
-              ) : null}
+              </div>
+            ) : null}
+            {reportType === 'weekly' ? (
               <ReportMetaRow
                 label="时间范围"
                 value={
                   context
                     ? formatReportDateRange(context.startDate, context.endDate)
-                    : reportType === 'custom' && !isRangeValid
-                      ? '请选择有效时间范围'
-                      : '正在读取时间范围'
+                    : '正在读取时间范围'
                 }
               />
+            ) : null}
+          </div>
+          <TallyaScrollArea className="min-h-0 flex-1 px-6 pb-5">
+            <div className="grid gap-4">
               <ReportMetaRow
                 label="可用记忆"
                 value={isLoading ? '正在统计工作记忆' : countCopy}
@@ -282,23 +286,31 @@ function ReportTypeButton({
 }
 
 function ReportDateInput({
-  label,
+  ariaLabel,
   value,
   onChange,
 }: {
-  label: string;
+  ariaLabel: string;
   value: string;
   onChange: (value: string) => void;
 }) {
   return (
-    <label className="grid gap-1.5">
-      <span className="text-sm leading-5 font-semibold text-app-ink">{label}</span>
-      <input
-        type="date"
+    <div className="min-w-0">
+      <DatePickerPopover
+        ariaLabel={ariaLabel}
         value={value}
-        className="h-9 cursor-pointer rounded-xl border border-app-border bg-app-surface px-3 text-[13px] text-app-ink outline-none transition-colors duration-150 hover:border-app-border-strong focus:border-app-border-strong"
-        onChange={(event) => onChange(event.target.value)}
-      />
-    </label>
+        triggerClassName="flex h-9 w-full cursor-pointer items-center justify-between gap-2 rounded-xl border border-app-border bg-app-surface px-3 text-left text-[13px] text-app-ink outline-none transition-colors duration-150 hover:border-app-border-strong focus-visible:border-app-border-strong focus-visible:outline-none"
+        onChange={onChange}
+      >
+        <span>{formatReportDatePickerValue(value)}</span>
+        <CalendarDays className="size-3.5 shrink-0 text-app-ink-subtle" aria-hidden="true" />
+      </DatePickerPopover>
+    </div>
   );
+}
+
+function formatReportDatePickerValue(date: string) {
+  const [year, month, day] = date.split('-').map(Number);
+
+  return `${year}年${month}月${day}日`;
 }

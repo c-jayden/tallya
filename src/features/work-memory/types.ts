@@ -15,7 +15,19 @@ export type StatusVariant = 'empty' | 'draft' | 'settled' | 'locked';
 export type WeeklySnapshot = {
   settledDays: number;
   lastMemoryDate: string;
-  lastMemorySummary: string;
+};
+
+export type MemoryStatusActions = {
+  canViewDraft: boolean;
+  canViewMemory: boolean;
+  canViewReports: boolean;
+  canGenerateReport: boolean;
+};
+
+export type MemoryStatusSummary = {
+  title: string;
+  description: string;
+  actions: MemoryStatusActions;
 };
 
 export type DailyMemoryStatus = 'draft' | 'generated' | 'locked';

@@ -153,6 +153,20 @@ describe('SQLiteReportRepository', () => {
       }),
     ]);
   });
+
+  it('detects whether a daily memory is referenced by a report source', async () => {
+    const repository = createRepository();
+    const report = createReport();
+    const memory = createDailyMemory('2026-06-01');
+
+    await repository.saveReport(report);
+    await repository.saveReportSources(report.id, [memory]);
+
+    await expect(repository.hasReportSourceForDailyMemory(memory.id)).resolves.toBe(true);
+    await expect(repository.hasReportSourceForDailyMemory('daily-memory-2026-06-02')).resolves.toBe(
+      false,
+    );
+  });
 });
 
 function createRepository(database = new TestDatabaseClient()) {

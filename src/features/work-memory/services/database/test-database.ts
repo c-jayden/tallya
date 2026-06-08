@@ -235,6 +235,12 @@ export class TestDatabaseClient implements DatabaseClient {
         .sort((first, second) => first.id.localeCompare(second.id)) as T;
     }
 
+    if (normalizedQuery.startsWith('select * from report_sources where daily_memory_id =')) {
+      return Array.from(this.reportSources.values())
+        .filter((row) => row.daily_memory_id === String(bindValues[0]))
+        .slice(0, 1) as T;
+    }
+
     return [] as T;
   }
 

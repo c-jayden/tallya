@@ -1,11 +1,19 @@
 import {
-  displayDate,
-  displayWeekday,
   supplementFields,
   supplementPlaceholders,
   today,
 } from './constants';
 import { useState } from 'react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { DailyMemoryPreviewDialog } from './components/daily-memory-preview-dialog';
 import { HomeToolbar } from './components/home-toolbar';
 import { MemoryEntryForm } from './components/memory-entry-form';
@@ -25,8 +33,15 @@ import { useTrayWindowEvents } from './hooks/use-tray-window-events';
 import { useWeeklyReportFlow } from './hooks/use-weekly-report-flow';
 import { useWorkMemoryController } from './hooks/use-work-memory-controller';
 import { useWorkMemoryShortcuts } from './hooks/use-work-memory-shortcuts';
-import { getStatusVariant } from './memory-view-model';
+import {
+  formatToolbarDate,
+  getDailyMemoryHeroCopy,
+  isFutureMemoryDate,
+  isTodayDate,
+} from './memory-date-view-model';
+import { getMemoryStatusSummary, getStatusVariant } from './memory-view-model';
 import { getDailyMemoryDate } from './services/daily-memory-repository';
+import type { DailyMemory } from './types';
 
 function getCommandKey() {
   return typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/i.test(navigator.platform)
@@ -36,13 +51,27 @@ function getCommandKey() {
 
 export function WorkMemoryHome() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const currentDate = getDailyMemoryDate(today);
+  const todayDate = getDailyMemoryDate(today);
+  const [selectedDate, setSelectedDate] = useState(todayDate);
   const commandKey = getCommandKey();
   const contentRef = useHomeWindowSizing();
-  const memory = useWorkMemoryController({ currentDate });
+  const memory = useWorkMemoryController({ currentDate: selectedDate, todayDate });
   const search = useMemorySearch({ onOpenMemory: memory.openMemoryDetail });
   const weeklyReport = useWeeklyReportFlow();
   const statusVariant = getStatusVariant(memory.todayMemory, memory.isLocked);
+  const memoryStatusSummary = getMemoryStatusSummary({
+    selectedDate,
+    todayDate,
+    selectedDateMemory: memory.currentMemory,
+    memories: memory.memories,
+    hasReports: weeklyReport.hasSavedReports,
+    hasCurrentWeekReport: weeklyReport.hasCurrentWeekReport,
+  });
+  const toolbarDate = formatToolbarDate(selectedDate);
+  const heroCopy = getDailyMemoryHeroCopy(selectedDate, todayDate);
+  const selectedDateHint = isTodayDate(selectedDate, todayDate)
+    ? undefined
+    : `当前正在记录 ${toolbarDate.date}`;
 
   useWorkMemoryShortcuts({
     isSearchOpen: search.isSearchOpen,
@@ -103,6 +132,20 @@ export function WorkMemoryHome() {
     },
   });
 
+  function updateSelectedDate(date: string) {
+    if (!date || isFutureMemoryDate(date, todayDate)) {
+      return;
+    }
+
+    // TODO: Add a gentle unsaved-change confirmation before switching dates.
+    setSelectedDate(date);
+  }
+
+  function editOriginalRecord(memoryItem: DailyMemory) {
+    updateSelectedDate(memoryItem.date);
+    memory.editOriginalRecord(memoryItem);
+  }
+
   return (
     <main className="max-h-screen w-screen bg-app-bg">
       <section
@@ -112,10 +155,13 @@ export function WorkMemoryHome() {
         <div ref={contentRef} className="flex flex-col px-1">
           <HomeToolbar
             commandKey={commandKey}
-            date={displayDate}
-            dateTime={today.toISOString()}
+            date={toolbarDate.date}
+            dateTime={toolbarDate.dateTime}
+            maxDate={todayDate}
             searchButtonRef={search.searchButtonRef}
-            weekday={displayWeekday}
+            selectedDate={selectedDate}
+            weekday={toolbarDate.weekday}
+            onDateChange={updateSelectedDate}
             onSearchClick={() => {
               if (!weeklyReport.isReportBusy) {
                 search.openSearchPanel();
@@ -128,7 +174,11 @@ export function WorkMemoryHome() {
             }}
           />
 
-          <MemoryHero />
+          <MemoryHero
+            title={heroCopy.title}
+            description={heroCopy.description}
+            selectedDateHint={selectedDateHint}
+          />
 
           <MemoryEntryForm
             workNote={memory.workNote}
@@ -140,6 +190,7 @@ export function WorkMemoryHome() {
             isPrimaryPulsing={memory.primaryPulse}
             isSavingDraft={memory.isSavingDraft}
             primaryActionLabel={memory.primaryActionLabel}
+            placeholder={memory.workNotePlaceholder}
             primaryActionRef={memory.primaryActionRef}
             workNoteInputRef={memory.workNoteInputRef}
             supplementFields={supplementFields}
@@ -155,9 +206,7 @@ export function WorkMemoryHome() {
 
           <MemoryStatusCard
             statusVariant={statusVariant}
-            todayMemory={memory.todayMemory}
-            weeklySnapshot={memory.weeklySnapshot}
-            hasReports={weeklyReport.hasSavedReports}
+            summary={memoryStatusSummary}
             onGenerateReport={weeklyReport.openGenerateDialog}
             onViewReports={weeklyReport.openReportList}
             onViewDraft={memory.viewDraft}
@@ -168,6 +217,8 @@ export function WorkMemoryHome() {
       <DailyMemoryPreviewDialog
         open={memory.isPreviewOpen}
         content={memory.generatedPreview}
+        title={memory.previewTitle}
+        description={memory.previewDescription}
         isSaving={memory.isSavingGeneratedMemory}
         saveLabel={memory.saveGeneratedLabel}
         onOpenChange={memory.setIsPreviewOpen}
@@ -176,16 +227,16 @@ export function WorkMemoryHome() {
       <MemoryListDialog
         open={memory.isMemoryListOpen}
         items={memory.memoryListItems}
-        currentDate={currentDate}
+        currentDate={todayDate}
         onOpenChange={memory.setIsMemoryListOpen}
-        onEditOriginal={memory.editOriginalRecord}
+        onEditOriginal={editOriginalRecord}
       />
       <SpotlightSearchPanel
         open={search.isSearchOpen}
         keyword={search.searchKeyword}
         results={search.searchResults}
         activeIndex={search.activeSearchIndex}
-        currentDate={currentDate}
+        currentDate={todayDate}
         inputRef={search.searchInputRef}
         isComposing={search.isSearchComposing}
         onClose={search.closeSearchPanel}
@@ -200,9 +251,13 @@ export function WorkMemoryHome() {
       <MemoryDetailDialog
         open={memory.isMemoryDialogOpen}
         memory={memory.viewingMemory}
-        currentDate={currentDate}
+        currentDate={todayDate}
         onOpenChange={memory.setIsMemoryDialogOpen}
-        onEditOriginal={memory.editOriginalRecord}
+        onEditOriginal={() => {
+          if (memory.viewingMemory) {
+            editOriginalRecord(memory.viewingMemory);
+          }
+        }}
       />
       <ReportGenerateDialog
         open={weeklyReport.isGenerateDialogOpen}
@@ -247,6 +302,32 @@ export function WorkMemoryHome() {
         onOpenChange={setIsSettingsOpen}
         onClearLocalData={memory.clearLocalData}
       />
+      <AlertDialog
+        open={memory.isReferenceConfirmOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            memory.cancelReferencedMemorySave();
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>这一天的工作记忆已被报告引用</AlertDialogTitle>
+            <AlertDialogDescription>
+              修改后，相关报告可能需要重新生成。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="cursor-pointer">取消</AlertDialogCancel>
+            <AlertDialogAction
+              className="cursor-pointer"
+              onClick={memory.confirmReferencedMemorySave}
+            >
+              继续保存
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </main>
   );
 }

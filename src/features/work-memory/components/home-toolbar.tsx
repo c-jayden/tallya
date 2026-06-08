@@ -1,14 +1,18 @@
 import type { Ref } from 'react';
-import { Search, Settings } from 'lucide-react';
+import { ChevronDown, Search, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Kbd, KbdGroup } from '@/components/ui/kbd';
+import { DatePickerPopover } from './date-picker-popover';
 
 type HomeToolbarProps = {
   commandKey: string;
   date: string;
   dateTime: string;
+  maxDate: string;
   searchButtonRef: Ref<HTMLButtonElement>;
+  selectedDate: string;
   weekday: string;
+  onDateChange: (date: string) => void;
   onSearchClick: () => void;
   onSettingsClick: () => void;
 };
@@ -17,20 +21,32 @@ export function HomeToolbar({
   commandKey,
   date,
   dateTime,
+  maxDate,
   searchButtonRef,
+  selectedDate,
   weekday,
+  onDateChange,
   onSearchClick,
   onSettingsClick,
 }: HomeToolbarProps) {
   return (
     <header className="mb-3 flex h-9 items-center justify-between overflow-visible">
-      <time
-        className="inline-flex min-w-0 items-center gap-2.5 text-[13px] leading-[1.2] text-app-ink-subtle"
-        dateTime={dateTime}
+      <DatePickerPopover
+        ariaLabel="选择记录日期"
+        value={selectedDate}
+        maxDate={maxDate}
+        triggerClassName="group inline-flex min-w-0 cursor-pointer items-center gap-1.5 rounded-lg px-1.5 py-1 text-[13px] leading-[1.2] text-app-ink-subtle transition-colors duration-150 hover:bg-app-surface-muted hover:text-app-ink-muted focus-visible:bg-app-surface-muted focus-visible:text-app-ink-muted focus-visible:outline-none"
+        onChange={onDateChange}
       >
-        <span>{date}</span>
-        <span>{weekday}</span>
-      </time>
+        <time className="inline-flex min-w-0 items-center gap-2.5" dateTime={dateTime}>
+          <span>{date}</span>
+          <span>{weekday}</span>
+        </time>
+        <ChevronDown
+          className="size-3 text-app-ink-subtle transition-colors duration-150 group-hover:text-app-ink-muted"
+          aria-hidden="true"
+        />
+      </DatePickerPopover>
       <div className="flex min-w-0 items-center gap-3">
         <Button
           ref={searchButtonRef}

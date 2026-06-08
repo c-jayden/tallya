@@ -25,5 +25,4 @@ export const supplementPlaceholders: Record<SupplementField, string> = {
 export const weeklySnapshot: WeeklySnapshot = {
   settledDays: 3,
   lastMemoryDate: '昨天',
-  lastMemorySummary: '修复订单导出异常，补充回归用例。',
 };

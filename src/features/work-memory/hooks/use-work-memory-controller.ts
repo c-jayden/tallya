@@ -2,6 +2,15 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { supplementFields, type SupplementField } from '../constants';
 import {
+  getDailyMemoryPrimaryActionLabel,
+  getDailyMemorySaveGeneratedLabel,
+  getDailyMemorySaveSuccessToast,
+  isTodayDate,
+  isFutureMemoryDate,
+  getDailyMemoryPreviewCopy,
+  getDailyMemoryTextareaPlaceholder,
+} from '../memory-date-view-model';
+import {
   getFallbackWeeklySnapshot,
   getGeneratedMemories,
   getTodayMemoryState,
@@ -9,6 +18,7 @@ import {
 } from '../memory-view-model';
 import { aiService } from '../services/ai/ai-service';
 import { dailyMemoryRepository } from '../services/daily-memory-repository';
+import { reportRepository } from '../services/report-repository';
 import type {
   DailyMemory,
   DailyMemoryGeneratedContent,
@@ -19,9 +29,12 @@ import type {
 
 type UseWorkMemoryControllerOptions = {
   currentDate: string;
+  todayDate: string;
 };
 
-export function useWorkMemoryController({ currentDate }: UseWorkMemoryControllerOptions) {
+type PendingReferencedSaveAction = 'draft' | 'generated';
+
+export function useWorkMemoryController({ currentDate, todayDate }: UseWorkMemoryControllerOptions) {
   const [workNote, setWorkNote] = useState('');
   const [isSupplementOpen, setIsSupplementOpen] = useState(false);
   const [activeSupplementFields, setActiveSupplementFields] = useState<SupplementField[]>([]);
@@ -45,6 +58,9 @@ export function useWorkMemoryController({ currentDate }: UseWorkMemoryController
   const [isGeneratingMemory, setIsGeneratingMemory] = useState(false);
   const [isSavingGeneratedMemory, setIsSavingGeneratedMemory] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [isCurrentMemoryReferenced, setIsCurrentMemoryReferenced] = useState(false);
+  const [pendingReferencedSaveAction, setPendingReferencedSaveAction] =
+    useState<PendingReferencedSaveAction | null>(null);
   const [generatedPreview, setGeneratedPreview] = useState<DailyMemoryGeneratedContent | null>(
     null,
   );
@@ -56,10 +72,19 @@ export function useWorkMemoryController({ currentDate }: UseWorkMemoryController
   const primaryActionRef = useRef<HTMLButtonElement>(null);
   const pulseTimeoutsRef = useRef<number[]>([]);
 
+  const isSelectedDateToday = isTodayDate(currentDate, todayDate);
   const hasGeneratedToday = todayMemory.officialStatus !== 'notGenerated';
   const isLocked = todayMemory.officialStatus === 'locked';
-  const primaryActionLabel = hasGeneratedToday ? '更新今日记录' : '整理成今日记录';
-  const saveGeneratedLabel = hasGeneratedToday ? '更新今日记录' : '保存为今日记忆';
+  const primaryActionLabel = getDailyMemoryPrimaryActionLabel({
+    isToday: isSelectedDateToday,
+    hasGeneratedMemory: hasGeneratedToday,
+  });
+  const saveGeneratedLabel = getDailyMemorySaveGeneratedLabel({
+    isToday: isSelectedDateToday,
+    hasGeneratedMemory: hasGeneratedToday,
+  });
+  const previewCopy = getDailyMemoryPreviewCopy(isSelectedDateToday);
+  const workNotePlaceholder = getDailyMemoryTextareaPlaceholder(isSelectedDateToday);
 
   const buildDailyMemoryInput = useCallback(() => {
     const [projectTopicField, tomorrowPlanField, extraNoteField] = supplementFields;
@@ -91,9 +116,19 @@ export function useWorkMemoryController({ currentDate }: UseWorkMemoryController
       setCurrentMemory(memory);
       setMemories(memories);
       setTodayMemory(getTodayMemoryState(memory, memories));
-      setWeeklySnapshot(getWeeklySnapshotFromMemories(memories, currentDate));
+      setWeeklySnapshot(getWeeklySnapshotFromMemories(memories, todayDate));
 
       if (!memory) {
+        const [projectTopicField, tomorrowPlanField, extraNoteField] = supplementFields;
+
+        setWorkNote('');
+        setSupplementValues({
+          [projectTopicField]: '',
+          [tomorrowPlanField]: '',
+          [extraNoteField]: '',
+        });
+        setActiveSupplementFields([]);
+        setIsSupplementOpen(false);
         return;
       }
 
@@ -121,7 +156,7 @@ export function useWorkMemoryController({ currentDate }: UseWorkMemoryController
         ),
       );
     },
-    [currentDate],
+    [todayDate],
   );
 
   const pulseAction = useCallback((setter: (value: boolean) => void) => {
@@ -134,7 +169,7 @@ export function useWorkMemoryController({ currentDate }: UseWorkMemoryController
   }, []);
 
   const settleTodayMemory = useCallback(async () => {
-    if (isLocked || isGeneratingMemory || isSavingDraft) {
+    if (isLocked || isGeneratingMemory || isSavingDraft || isFutureMemoryDate(currentDate, todayDate)) {
       return;
     }
 
@@ -158,18 +193,36 @@ export function useWorkMemoryController({ currentDate }: UseWorkMemoryController
     } finally {
       setIsGeneratingMemory(false);
     }
-  }, [buildDailyMemoryInput, isGeneratingMemory, isLocked, isSavingDraft, pulseAction, workNote]);
+  }, [
+    buildDailyMemoryInput,
+    currentDate,
+    isGeneratingMemory,
+    isLocked,
+    isSavingDraft,
+    pulseAction,
+    todayDate,
+    workNote,
+  ]);
 
   useEffect(() => {
     let isMounted = true;
 
     // Initial load restores today's editable state and also reads history for
     // the status card without exposing storage details to the component.
-    void Promise.all([
-      dailyMemoryRepository.getByDate(currentDate),
-      dailyMemoryRepository.list(),
-    ]).then(([memory, memories]) => {
+    void Promise.all([dailyMemoryRepository.getByDate(currentDate), dailyMemoryRepository.list()])
+      .then(async ([memory, memories]) => {
+        const isReferenced = memory
+          ? await reportRepository.hasReportSourceForDailyMemory(memory.id)
+          : false;
+
+        return { memory, memories, isReferenced };
+      })
+      .then(({ memory, memories, isReferenced }) => {
       if (isMounted) {
+        setIsCurrentMemoryReferenced(isReferenced);
+        setGeneratedPreview(null);
+        setIsPreviewOpen(false);
+        setPendingReferencedSaveAction(null);
         applyDailyMemory(memory, memories);
       }
     });
@@ -201,7 +254,16 @@ export function useWorkMemoryController({ currentDate }: UseWorkMemoryController
   }
 
   async function saveDraft() {
-    if (isLocked || isSavingDraft || isGeneratingMemory) {
+    if (shouldConfirmReferencedMemorySave()) {
+      setPendingReferencedSaveAction('draft');
+      return;
+    }
+
+    await saveDraftWithoutReferenceCheck();
+  }
+
+  async function saveDraftWithoutReferenceCheck() {
+    if (isLocked || isSavingDraft || isGeneratingMemory || isFutureMemoryDate(currentDate, todayDate)) {
       return;
     }
 
@@ -219,7 +281,7 @@ export function useWorkMemoryController({ currentDate }: UseWorkMemoryController
       setCurrentMemory(memory);
       setMemories(memories);
       setTodayMemory(getTodayMemoryState(memory, memories));
-      setWeeklySnapshot(getWeeklySnapshotFromMemories(memories, currentDate));
+      setWeeklySnapshot(getWeeklySnapshotFromMemories(memories, todayDate));
       toast.success('草稿已保存');
     } catch (error) {
       const message = error instanceof Error ? error.message : '草稿保存失败，请稍后重试。';
@@ -231,6 +293,15 @@ export function useWorkMemoryController({ currentDate }: UseWorkMemoryController
   }
 
   async function saveGeneratedMemory() {
+    if (shouldConfirmReferencedMemorySave()) {
+      setPendingReferencedSaveAction('generated');
+      return;
+    }
+
+    await saveGeneratedMemoryWithoutReferenceCheck();
+  }
+
+  async function saveGeneratedMemoryWithoutReferenceCheck() {
     if (!generatedPreview || isSavingGeneratedMemory) {
       return;
     }
@@ -251,9 +322,10 @@ export function useWorkMemoryController({ currentDate }: UseWorkMemoryController
         ...getTodayMemoryState(memory, memories),
         reportFreshness: current.referencedByWeeklyReport ? 'stale' : current.reportFreshness,
       }));
-      setWeeklySnapshot(getWeeklySnapshotFromMemories(memories, currentDate));
+      setWeeklySnapshot(getWeeklySnapshotFromMemories(memories, todayDate));
       setIsPreviewOpen(false);
-      toast.success('今日记忆已保存');
+      // TODO: Mark reports that reference this memory as stale after stale propagation is implemented.
+      toast.success(getDailyMemorySaveSuccessToast(isSelectedDateToday));
     } catch (error) {
       const message = error instanceof Error ? error.message : '今日记忆保存失败，请稍后重试。';
 
@@ -261,6 +333,34 @@ export function useWorkMemoryController({ currentDate }: UseWorkMemoryController
     } finally {
       setIsSavingGeneratedMemory(false);
     }
+  }
+
+  async function confirmReferencedMemorySave() {
+    const action = pendingReferencedSaveAction;
+
+    setPendingReferencedSaveAction(null);
+
+    if (action === 'draft') {
+      await saveDraftWithoutReferenceCheck();
+      return;
+    }
+
+    if (action === 'generated') {
+      await saveGeneratedMemoryWithoutReferenceCheck();
+    }
+  }
+
+  function cancelReferencedMemorySave() {
+    setPendingReferencedSaveAction(null);
+  }
+
+  function shouldConfirmReferencedMemorySave() {
+    return (
+      isCurrentMemoryReferenced &&
+      currentMemory !== null &&
+      currentMemory.status !== 'draft' &&
+      pendingReferencedSaveAction === null
+    );
   }
 
   function viewDraft() {
@@ -317,8 +417,13 @@ export function useWorkMemoryController({ currentDate }: UseWorkMemoryController
   return {
     activeSupplementFields,
     clearLocalData,
+    currentMemory,
     editOriginalRecord,
     generatedPreview,
+    previewDescription: previewCopy.description,
+    previewTitle: previewCopy.title,
+    cancelReferencedMemorySave,
+    confirmReferencedMemorySave,
     isGeneratingMemory,
     isLocked,
     isMemoryDialogOpen,
@@ -327,7 +432,9 @@ export function useWorkMemoryController({ currentDate }: UseWorkMemoryController
     isSavingDraft,
     isSavingGeneratedMemory,
     isSupplementOpen,
+    isReferenceConfirmOpen: pendingReferencedSaveAction !== null,
     memoryListItems,
+    memories,
     openMemoryDetail,
     primaryActionLabel,
     primaryActionRef,
@@ -350,6 +457,7 @@ export function useWorkMemoryController({ currentDate }: UseWorkMemoryController
     viewMemoryList,
     weeklySnapshot,
     workNoteInputRef,
+    workNotePlaceholder,
     workNote,
   };
 }
