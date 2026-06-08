@@ -96,6 +96,36 @@ pnpm check:release
 
 测试分层、Tauri API mock、SQLite 测试隔离和后续 E2E 策略见 [TESTING.md](./TESTING.md)。
 
+## 打包
+
+打包前先运行：
+
+```bash
+pnpm check:release
+```
+
+生成 Windows 安装包：
+
+```bash
+pnpm tauri build
+```
+
+当前 Windows 第一版优先生成 NSIS 安装包，产物通常位于：
+
+```text
+src-tauri/target/release/bundle/nsis/
+```
+
+Windows 打包机需要可用的 NSIS / `makensis`。如果 Tauri 已生成 release exe 但 bundling 失败，先安装 NSIS 后再重新运行发布检查。
+
+如果本机缺少打包工具链，可以使用 GitHub Actions 的 `Release` workflow。它会读取 `package.json` 的 `version`，使用 `v{version}` 作为 tag；手动触发时如果 tag 不存在会自动创建 tag，然后在 Windows runner 上运行检查、构建 NSIS 安装包，并创建 draft GitHub Release。
+
+常规提交和 PR 会运行 `CI` workflow，覆盖 typecheck、lint、Vitest、Rust test/check 和前端 build。发布时手动触发 `Release` workflow 即可，安装包会上传到 GitHub Releases；当前 Windows 安装包未配置代码签名，Windows 可能提示未知发布者。
+
+发布前按 [RELEASE_CHECKLIST.md](./RELEASE_CHECKLIST.md) 做安装、覆盖安装、托盘、通知、Codex CLI、SQLite 数据保留和备份恢复检查。
+
+Tallya 当前 AI 生成依赖本机 Codex CLI。SQLite 数据库使用 Tauri SQL 插件保存到应用数据目录，配置为 `sqlite:tallya.db`；覆盖安装不应清空工作记忆、报告或设置。
+
 ## Codex CLI
 
 Tallya 当前使用本机 Codex CLI 生成工作记忆。请确保本机已安装并登录 Codex CLI。

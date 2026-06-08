@@ -1,8 +1,8 @@
 [package]
 name = "tallya"
 version = "0.1.0"
-description = "A Tauri App"
-authors = ["you"]
+description = "Local-first AI work memory tool"
+authors = ["Tallya contributors"]
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -30,3 +30,10 @@ tauri-plugin-sql = { version = "2.4.0", features = ["sqlite"] }
 [target.'cfg(windows)'.dependencies]
 tauri-winrt-notification = "0.7.2"
 windows-registry = "0.6.1"
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+strip = true
+opt-level = "s"
