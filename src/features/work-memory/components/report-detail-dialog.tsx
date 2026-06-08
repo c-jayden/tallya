@@ -43,6 +43,7 @@ export function ReportDetailDialog({
 }: ReportDetailDialogProps) {
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const content = report ? normalizeReportContent(report.content) : null;
+  const isCustomReport = report?.type === 'custom';
 
   function handleConfirmRegenerate() {
     setIsConfirmOpen(false);
@@ -69,11 +70,15 @@ export function ReportDetailDialog({
         >
           <DialogHeader className="shrink-0 gap-1.5 px-6 pt-5 pb-4">
             <DialogTitle className="text-lg leading-6 font-semibold tracking-normal text-app-ink">
-              {report?.title || '周报详情'}
+              {isCustomReport ? '报告详情' : '周报详情'}
             </DialogTitle>
           </DialogHeader>
           <TallyaScrollArea className="min-h-0 max-h-[calc(100vh-190px)] flex-1 px-6 pb-5">
-            <ReportDocument content={content} fallbackTitle={report?.title} showTitle={false} />
+            <ReportDocument
+              content={content}
+              fallbackTitle={report?.title ?? (isCustomReport ? '工作总结' : '本周周报')}
+              showTitle
+            />
           </TallyaScrollArea>
           <TallyaDialogFooter>
             <Button
@@ -121,8 +126,12 @@ export function ReportDetailDialog({
       <AlertDialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>重新生成周报？</AlertDialogTitle>
-            <AlertDialogDescription>重新生成会覆盖当前保存的周报。</AlertDialogDescription>
+            <AlertDialogTitle>{isCustomReport ? '重新生成报告？' : '重新生成周报？'}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {isCustomReport
+                ? '重新生成会覆盖当前保存的报告。'
+                : '重新生成会覆盖当前保存的周报。'}
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel className="cursor-pointer">取消</AlertDialogCancel>

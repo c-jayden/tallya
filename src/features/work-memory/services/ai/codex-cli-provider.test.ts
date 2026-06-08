@@ -3,6 +3,7 @@ import type {
   GeneratedDailyMemory,
   GeneratedReportContent,
   GenerateDailyMemoryInput,
+  GenerateRangeReportInput,
   GenerateWeeklyReportInput,
 } from '../../types';
 import { AIProviderError } from './ai-provider';
@@ -40,6 +41,12 @@ const weeklyInput: GenerateWeeklyReportInput = {
       updatedAt: '2026-06-01T02:00:00.000Z',
     },
   ],
+};
+
+const customInput: GenerateRangeReportInput = {
+  ...weeklyInput,
+  reportType: 'custom',
+  endDate: '2026-06-03',
 };
 
 const weeklyGenerated: GeneratedReportContent = {
@@ -95,8 +102,29 @@ describe('createCodexCliProvider', () => {
       }),
     ).resolves.toEqual(weeklyGenerated);
 
-    expect(invoke).toHaveBeenCalledWith('generate_weekly_report_with_codex', {
-      input: weeklyInput,
+    expect(invoke).toHaveBeenCalledWith('generate_range_report_with_codex', {
+      input: {
+        ...weeklyInput,
+        reportType: 'weekly',
+      },
+      codexCommand: 'custom-codex',
+      codexModel: 'gpt-5.4-mini',
+    });
+  });
+
+  it('passes custom report input to the Tauri Codex command', async () => {
+    const invoke = vi.fn().mockResolvedValue(weeklyGenerated);
+    const provider = createCodexCliProvider(invoke);
+
+    await expect(
+      provider.generateRangeReport(customInput, {
+        codexCommand: 'custom-codex',
+        codexModel: 'gpt-5.4-mini',
+      }),
+    ).resolves.toEqual(weeklyGenerated);
+
+    expect(invoke).toHaveBeenCalledWith('generate_range_report_with_codex', {
+      input: customInput,
       codexCommand: 'custom-codex',
       codexModel: 'gpt-5.4-mini',
     });

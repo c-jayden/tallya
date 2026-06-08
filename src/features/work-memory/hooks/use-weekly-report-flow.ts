@@ -1,30 +1,60 @@
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { copyReportMarkdown, copyReportPlainText } from '../services/report-clipboard';
-import { formatReportDateRange } from '../services/report-date';
+import {
+  formatReportDateRange,
+  getDefaultCustomReportRange,
+  isValidReportDateRange,
+} from '../services/report-date';
 import { reportService } from '../services/report-service';
-import type { WeeklyReportContext, WeeklyReportDraft } from '../services/report-service';
+import type { ReportContext, ReportDraft } from '../services/report-service';
 import { normalizeReportContent } from '../report-view-model';
-import type { Report } from '../types';
+import type { Report, ReportGenerationType } from '../types';
 
 export function useWeeklyReportFlow() {
+  const defaultCustomRange = getDefaultCustomReportRange();
   const [isGenerateDialogOpen, setIsGenerateDialogOpen] = useState(false);
   const [isLoadingContext, setIsLoadingContext] = useState(false);
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [isSavingReport, setIsSavingReport] = useState(false);
-  const [weeklyReportContext, setWeeklyReportContext] = useState<WeeklyReportContext | null>(null);
-  const [weeklyReportDraft, setWeeklyReportDraft] = useState<WeeklyReportDraft | null>(null);
+  const [reportType, setReportType] = useState<ReportGenerationType>('weekly');
+  const [customStartDate, setCustomStartDate] = useState(defaultCustomRange.startDate);
+  const [customEndDate, setCustomEndDate] = useState(defaultCustomRange.endDate);
+  const [reportContext, setReportContext] = useState<ReportContext | null>(null);
+  const [reportDraft, setReportDraft] = useState<ReportDraft | null>(null);
   const [isPreviewDialogOpen, setIsPreviewDialogOpen] = useState(false);
   const [reportListItems, setReportListItems] = useState<Report[]>([]);
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
   const [isReportListOpen, setIsReportListOpen] = useState(false);
   const [isReportDetailOpen, setIsReportDetailOpen] = useState(false);
 
-  const loadContext = useCallback(async () => {
+  const loadContext = useCallback(async (
+    nextReportType: ReportGenerationType = reportType,
+    nextStartDate: string = customStartDate,
+    nextEndDate: string = customEndDate,
+  ) => {
+    if (
+      nextReportType === 'custom' &&
+      !isValidReportDateRange(nextStartDate, nextEndDate)
+    ) {
+      setReportContext(null);
+      return;
+    }
+
     setIsLoadingContext(true);
 
     try {
-      setWeeklyReportContext(await reportService.getCurrentWeeklyReportContext());
+      if (nextReportType === 'weekly') {
+        const context = await reportService.getCurrentWeeklyReportContext();
+        setReportContext({
+          reportType: 'weekly',
+          ...context,
+        });
+      } else {
+        setReportContext(
+          await reportService.getReportContext('custom', nextStartDate, nextEndDate),
+        );
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : '报告信息读取失败，请稍后重试。';
 
@@ -32,7 +62,7 @@ export function useWeeklyReportFlow() {
     } finally {
       setIsLoadingContext(false);
     }
-  }, []);
+  }, [customEndDate, customStartDate, reportType]);
 
   const loadReports = useCallback(async () => {
     try {
@@ -66,8 +96,29 @@ export function useWeeklyReportFlow() {
   }, []);
 
   function openGenerateDialog() {
+    const range = getDefaultCustomReportRange();
+
+    setReportType('weekly');
+    setCustomStartDate(range.startDate);
+    setCustomEndDate(range.endDate);
+    setReportContext(null);
     setIsGenerateDialogOpen(true);
-    void loadContext();
+    void loadContext('weekly', range.startDate, range.endDate);
+  }
+
+  function updateReportType(nextReportType: ReportGenerationType) {
+    setReportType(nextReportType);
+    void loadContext(nextReportType);
+  }
+
+  function updateCustomStartDate(nextStartDate: string) {
+    setCustomStartDate(nextStartDate);
+    void loadContext('custom', nextStartDate, customEndDate);
+  }
+
+  function updateCustomEndDate(nextEndDate: string) {
+    setCustomEndDate(nextEndDate);
+    void loadContext('custom', customStartDate, nextEndDate);
   }
 
   function openReportList() {
@@ -92,21 +143,28 @@ export function useWeeklyReportFlow() {
     setIsReportDetailOpen(false);
   }
 
-  async function generateWeeklyReport() {
+  async function generateReport() {
     if (isGeneratingReport) {
+      return;
+    }
+
+    if (reportType === 'custom' && !isValidReportDateRange(customStartDate, customEndDate)) {
       return;
     }
 
     setIsGeneratingReport(true);
 
     try {
-      const draft = await reportService.generateCurrentWeeklyReport();
+      const draft =
+        reportType === 'custom'
+          ? await reportService.generateCustomRangeReport(customStartDate, customEndDate)
+          : await reportService.generateCurrentWeeklyReport();
 
-      setWeeklyReportDraft(draft);
+      setReportDraft(draft as ReportDraft);
       setIsGenerateDialogOpen(false);
       setIsPreviewDialogOpen(true);
     } catch (error) {
-      const message = error instanceof Error ? error.message : '周报生成失败，请稍后重试。';
+      const message = error instanceof Error ? error.message : '报告生成失败，请稍后重试。';
 
       toast.error(message);
       await loadContext();
@@ -116,12 +174,12 @@ export function useWeeklyReportFlow() {
   }
 
   async function copyMarkdown() {
-    if (!weeklyReportDraft) {
+    if (!reportDraft) {
       return;
     }
 
     try {
-      await copyReportMarkdown(weeklyReportDraft.generated.markdown);
+      await copyReportMarkdown(reportDraft.generated.markdown);
       toast.success('已复制 Markdown');
     } catch (error) {
       const message = error instanceof Error ? error.message : '复制失败，请稍后重试。';
@@ -131,13 +189,13 @@ export function useWeeklyReportFlow() {
   }
 
   async function copyPlainText() {
-    if (!weeklyReportDraft) {
+    if (!reportDraft) {
       return;
     }
 
     try {
-      await copyReportPlainText(weeklyReportDraft.generated, {
-        title: getWeeklyReportCopyTitle(weeklyReportDraft),
+      await copyReportPlainText(reportDraft.generated, {
+        title: getReportCopyTitle(reportDraft),
       });
       toast.success('已复制纯文本');
     } catch (error) {
@@ -147,23 +205,23 @@ export function useWeeklyReportFlow() {
     }
   }
 
-  async function saveWeeklyReport() {
-    if (!weeklyReportDraft || isSavingReport) {
+  async function saveReportPreview() {
+    if (!reportDraft || isSavingReport) {
       return;
     }
 
     setIsSavingReport(true);
 
     try {
-      await reportService.saveWeeklyReport(weeklyReportDraft);
-      toast.success('周报已保存');
+      await reportService.saveReport(reportDraft);
+      toast.success(reportDraft.reportType === 'custom' ? '报告已保存' : '周报已保存');
       setIsPreviewDialogOpen(false);
-      setWeeklyReportDraft(null);
-      setWeeklyReportContext(null);
+      setReportDraft(null);
+      setReportContext(null);
       setSelectedReport(null);
       await loadReports();
     } catch (error) {
-      const message = error instanceof Error ? error.message : '周报保存失败，请稍后重试。';
+      const message = error instanceof Error ? error.message : '报告保存失败，请稍后重试。';
 
       toast.error(message);
     } finally {
@@ -213,13 +271,13 @@ export function useWeeklyReportFlow() {
     setIsGeneratingReport(true);
 
     try {
-      const draft = await reportService.generateWeeklyReportForRange(selectedReport);
+      const draft = await reportService.generateReportForRange(selectedReport);
 
-      setWeeklyReportDraft(draft);
+      setReportDraft(draft);
       setIsReportDetailOpen(false);
       setIsPreviewDialogOpen(true);
     } catch (error) {
-      const message = error instanceof Error ? error.message : '周报生成失败，请稍后重试。';
+      const message = error instanceof Error ? error.message : '报告生成失败，请稍后重试。';
 
       toast.error(message);
     } finally {
@@ -233,7 +291,9 @@ export function useWeeklyReportFlow() {
     copyPlainText,
     copySavedReportMarkdown,
     copySavedReportPlainText,
-    generateWeeklyReport,
+    customEndDate,
+    customStartDate,
+    generateReport,
     isGenerateDialogOpen,
     isGeneratingReport,
     isLoadingContext,
@@ -248,23 +308,30 @@ export function useWeeklyReportFlow() {
     openReportList,
     regenerateSelectedReport,
     reportListItems,
-    saveWeeklyReport,
+    reportContext,
+    reportDraft,
+    reportType,
+    saveReportPreview,
     selectedReport,
     setIsGenerateDialogOpen,
     setIsPreviewDialogOpen,
     setIsReportDetailOpen,
     setIsReportListOpen,
-    weeklyReportContext,
-    weeklyReportDraft,
+    setReportType: updateReportType,
+    updateCustomEndDate,
+    updateCustomStartDate,
   };
 }
 
-function getWeeklyReportCopyTitle(draft: WeeklyReportDraft) {
-  const title = draft.generated.title || '本周周报';
+function getReportCopyTitle(draft: ReportDraft) {
+  const fallbackTitle = draft.reportType === 'custom' ? '工作总结' : '本周周报';
+  const title = draft.generated.title || fallbackTitle;
 
   return `${title}（${formatReportDateRange(draft.startDate, draft.endDate)}）`;
 }
 
 function getSavedReportCopyTitle(report: Report) {
-  return `${report.title || '本周周报'}（${formatReportDateRange(report.startDate, report.endDate)}）`;
+  const fallbackTitle = report.type === 'custom' ? '工作总结' : '本周周报';
+
+  return `${report.title || fallbackTitle}（${formatReportDateRange(report.startDate, report.endDate)}）`;
 }

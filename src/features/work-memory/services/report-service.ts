@@ -1,4 +1,10 @@
-import type { DailyMemory, GeneratedReportContent, Report, WeeklyReportSourceInput } from '../types';
+import type {
+  DailyMemory,
+  GeneratedReportContent,
+  RangeReportSourceInput,
+  Report,
+  ReportGenerationType,
+} from '../types';
 import { aiService as defaultAIService } from './ai/ai-service';
 import { dailyMemoryRepository as defaultDailyMemoryRepository } from './daily-memory-repository';
 import { reportRepository as defaultReportRepository } from './report-repository';
@@ -11,6 +17,7 @@ export type ReportDailyMemoryRepository = {
 export type ReportRepository = {
   getAllReports(): Promise<Report[]>;
   getReportsByType(type: Report['type']): Promise<Report[]>;
+  getReportByTypeAndRange(type: ReportGenerationType, startDate: string, endDate: string): Promise<Report | null>;
   getWeeklyReportByRange(startDate: string, endDate: string): Promise<Report | null>;
   saveReport(report: Report): Promise<void>;
   updateReport(report: Report): Promise<void>;
@@ -20,7 +27,7 @@ export type ReportRepository = {
 };
 
 export type ReportAIService = {
-  generateWeeklyReport(input: WeeklyReportSourceInput): Promise<GeneratedReportContent>;
+  generateRangeReport(input: RangeReportSourceInput): Promise<GeneratedReportContent>;
 };
 
 export type ReportServiceOptions = {
@@ -30,15 +37,21 @@ export type ReportServiceOptions = {
   aiService?: ReportAIService;
 };
 
-export type WeeklyReportContext = {
+export type ReportContext = {
+  reportType: ReportGenerationType;
   startDate: string;
   endDate: string;
   memories: DailyMemory[];
   existingReport: Report | null;
 };
 
-export type WeeklyReportDraft = WeeklyReportContext & {
+export type ReportDraft = ReportContext & {
   generated: GeneratedReportContent;
+};
+
+export type WeeklyReportContext = Omit<ReportContext, 'reportType'>;
+export type WeeklyReportDraft = Omit<ReportDraft, 'reportType'> & {
+  reportType?: 'weekly';
 };
 
 export function createReportService({
@@ -54,37 +67,82 @@ export function createReportService({
 
     async getCurrentWeeklyReportContext(): Promise<WeeklyReportContext> {
       const { startDate, endDate } = getCurrentWeekRange(now());
-      return getWeeklyReportContext(dailyMemoryRepository, reportRepository, startDate, endDate);
+      const context = await getReportContext(
+        dailyMemoryRepository,
+        reportRepository,
+        'weekly',
+        startDate,
+        endDate,
+      );
+
+      return toWeeklyContext(context);
+    },
+
+    async getReportContext(
+      reportType: ReportGenerationType,
+      startDate: string,
+      endDate: string,
+    ): Promise<ReportContext> {
+      return getReportContext(dailyMemoryRepository, reportRepository, reportType, startDate, endDate);
     },
 
     async generateCurrentWeeklyReport(): Promise<WeeklyReportDraft> {
       const context = await this.getCurrentWeeklyReportContext();
+      const draft = await generateReportDraft(aiService, {
+        reportType: 'weekly',
+        ...context,
+      });
 
-      return generateWeeklyReportDraft(aiService, context);
+      return toWeeklyDraft(draft);
+    },
+
+    async generateCustomRangeReport(startDate: string, endDate: string): Promise<ReportDraft> {
+      const context = await this.getReportContext('custom', startDate, endDate);
+
+      return generateReportDraft(aiService, context);
     },
 
     async generateWeeklyReportForRange(report: Report): Promise<WeeklyReportDraft> {
-      const context = await getWeeklyReportContext(
+      const draft = await this.generateReportForRange(report);
+
+      return toWeeklyDraft(draft);
+    },
+
+    async generateReportForRange(report: Report): Promise<ReportDraft> {
+      const reportType = getSupportedGenerationType(report.type);
+      const context = await getReportContext(
         dailyMemoryRepository,
         reportRepository,
+        reportType,
         report.startDate,
         report.endDate,
       );
 
-      return generateWeeklyReportDraft(aiService, {
+      return generateReportDraft(aiService, {
         ...context,
         existingReport: context.existingReport ?? report,
       });
     },
 
     async saveWeeklyReport(draft: WeeklyReportDraft): Promise<Report> {
+      return this.saveReport({
+        ...draft,
+        reportType: 'weekly',
+      });
+    },
+
+    async saveReport(draft: ReportDraft): Promise<Report> {
       const existingReport =
         draft.existingReport ??
-        (await reportRepository.getWeeklyReportByRange(draft.startDate, draft.endDate));
+        (await reportRepository.getReportByTypeAndRange(
+          draft.reportType,
+          draft.startDate,
+          draft.endDate,
+        ));
       const timestamp = now().toISOString();
       const report: Report = {
-        id: existingReport?.id ?? getWeeklyReportId(draft.startDate, draft.endDate),
-        type: 'weekly',
+        id: existingReport?.id ?? getReportId(draft.reportType, draft.startDate, draft.endDate),
+        type: draft.reportType,
         title: draft.generated.title,
         startDate: draft.startDate,
         endDate: draft.endDate,
@@ -127,18 +185,20 @@ async function getFormalMemoriesInRange(
     .sort((first, second) => first.date.localeCompare(second.date));
 }
 
-async function getWeeklyReportContext(
+async function getReportContext(
   dailyMemoryRepository: ReportDailyMemoryRepository,
   reportRepository: ReportRepository,
+  reportType: ReportGenerationType,
   startDate: string,
   endDate: string,
-): Promise<WeeklyReportContext> {
+): Promise<ReportContext> {
   const [memories, existingReport] = await Promise.all([
     getFormalMemoriesInRange(dailyMemoryRepository, startDate, endDate),
-    reportRepository.getWeeklyReportByRange(startDate, endDate),
+    reportRepository.getReportByTypeAndRange(reportType, startDate, endDate),
   ]);
 
   return {
+    reportType,
     startDate,
     endDate,
     memories,
@@ -146,15 +206,16 @@ async function getWeeklyReportContext(
   };
 }
 
-async function generateWeeklyReportDraft(
+async function generateReportDraft(
   aiService: ReportAIService,
-  context: WeeklyReportContext,
-): Promise<WeeklyReportDraft> {
+  context: ReportContext,
+): Promise<ReportDraft> {
   if (context.memories.length === 0) {
     throw new Error('这个时间范围内还没有可用于生成报告的工作记忆。');
   }
 
-  const generated = await aiService.generateWeeklyReport({
+  const generated = await aiService.generateRangeReport({
+    reportType: context.reportType,
     startDate: context.startDate,
     endDate: context.endDate,
     memories: context.memories,
@@ -166,6 +227,31 @@ async function generateWeeklyReportDraft(
   };
 }
 
-function getWeeklyReportId(startDate: string, endDate: string) {
-  return `weekly-report-${startDate}-${endDate}`;
+function toWeeklyContext(context: ReportContext): WeeklyReportContext {
+  return {
+    startDate: context.startDate,
+    endDate: context.endDate,
+    memories: context.memories,
+    existingReport: context.existingReport,
+  };
+}
+
+function toWeeklyDraft(draft: ReportDraft): WeeklyReportDraft {
+  return {
+    ...toWeeklyContext(draft),
+    reportType: 'weekly',
+    generated: draft.generated,
+  };
+}
+
+function getSupportedGenerationType(type: Report['type']): ReportGenerationType {
+  if (type === 'custom') {
+    return 'custom';
+  }
+
+  return 'weekly';
+}
+
+function getReportId(reportType: ReportGenerationType, startDate: string, endDate: string) {
+  return `${reportType}-report-${startDate}-${endDate}`;
 }

@@ -12,7 +12,7 @@ export function getReportTypeLabel(type: ReportType) {
     weekly: '周报',
     monthly: '月报',
     yearly: '年报',
-    custom: '自定义报告',
+    custom: '工作总结',
     performance: '绩效材料',
     handoff: '交接材料',
   };

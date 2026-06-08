@@ -2,6 +2,7 @@ import type {
   GeneratedDailyMemory,
   GeneratedReportContent,
   GenerateDailyMemoryInput,
+  RangeReportSourceInput,
   WeeklyReportSourceInput,
 } from '../../types';
 import { appSettingsRepository, type AppSettings } from '../app-settings-repository';
@@ -30,6 +31,24 @@ export function createAIService({
   settingsRepository = appSettingsRepository,
   codexProvider = codexCliProvider,
 }: CreateAIServiceOptions = {}) {
+  async function generateRangeReport(input: RangeReportSourceInput): Promise<GeneratedReportContent> {
+    const settings = await settingsRepository.getSettings();
+    const provider = getProviderForSettings(settings, codexProvider);
+
+    return provider.generateRangeReport(
+      {
+        ...input,
+        reportLength: settings.reportLength,
+        reportTone: settings.reportTone,
+        reportFocus: settings.reportFocus,
+      },
+      {
+        codexCommand: settings.codexCommand,
+        codexModel: settings.codexModel,
+      },
+    );
+  }
+
   return {
     getCurrentProvider(): AIProvider {
       return codexProvider;
@@ -57,22 +76,13 @@ export function createAIService({
     },
 
     async generateWeeklyReport(input: WeeklyReportSourceInput): Promise<GeneratedReportContent> {
-      const settings = await settingsRepository.getSettings();
-      const provider = getProviderForSettings(settings, codexProvider);
-
-      return provider.generateWeeklyReport(
-        {
-          ...input,
-          reportLength: settings.reportLength,
-          reportTone: settings.reportTone,
-          reportFocus: settings.reportFocus,
-        },
-        {
-          codexCommand: settings.codexCommand,
-          codexModel: settings.codexModel,
-        },
-      );
+      return generateRangeReport({
+        reportType: 'weekly',
+        ...input,
+      });
     },
+
+    generateRangeReport,
 
     async checkHealth(): Promise<ProviderHealth> {
       const settings = await settingsRepository.getSettings();

@@ -23,7 +23,8 @@ describe('getReportGenerateActionLabel', () => {
   });
 
   it('uses generate labels for a new weekly report', () => {
-    expect(getReportGenerateActionLabel(false, false)).toBe('生成周报');
+    expect(getReportGenerateActionLabel(false, false, 'weekly')).toBe('生成周报');
+    expect(getReportGenerateActionLabel(false, false, 'custom')).toBe('生成报告');
     expect(getReportGenerateActionLabel(false, true)).toBe('生成中...');
   });
 });
@@ -35,6 +36,7 @@ describe('getReportGenerateDialogState', () => {
         availableMemoryCount: 2,
         hasExistingReport: false,
         isGenerating: false,
+        reportType: 'weekly',
       }),
     ).toEqual({
       kind: 'ready',
@@ -53,6 +55,7 @@ describe('getReportGenerateDialogState', () => {
         availableMemoryCount: 2,
         hasExistingReport: true,
         isGenerating: false,
+        reportType: 'custom',
       }),
     ).toMatchObject({
       kind: 'reportExists',
@@ -69,6 +72,7 @@ describe('getReportGenerateDialogState', () => {
         availableMemoryCount: 0,
         hasExistingReport: false,
         isGenerating: false,
+        reportType: 'custom',
       }),
     ).toMatchObject({
       kind: 'emptyRange',
@@ -84,6 +88,7 @@ describe('getReportGenerateDialogState', () => {
         availableMemoryCount: 2,
         hasExistingReport: true,
         isGenerating: true,
+        reportType: 'custom',
       }),
     ).toMatchObject({
       kind: 'generating',
@@ -92,6 +97,25 @@ describe('getReportGenerateDialogState', () => {
       showPrimary: true,
       primaryDisabled: true,
       primaryLabel: '重新生成中...',
+    });
+  });
+
+  it('disables custom report generation for an invalid range', () => {
+    expect(
+      getReportGenerateDialogState({
+        availableMemoryCount: 2,
+        hasExistingReport: false,
+        isGenerating: false,
+        isRangeValid: false,
+        reportType: 'custom',
+      }),
+    ).toMatchObject({
+      kind: 'invalidRange',
+      canClose: true,
+      showCancel: true,
+      showPrimary: true,
+      primaryDisabled: true,
+      primaryLabel: '生成报告',
     });
   });
 });

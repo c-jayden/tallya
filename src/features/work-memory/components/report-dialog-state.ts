@@ -1,3 +1,5 @@
+import type { ReportGenerationType } from '../types';
+
 export function shouldAllowReportDialogOpenChange(nextOpen: boolean, isBusy: boolean) {
   return nextOpen || !isBusy;
 }
@@ -11,16 +13,24 @@ export function preventReportDialogDismissWhenBusy(
   }
 }
 
-export function getReportGenerateActionLabel(hasExistingReport: boolean, isGenerating: boolean) {
+export function getReportGenerateActionLabel(
+  hasExistingReport: boolean,
+  isGenerating: boolean,
+  reportType: ReportGenerationType = 'weekly',
+) {
   if (isGenerating) {
     return hasExistingReport ? '重新生成中...' : '生成中...';
   }
 
-  return hasExistingReport ? '重新生成' : '生成周报';
+  if (hasExistingReport) {
+    return '重新生成';
+  }
+
+  return reportType === 'custom' ? '生成报告' : '生成周报';
 }
 
 export type ReportGenerateDialogState = {
-  kind: 'emptyRange' | 'ready' | 'reportExists' | 'generating';
+  kind: 'emptyRange' | 'invalidRange' | 'ready' | 'reportExists' | 'generating';
   canClose: boolean;
   showCancel: boolean;
   cancelDisabled: boolean;
@@ -34,11 +44,15 @@ export function getReportGenerateDialogState({
   hasExistingReport,
   isGenerating,
   isLoading = false,
+  isRangeValid = true,
+  reportType = 'weekly',
 }: {
   availableMemoryCount: number;
   hasExistingReport: boolean;
   isGenerating: boolean;
   isLoading?: boolean;
+  isRangeValid?: boolean;
+  reportType?: ReportGenerationType;
 }): ReportGenerateDialogState {
   if (isGenerating) {
     return {
@@ -48,7 +62,19 @@ export function getReportGenerateDialogState({
       cancelDisabled: true,
       showPrimary: true,
       primaryDisabled: true,
-      primaryLabel: getReportGenerateActionLabel(hasExistingReport, true),
+      primaryLabel: getReportGenerateActionLabel(hasExistingReport, true, reportType),
+    };
+  }
+
+  if (!isRangeValid) {
+    return {
+      kind: 'invalidRange',
+      canClose: true,
+      showCancel: true,
+      cancelDisabled: false,
+      showPrimary: true,
+      primaryDisabled: true,
+      primaryLabel: getReportGenerateActionLabel(hasExistingReport, false, reportType),
     };
   }
 
@@ -71,6 +97,6 @@ export function getReportGenerateDialogState({
     cancelDisabled: false,
     showPrimary: true,
     primaryDisabled: false,
-    primaryLabel: getReportGenerateActionLabel(hasExistingReport, false),
+    primaryLabel: getReportGenerateActionLabel(hasExistingReport, false, reportType),
   };
 }

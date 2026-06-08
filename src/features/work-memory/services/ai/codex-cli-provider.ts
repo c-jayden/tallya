@@ -7,6 +7,21 @@ type TauriInvoke = typeof invoke;
 const CODEX_PROVIDER_ID = 'ai-codex-cli';
 
 export function createCodexCliProvider(invokeCommand: TauriInvoke = invoke): AIProvider {
+  async function generateRangeReport(
+    input: Parameters<AIProvider['generateRangeReport']>[0],
+    options: Parameters<AIProvider['generateRangeReport']>[1],
+  ) {
+    try {
+      return await invokeCommand<GeneratedReportContent>('generate_range_report_with_codex', {
+        input,
+        codexCommand: options.codexCommand,
+        codexModel: options.codexModel,
+      });
+    } catch (error) {
+      throw new AIProviderError(getFriendlyCodexError(error), CODEX_PROVIDER_ID, error);
+    }
+  }
+
   return {
     id: CODEX_PROVIDER_ID,
     name: 'Codex CLI',
@@ -22,16 +37,15 @@ export function createCodexCliProvider(invokeCommand: TauriInvoke = invoke): AIP
       }
     },
     async generateWeeklyReport(input, options) {
-      try {
-        return await invokeCommand<GeneratedReportContent>('generate_weekly_report_with_codex', {
-          input,
-          codexCommand: options.codexCommand,
-          codexModel: options.codexModel,
-        });
-      } catch (error) {
-        throw new AIProviderError(getFriendlyCodexError(error), CODEX_PROVIDER_ID, error);
-      }
+      return generateRangeReport(
+        {
+          reportType: 'weekly',
+          ...input,
+        },
+        options,
+      );
     },
+    generateRangeReport,
     async checkHealth(options) {
       try {
         const version = await checkCodexCli(invokeCommand, options.codexCommand);

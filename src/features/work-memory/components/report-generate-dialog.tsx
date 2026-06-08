@@ -19,8 +19,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { formatReportDateRange } from '../services/report-date';
-import type { WeeklyReportContext } from '../services/report-service';
+import { formatReportDateRange, isValidReportDateRange } from '../services/report-date';
+import type { ReportContext } from '../services/report-service';
+import type { ReportGenerationType } from '../types';
 import {
   getReportGenerateDialogState,
   preventReportDialogDismissWhenBusy,
@@ -30,31 +31,55 @@ import { TallyaDialogFooter } from './tallya-dialog-footer';
 
 type ReportGenerateDialogProps = {
   open: boolean;
-  context: WeeklyReportContext | null;
+  context: ReportContext | null;
+  reportType: ReportGenerationType;
+  customStartDate: string;
+  customEndDate: string;
   isLoading: boolean;
   isGenerating: boolean;
   onOpenChange: (open: boolean) => void;
+  onReportTypeChange: (reportType: ReportGenerationType) => void;
+  onCustomStartDateChange: (date: string) => void;
+  onCustomEndDateChange: (date: string) => void;
   onGenerate: () => void;
 };
 
 export function ReportGenerateDialog({
   open,
   context,
+  reportType,
+  customStartDate,
+  customEndDate,
   isLoading,
   isGenerating,
   onOpenChange,
+  onReportTypeChange,
+  onCustomStartDateChange,
+  onCustomEndDateChange,
   onGenerate,
 }: ReportGenerateDialogProps) {
   const [isOverwriteConfirmOpen, setIsOverwriteConfirmOpen] = useState(false);
   const availableMemoryCount = context?.memories.length ?? 0;
   const hasAvailableMemories = availableMemoryCount > 0;
   const hasExistingReport = Boolean(context?.existingReport);
+  const isRangeValid =
+    reportType === 'weekly' || isValidReportDateRange(customStartDate, customEndDate);
   const dialogState = getReportGenerateDialogState({
     availableMemoryCount,
     hasExistingReport,
     isGenerating,
     isLoading,
+    isRangeValid,
+    reportType,
   });
+  const existingReportCopy =
+    reportType === 'custom'
+      ? '这个时间范围的报告已存在，重新生成会覆盖原报告。'
+      : '本周周报已存在，重新生成会覆盖原报告。';
+  const countCopy =
+    reportType === 'custom'
+      ? `该范围内可用 ${availableMemoryCount} 条工作记忆`
+      : `本周可用 ${availableMemoryCount} 条工作记忆`;
 
   function handleOpenChange(nextOpen: boolean) {
     if (shouldAllowReportDialogOpenChange(nextOpen, !dialogState.canClose)) {
@@ -104,24 +129,57 @@ export function ReportGenerateDialog({
           </DialogHeader>
           <TallyaScrollArea className="min-h-0 flex-1 px-6 pb-5">
             <div className="grid gap-5">
-              <ReportMetaRow label="报告类型" value="本周周报" />
+              <div className="grid gap-2">
+                <span className="text-sm leading-5 font-semibold text-app-ink">报告类型</span>
+                <div className="inline-flex w-fit rounded-xl bg-app-surface-muted p-1">
+                  <ReportTypeButton
+                    active={reportType === 'weekly'}
+                    label="本周周报"
+                    onClick={() => onReportTypeChange('weekly')}
+                  />
+                  <ReportTypeButton
+                    active={reportType === 'custom'}
+                    label="自定义范围报告"
+                    onClick={() => onReportTypeChange('custom')}
+                  />
+                </div>
+              </div>
+              {reportType === 'custom' ? (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <ReportDateInput
+                    label="开始日期"
+                    value={customStartDate}
+                    onChange={onCustomStartDateChange}
+                  />
+                  <ReportDateInput
+                    label="结束日期"
+                    value={customEndDate}
+                    onChange={onCustomEndDateChange}
+                  />
+                </div>
+              ) : null}
               <ReportMetaRow
                 label="时间范围"
                 value={
                   context
                     ? formatReportDateRange(context.startDate, context.endDate)
-                    : '正在读取本周范围'
+                    : reportType === 'custom' && !isRangeValid
+                      ? '请选择有效时间范围'
+                      : '正在读取时间范围'
                 }
               />
               <ReportMetaRow
                 label="可用记忆"
-                value={
-                  isLoading ? '正在统计工作记忆' : `本周可用 ${availableMemoryCount} 条工作记忆`
-                }
+                value={isLoading ? '正在统计工作记忆' : countCopy}
               />
+              {reportType === 'custom' && !isRangeValid ? (
+                <p className="rounded-lg bg-app-surface-muted px-3 py-2 text-[13px] leading-[1.5] text-app-ink-muted">
+                  开始日期不能晚于结束日期。
+                </p>
+              ) : null}
               {!isLoading && availableMemoryCount === 1 ? (
                 <p className="rounded-lg bg-app-surface-muted px-3 py-2 text-[13px] leading-[1.5] text-app-ink-muted">
-                  记忆较少时，周报内容可能偏简短。
+                  记忆较少时，报告内容可能偏简短。
                 </p>
               ) : null}
               {!isLoading && !hasAvailableMemories ? (
@@ -131,7 +189,7 @@ export function ReportGenerateDialog({
               ) : null}
               {!isLoading && hasExistingReport ? (
                 <p className="rounded-lg bg-app-surface-muted px-3 py-2 text-[13px] leading-[1.5] text-app-ink-muted">
-                  本周周报已存在，重新生成会覆盖原报告。
+                  {existingReportCopy}
                 </p>
               ) : null}
             </div>
@@ -168,8 +226,14 @@ export function ReportGenerateDialog({
       <AlertDialog open={isOverwriteConfirmOpen} onOpenChange={setIsOverwriteConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>重新生成周报？</AlertDialogTitle>
-            <AlertDialogDescription>重新生成会覆盖当前保存的周报。</AlertDialogDescription>
+            <AlertDialogTitle>
+              {reportType === 'custom' ? '重新生成报告？' : '重新生成周报？'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {reportType === 'custom'
+                ? '重新生成会覆盖当前保存的报告。'
+                : '重新生成会覆盖当前保存的周报。'}
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel className="cursor-pointer">取消</AlertDialogCancel>
@@ -189,5 +253,52 @@ function ReportMetaRow({ label, value }: { label: string; value: string }) {
       <span className="text-sm leading-5 font-semibold text-app-ink">{label}</span>
       <span className="text-[13px] leading-[1.5] text-app-ink-muted">{value}</span>
     </div>
+  );
+}
+
+function ReportTypeButton({
+  active,
+  label,
+  onClick,
+}: {
+  active: boolean;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={[
+        'h-8 cursor-pointer rounded-lg px-3 text-[13px] leading-5 transition-colors duration-150',
+        active
+          ? 'bg-app-surface text-app-ink shadow-[0_1px_2px_rgb(15_23_42/0.06)]'
+          : 'bg-transparent text-app-ink-muted hover:text-app-ink',
+      ].join(' ')}
+      onClick={onClick}
+    >
+      {label}
+    </button>
+  );
+}
+
+function ReportDateInput({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="grid gap-1.5">
+      <span className="text-sm leading-5 font-semibold text-app-ink">{label}</span>
+      <input
+        type="date"
+        value={value}
+        className="h-9 cursor-pointer rounded-xl border border-app-border bg-app-surface px-3 text-[13px] text-app-ink outline-none transition-colors duration-150 hover:border-app-border-strong focus:border-app-border-strong"
+        onChange={(event) => onChange(event.target.value)}
+      />
+    </label>
   );
 }

@@ -55,6 +55,8 @@ export type ReportPreferences = {
   reportFocus: ReportFocus;
 };
 
+export type ReportGenerationType = 'weekly' | 'custom';
+
 export type WeeklyReportSourceInput = {
   startDate: string;
   endDate: string;
@@ -62,6 +64,12 @@ export type WeeklyReportSourceInput = {
 };
 
 export type GenerateWeeklyReportInput = WeeklyReportSourceInput & ReportPreferences;
+
+export type RangeReportSourceInput = WeeklyReportSourceInput & {
+  reportType: ReportGenerationType;
+};
+
+export type GenerateRangeReportInput = RangeReportSourceInput & ReportPreferences;
 
 export type GeneratedReportContent = {
   title: string;

@@ -16,6 +16,7 @@ describe('report view model', () => {
 
   it('maps report type and stale status for display', () => {
     expect(getReportTypeLabel('weekly')).toBe('周报');
+    expect(getReportTypeLabel('custom')).toBe('工作总结');
     expect(getReportTypeLabel('monthly')).toBe('月报');
     expect(getReportStatusLabel('generated')).toBe('已保存');
     expect(getReportStatusLabel('stale')).toBe('需要重新生成');

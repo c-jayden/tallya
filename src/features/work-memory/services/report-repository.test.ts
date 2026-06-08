@@ -88,6 +88,23 @@ describe('SQLiteReportRepository', () => {
     ]);
   });
 
+  it('reads a custom report by type and range', async () => {
+    const repository = createRepository();
+    const report = createReport({
+      id: 'custom-2026-06-01-2026-06-03',
+      type: 'custom',
+      title: '阶段工作总结',
+      startDate: '2026-06-01',
+      endDate: '2026-06-03',
+    });
+
+    await repository.saveReport(report);
+
+    await expect(
+      repository.getReportByTypeAndRange('custom', '2026-06-01', '2026-06-03'),
+    ).resolves.toEqual(report);
+  });
+
   it('uses an empty object when report content JSON cannot be parsed', async () => {
     const database = new TestDatabaseClient();
     const repository = createRepository(database);

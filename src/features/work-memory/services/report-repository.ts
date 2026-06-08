@@ -63,6 +63,10 @@ export class SQLiteReportRepository {
   }
 
   async getWeeklyReportByRange(startDate: string, endDate: string) {
+    return this.getReportByTypeAndRange('weekly', startDate, endDate);
+  }
+
+  async getReportByTypeAndRange(type: ReportType, startDate: string, endDate: string) {
     return this.read(async (database) => {
       const rows = await database.select<ReportRow[]>(
         `
@@ -71,7 +75,7 @@ export class SQLiteReportRepository {
           ORDER BY updated_at DESC
           LIMIT 1
         `,
-        ['weekly', startDate, endDate],
+        [type, startDate, endDate],
       );
 
       return normalizeReportRow(rows[0]) ?? null;

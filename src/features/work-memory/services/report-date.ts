@@ -7,6 +7,8 @@ export type WeekRange = {
   endDate: string;
 };
 
+export type ReportDateRange = WeekRange;
+
 export function getCurrentWeekRange(now = new Date()): WeekRange {
   const current = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const day = current.getDay();
@@ -27,8 +29,25 @@ export function formatReportDateRange(startDate: string, endDate: string) {
   return `${formatChineseDate(startDate)} - ${formatChineseDate(endDate)}`;
 }
 
+export function getDefaultCustomReportRange(now = new Date()): ReportDateRange {
+  const weekRange = getCurrentWeekRange(now);
+
+  return {
+    startDate: weekRange.startDate,
+    endDate: getDailyMemoryDate(now),
+  };
+}
+
+export function isValidReportDateRange(startDate: string, endDate: string) {
+  return isDailyMemoryDate(startDate) && isDailyMemoryDate(endDate) && startDate <= endDate;
+}
+
 function formatChineseDate(date: string) {
   const [year, month, day] = date.split('-').map(Number);
 
   return `${year}年${month}月${day}日`;
+}
+
+function isDailyMemoryDate(value: string) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value);
 }

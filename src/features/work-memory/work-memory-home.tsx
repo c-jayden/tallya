@@ -206,20 +206,26 @@ export function WorkMemoryHome() {
       />
       <ReportGenerateDialog
         open={weeklyReport.isGenerateDialogOpen}
-        context={weeklyReport.weeklyReportContext}
+        context={weeklyReport.reportContext}
+        reportType={weeklyReport.reportType}
+        customStartDate={weeklyReport.customStartDate}
+        customEndDate={weeklyReport.customEndDate}
         isLoading={weeklyReport.isLoadingContext}
         isGenerating={weeklyReport.isGeneratingReport}
         onOpenChange={weeklyReport.setIsGenerateDialogOpen}
-        onGenerate={weeklyReport.generateWeeklyReport}
+        onReportTypeChange={weeklyReport.setReportType}
+        onCustomStartDateChange={weeklyReport.updateCustomStartDate}
+        onCustomEndDateChange={weeklyReport.updateCustomEndDate}
+        onGenerate={weeklyReport.generateReport}
       />
       <ReportPreviewDialog
         open={weeklyReport.isPreviewDialogOpen}
-        draft={weeklyReport.weeklyReportDraft}
+        draft={weeklyReport.reportDraft}
         isSaving={weeklyReport.isSavingReport}
         onOpenChange={weeklyReport.setIsPreviewDialogOpen}
         onCopyText={weeklyReport.copyPlainText}
         onCopyMarkdown={weeklyReport.copyMarkdown}
-        onSave={weeklyReport.saveWeeklyReport}
+        onSave={weeklyReport.saveReportPreview}
       />
       <ReportListDialog
         open={weeklyReport.isReportListOpen}

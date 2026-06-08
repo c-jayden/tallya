@@ -4,6 +4,7 @@ import type {
   GeneratedDailyMemory,
   GeneratedReportContent,
   GenerateDailyMemoryInput,
+  RangeReportSourceInput,
   WeeklyReportSourceInput,
 } from '../../types';
 import { createAIService } from './ai-service';
@@ -38,6 +39,13 @@ const weeklyInput: WeeklyReportSourceInput = {
       updatedAt: '2026-06-01T02:00:00.000Z',
     },
   ],
+};
+
+const customInput: RangeReportSourceInput = {
+  reportType: 'custom',
+  startDate: '2026-06-01',
+  endDate: '2026-06-03',
+  memories: weeklyInput.memories,
 };
 
 const weeklyGenerated: GeneratedReportContent = {
@@ -93,6 +101,7 @@ describe('createAIService', () => {
         name: 'Codex CLI',
         generateDailyMemory,
         generateWeeklyReport: vi.fn(),
+        generateRangeReport: vi.fn(),
       },
     });
 
@@ -118,6 +127,7 @@ describe('createAIService', () => {
         name: 'Codex CLI',
         generateDailyMemory: vi.fn(),
         generateWeeklyReport: vi.fn(),
+        generateRangeReport: vi.fn(),
         checkHealth,
       },
     });
@@ -134,8 +144,8 @@ describe('createAIService', () => {
   });
 
   it('reads saved settings before generating a weekly report', async () => {
-    const generateWeeklyReport = vi
-      .fn<AIProvider['generateWeeklyReport']>()
+    const generateRangeReport = vi
+      .fn<AIProvider['generateRangeReport']>()
       .mockResolvedValue(weeklyGenerated);
     const service = createAIService({
       settingsRepository: {
@@ -145,14 +155,48 @@ describe('createAIService', () => {
         id: 'ai-codex-cli',
         name: 'Codex CLI',
         generateDailyMemory: vi.fn(),
-        generateWeeklyReport,
+        generateWeeklyReport: vi.fn(),
+        generateRangeReport,
       },
     });
 
     await expect(service.generateWeeklyReport(weeklyInput)).resolves.toEqual(weeklyGenerated);
-    expect(generateWeeklyReport).toHaveBeenCalledWith(
+    expect(generateRangeReport).toHaveBeenCalledWith(
       {
+        reportType: 'weekly',
         ...weeklyInput,
+        reportLength: 'brief',
+        reportTone: 'retrospective',
+        reportFocus: 'risks',
+      },
+      {
+        codexCommand: 'custom-codex',
+        codexModel: 'gpt-5.4-mini',
+      },
+    );
+  });
+
+  it('reads saved report preferences before generating a custom range report', async () => {
+    const generateRangeReport = vi
+      .fn<AIProvider['generateRangeReport']>()
+      .mockResolvedValue(weeklyGenerated);
+    const service = createAIService({
+      settingsRepository: {
+        getSettings: vi.fn().mockResolvedValue(settings),
+      },
+      codexProvider: {
+        id: 'ai-codex-cli',
+        name: 'Codex CLI',
+        generateDailyMemory: vi.fn(),
+        generateWeeklyReport: vi.fn(),
+        generateRangeReport,
+      },
+    });
+
+    await expect(service.generateRangeReport(customInput)).resolves.toEqual(weeklyGenerated);
+    expect(generateRangeReport).toHaveBeenCalledWith(
+      {
+        ...customInput,
         reportLength: 'brief',
         reportTone: 'retrospective',
         reportFocus: 'risks',

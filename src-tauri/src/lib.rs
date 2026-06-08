@@ -94,6 +94,22 @@ struct GenerateWeeklyReportInput {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+struct GenerateRangeReportInput {
+    #[serde(default = "default_report_type")]
+    report_type: String,
+    start_date: String,
+    end_date: String,
+    memories: Vec<DailyMemoryForReport>,
+    #[serde(default = "default_report_length")]
+    report_length: String,
+    #[serde(default = "default_report_tone")]
+    report_tone: String,
+    #[serde(default = "default_report_focus")]
+    report_focus: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct DailyMemoryForReport {
     id: String,
     date: String,
@@ -128,12 +144,30 @@ fn default_report_length() -> String {
     "standard".to_string()
 }
 
+fn default_report_type() -> String {
+    "weekly".to_string()
+}
+
 fn default_report_tone() -> String {
     "natural".to_string()
 }
 
 fn default_report_focus() -> String {
     "outcomes".to_string()
+}
+
+impl GenerateWeeklyReportInput {
+    fn into_range_report_input(self) -> GenerateRangeReportInput {
+        GenerateRangeReportInput {
+            report_type: "weekly".to_string(),
+            start_date: self.start_date,
+            end_date: self.end_date,
+            memories: self.memories,
+            report_length: self.report_length,
+            report_tone: self.report_tone,
+            report_focus: self.report_focus,
+        }
+    }
 }
 
 #[tauri::command]
@@ -169,11 +203,31 @@ async fn generate_weekly_report_with_codex(
     codex_model: String,
 ) -> Result<GeneratedReportContent, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        run_codex_weekly_report_generation(input, codex_command, codex_model)
+        run_codex_range_report_generation(
+            input.into_range_report_input(),
+            codex_command,
+            codex_model,
+        )
     })
     .await
     .map_err(|error| {
         eprintln!("Codex weekly report task join failed: {error}");
+        "Codex 生成失败，请检查 Codex CLI 是否可用。".to_string()
+    })?
+}
+
+#[tauri::command]
+async fn generate_range_report_with_codex(
+    input: GenerateRangeReportInput,
+    codex_command: String,
+    codex_model: String,
+) -> Result<GeneratedReportContent, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        run_codex_range_report_generation(input, codex_command, codex_model)
+    })
+    .await
+    .map_err(|error| {
+        eprintln!("Codex range report task join failed: {error}");
         "Codex 生成失败，请检查 Codex CLI 是否可用。".to_string()
     })?
 }
@@ -311,18 +365,18 @@ fn run_codex_daily_memory_generation(
     )
 }
 
-fn run_codex_weekly_report_generation(
-    input: GenerateWeeklyReportInput,
+fn run_codex_range_report_generation(
+    input: GenerateRangeReportInput,
     codex_command: String,
     codex_model: String,
 ) -> Result<GeneratedReportContent, String> {
-    let prompt = build_codex_weekly_report_prompt(&input);
+    let prompt = build_codex_range_report_prompt(&input);
     run_codex_prompt_generation(
         prompt,
         codex_command,
         codex_model,
-        "weekly-report",
-        |raw_output| parse_generated_weekly_report(raw_output, &input),
+        "range-report",
+        |raw_output| parse_generated_range_report(raw_output, &input),
     )
 }
 
@@ -555,27 +609,49 @@ JSON keys: summary:string, completedItems:string[], keyOutcome?:string, problems
     )
 }
 
+#[cfg(test)]
 fn build_codex_weekly_report_prompt(input: &GenerateWeeklyReportInput) -> String {
+    build_codex_range_report_prompt(&input.clone().into_range_report_input())
+}
+
+fn build_codex_range_report_prompt(input: &GenerateRangeReportInput) -> String {
     let input_json = serde_json::to_string(input).unwrap_or_else(|_| "{}".to_string());
     let length_instruction = report_length_instruction(&input.report_length);
     let tone_instruction = report_tone_instruction(&input.report_tone);
     let focus_instruction = report_focus_instruction(&input.report_focus);
     let single_memory_instruction = report_single_memory_instruction(input);
+    let is_custom = input.report_type == "custom";
+    let report_name = if is_custom {
+        "自定义范围工作总结"
+    } else {
+        "本周周报"
+    };
+    let title_instruction = if is_custom {
+        "title 根据时间范围生成，例如：2026年6月1日-6月7日工作总结。"
+    } else {
+        "title 使用适合本周范围的周报标题。"
+    };
+    let plan_key_instruction = if is_custom {
+        "nextWeekPlan 表示该范围后的下一步计划，根据明日计划、未完成事项和问题保守提炼；没有则返回空字符串。"
+    } else {
+        "nextWeekPlan 根据明日计划、未完成事项和问题保守提炼；没有则返回空字符串。"
+    };
 
     format!(
-        r#"请根据输入中的 daily memories 整理一份中文本周周报。只输出合法 JSON，不要 markdown code fence、解释、代码块或工具调用。
+        r#"请根据输入中的 daily memories 整理一份中文{report_name}。只输出合法 JSON，不要 markdown code fence、解释、代码块或工具调用。
 JSON keys: title:string, summary:string, highlights:string[], completedItems:string[], problems?:string, nextWeekPlan?:string, markdown:string.
 规则：
 - 只能使用输入里已经存在的工作记忆，不要编造没有做过的事情。
 - 可以做归纳、合并和润色，语气遵守 Tallya 的产品性格：温和、克制、清楚，不鸡血、不像任务监督或绩效评价。
+- {title_instruction}
 - {length_instruction}
 - {single_memory_instruction}
 - {tone_instruction}
 - {focus_instruction}
 - completedItems 合并相近事项，避免把同一件事拆得过碎。
 - problems 只总结 daily memories 中提到的问题或风险；没有则返回空字符串。
-- nextWeekPlan 根据明日计划、未完成事项和问题保守提炼；没有则返回空字符串。
-- markdown 是一份可直接复制的周报文本，使用中文标题和分节。
+- {plan_key_instruction}
+- markdown 是一份可直接复制的报告文本，使用中文标题和分节。
 - markdown 不要包含多余空行；section 之间最多一个空行；不要输出空 section；不要用空行撑篇幅。
 输入：{input_json}
 "#
@@ -596,7 +672,7 @@ fn report_length_instruction(value: &str) -> &'static str {
     }
 }
 
-fn report_single_memory_instruction(input: &GenerateWeeklyReportInput) -> &'static str {
+fn report_single_memory_instruction(input: &GenerateRangeReportInput) -> &'static str {
     if input.report_length == "brief" && input.memories.len() == 1 {
         return "当前只有 1 条工作记忆，整体进一步压缩：highlights 最多 2 条，completedItems 最多 2 条，problems 和 nextWeekPlan 只保留必要内容，不要把同一条记忆拆成过多项目。";
     }
@@ -646,6 +722,22 @@ mod tests {
         assert!(prompt.contains("报告语气：复盘型"));
         assert!(prompt.contains("报告重点：问题风险优先"));
         assert!(prompt.contains("不要编造反思"));
+    }
+
+    #[test]
+    fn custom_report_prompt_includes_range_type_and_preferences() {
+        let mut input =
+            weekly_input("brief", "formal", "completed-items").into_range_report_input();
+        input.report_type = "custom".to_string();
+        input.end_date = "2026-06-03".to_string();
+
+        let prompt = build_codex_range_report_prompt(&input);
+
+        assert!(prompt.contains("自定义范围工作总结"));
+        assert!(prompt.contains("2026年6月1日-6月7日工作总结"));
+        assert!(prompt.contains("报告语气：正式"));
+        assert!(prompt.contains("报告重点：完成事项优先"));
+        assert!(prompt.contains("\"reportType\":\"custom\""));
     }
 
     fn weekly_input(
@@ -765,9 +857,9 @@ fn normalize_generated_daily_memory(
     })
 }
 
-fn parse_generated_weekly_report(
+fn parse_generated_range_report(
     raw_output: &str,
-    input: &GenerateWeeklyReportInput,
+    input: &GenerateRangeReportInput,
 ) -> Result<GeneratedReportContent, String> {
     let raw_output = raw_output.trim();
 
@@ -780,15 +872,15 @@ fn parse_generated_weekly_report(
         "AI 返回内容不是合法 JSON，请重试。".to_string()
     })?;
 
-    normalize_generated_weekly_report(parsed, input)
+    normalize_generated_range_report(parsed, input)
 }
 
-fn normalize_generated_weekly_report(
+fn normalize_generated_range_report(
     generated: GeneratedReportContent,
-    input: &GenerateWeeklyReportInput,
+    input: &GenerateRangeReportInput,
 ) -> Result<GeneratedReportContent, String> {
     let title = if generated.title.trim().is_empty() {
-        "本周周报".to_string()
+        default_report_title(input)
     } else {
         generated.title.trim().to_string()
     };
@@ -808,7 +900,7 @@ fn normalize_generated_weekly_report(
     };
 
     if report.markdown.is_empty() {
-        report.markdown = build_weekly_report_markdown(&report, input);
+        report.markdown = build_range_report_markdown(&report, input);
     }
 
     if report.summary.is_empty()
@@ -834,9 +926,9 @@ fn normalize_string_list(values: Vec<String>, limit: Option<usize>) -> Vec<Strin
     }
 }
 
-fn build_weekly_report_markdown(
+fn build_range_report_markdown(
     report: &GeneratedReportContent,
-    input: &GenerateWeeklyReportInput,
+    input: &GenerateRangeReportInput,
 ) -> String {
     let mut sections = vec![
         format!("# {}", report.title),
@@ -861,11 +953,23 @@ fn build_weekly_report_markdown(
 
     if let Some(next_week_plan) = &report.next_week_plan {
         sections.push(String::new());
-        sections.push("## 下周计划".to_string());
+        sections.push(if input.report_type == "custom" {
+            "## 下一步计划".to_string()
+        } else {
+            "## 下周计划".to_string()
+        });
         sections.push(next_week_plan.clone());
     }
 
     sections.join("\n")
+}
+
+fn default_report_title(input: &GenerateRangeReportInput) -> String {
+    if input.report_type == "custom" {
+        return format!("{}-{}工作总结", input.start_date, input.end_date);
+    }
+
+    "本周周报".to_string()
 }
 
 fn normalize_report_text(text: &str) -> String {
@@ -1021,6 +1125,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             check_codex_cli,
             generate_daily_memory_with_codex,
+            generate_range_report_with_codex,
             generate_weekly_report_with_codex,
             hide_main_window,
             quit_app,

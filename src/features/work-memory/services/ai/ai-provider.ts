@@ -2,6 +2,7 @@ import type {
   GeneratedDailyMemory,
   GeneratedReportContent,
   GenerateDailyMemoryInput,
+  GenerateRangeReportInput,
   GenerateWeeklyReportInput,
 } from '../../types';
 
@@ -31,6 +32,10 @@ export type AIProvider = {
   ): Promise<GeneratedDailyMemory>;
   generateWeeklyReport(
     input: GenerateWeeklyReportInput,
+    options: AIProviderOptions,
+  ): Promise<GeneratedReportContent>;
+  generateRangeReport(
+    input: GenerateRangeReportInput,
     options: AIProviderOptions,
   ): Promise<GeneratedReportContent>;
   checkHealth?(options: AIProviderOptions): Promise<ProviderHealth>;
