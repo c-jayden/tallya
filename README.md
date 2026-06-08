@@ -78,6 +78,24 @@ pnpm test
 pnpm lint
 ```
 
+## 测试与质量门禁
+
+常规检查：
+
+```bash
+pnpm typecheck
+pnpm lint
+pnpm test
+```
+
+打包前检查：
+
+```bash
+pnpm check:release
+```
+
+测试分层、Tauri API mock、SQLite 测试隔离和后续 E2E 策略见 [TESTING.md](./TESTING.md)。
+
 ## Codex CLI
 
 Tallya 当前使用本机 Codex CLI 生成工作记忆。请确保本机已安装并登录 Codex CLI。

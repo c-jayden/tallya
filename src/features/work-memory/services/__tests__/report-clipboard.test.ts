@@ -32,9 +32,21 @@ describe('copyReportMarkdown', () => {
   });
 
   it('returns a friendly error when clipboard is unavailable', async () => {
-    await expect(copyReportMarkdown('# 本周周报', undefined)).rejects.toThrow(
-      '复制失败，请稍后重试。',
-    );
+    const originalClipboard = globalThis.navigator.clipboard;
+
+    Object.defineProperty(globalThis.navigator, 'clipboard', {
+      configurable: true,
+      value: undefined,
+    });
+
+    try {
+      await expect(copyReportMarkdown('# 本周周报')).rejects.toThrow('复制失败，请稍后重试。');
+    } finally {
+      Object.defineProperty(globalThis.navigator, 'clipboard', {
+        configurable: true,
+        value: originalClipboard,
+      });
+    }
   });
 });
 

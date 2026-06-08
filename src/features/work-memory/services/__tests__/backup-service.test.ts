@@ -1,4 +1,5 @@
 ﻿import { describe, expect, it, vi } from 'vitest';
+import { tauriMocks } from '@/test/tauri-mocks';
 import { DEFAULT_APP_SETTINGS, type AppSettings } from '../app-settings-repository';
 import {
   buildBackupFileName,
@@ -105,6 +106,62 @@ describe('backup-service', () => {
     expect(buildBackupFileName(new Date('2026-06-08T10:00:00.000Z'))).toBe(
       'tallya-backup-2026-06-08.json',
     );
+  });
+
+  it('exports backup files through mocked Tauri dialog and fs APIs', async () => {
+    const service = createBackupService({
+      appVersion: '0.1.0',
+      now: () => new Date('2026-06-08T10:00:00.000Z'),
+      dailyMemoryRepository: createDailyMemoryRepository({
+        dailyMemories: [createDailyMemory('2026-06-08')],
+      }),
+      reportRepository: createReportRepository(),
+      appSettingsRepository: createAppSettingsRepository(),
+    });
+    tauriMocks.dialogSave.mockResolvedValueOnce('/mock/tallya-backup-2026-06-08.json');
+
+    await expect(service.exportBackupToFile()).resolves.toEqual({ status: 'exported' });
+
+    expect(tauriMocks.dialogSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        defaultPath: 'tallya-backup-2026-06-08.json',
+        filters: [{ name: 'JSON', extensions: ['json'] }],
+      }),
+    );
+    expect(tauriMocks.writeTextFile).toHaveBeenCalledWith(
+      '/mock/tallya-backup-2026-06-08.json',
+      expect.stringContaining('"dailyMemories"'),
+    );
+  });
+
+  it('does not write a file when export is cancelled', async () => {
+    const service = createBackupService({
+      appVersion: '0.1.0',
+      now: () => new Date('2026-06-08T10:00:00.000Z'),
+      dailyMemoryRepository: createDailyMemoryRepository(),
+      reportRepository: createReportRepository(),
+      appSettingsRepository: createAppSettingsRepository(),
+    });
+    tauriMocks.dialogSave.mockResolvedValueOnce(null);
+
+    await expect(service.exportBackupToFile()).resolves.toEqual({ status: 'cancelled' });
+
+    expect(tauriMocks.writeTextFile).not.toHaveBeenCalled();
+  });
+
+  it('opens the Tauri app data directory instead of a hard-coded platform path', async () => {
+    const service = createBackupService({
+      appVersion: '0.1.0',
+      now: () => new Date('2026-06-08T10:00:00.000Z'),
+      dailyMemoryRepository: createDailyMemoryRepository(),
+      reportRepository: createReportRepository(),
+      appSettingsRepository: createAppSettingsRepository(),
+    });
+    tauriMocks.appDataDir.mockResolvedValueOnce('/mock/app-data/tallya');
+
+    await service.openDataDirectory();
+
+    expect(tauriMocks.openPath).toHaveBeenCalledWith('/mock/app-data/tallya');
   });
 });
 

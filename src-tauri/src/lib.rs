@@ -740,6 +740,55 @@ mod tests {
         assert!(prompt.contains("\"reportType\":\"custom\""));
     }
 
+    #[test]
+    fn normalize_codex_model_uses_fast_default_for_empty_input() {
+        assert_eq!(normalize_codex_model(""), "gpt-5.4-mini");
+        assert_eq!(normalize_codex_model("  gpt-5.5  "), "gpt-5.5");
+    }
+
+    #[test]
+    fn command_candidates_reject_empty_commands() {
+        assert!(get_command_candidates("   ").is_err());
+    }
+
+    #[test]
+    fn command_candidates_are_cross_platform_safe() {
+        let candidates = get_command_candidates("codex").expect("codex command candidates");
+
+        #[cfg(target_os = "windows")]
+        assert_eq!(candidates, vec!["codex", "codex.cmd", "codex.exe"]);
+
+        #[cfg(not(target_os = "windows"))]
+        assert_eq!(candidates, vec!["codex"]);
+    }
+
+    #[test]
+    fn parse_daily_memory_rejects_empty_and_invalid_json_without_running_codex() {
+        let input = GenerateDailyMemoryInput {
+            date: "2026-06-08".to_string(),
+            raw_content: "work note".to_string(),
+            supplements: None,
+        };
+
+        assert!(parse_generated_daily_memory("", &input).is_err());
+        assert!(parse_generated_daily_memory("not json", &input).is_err());
+    }
+
+    #[test]
+    fn parse_range_report_rejects_empty_and_invalid_json_without_running_codex() {
+        let input = weekly_input("standard", "natural", "outcomes").into_range_report_input();
+
+        assert!(parse_generated_range_report("", &input).is_err());
+        assert!(parse_generated_range_report("not json", &input).is_err());
+    }
+
+    #[test]
+    fn normalize_report_text_collapses_extra_blank_lines() {
+        let normalized = normalize_report_text("# Title\n\n\n## Summary\n\nText\n\n\n- A");
+
+        assert_eq!(normalized, "# Title\n\n## Summary\n\nText\n\n- A");
+    }
+
     fn weekly_input(
         report_length: &str,
         report_tone: &str,
