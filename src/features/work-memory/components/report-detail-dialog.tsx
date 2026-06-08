@@ -44,6 +44,7 @@ export function ReportDetailDialog({
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const content = report ? normalizeReportContent(report.content) : null;
   const isCustomReport = report?.type === 'custom';
+  const isStale = report?.status === 'stale';
 
   function handleConfirmRegenerate() {
     setIsConfirmOpen(false);
@@ -74,6 +75,11 @@ export function ReportDetailDialog({
             </DialogTitle>
           </DialogHeader>
           <TallyaScrollArea className="min-h-0 max-h-[calc(100vh-190px)] flex-1 px-6 pb-5">
+            {isStale ? (
+              <p className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-[13px] leading-[1.5] text-amber-800 dark:bg-amber-500/10 dark:text-amber-200">
+                这份报告引用的工作记忆已更新，建议重新生成。
+              </p>
+            ) : null}
             <ReportDocument
               content={content}
               fallbackTitle={report?.title ?? (isCustomReport ? '工作总结' : '本周周报')}

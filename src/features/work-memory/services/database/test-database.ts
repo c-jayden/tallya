@@ -116,6 +116,30 @@ export class TestDatabaseClient implements DatabaseClient {
       return;
     }
 
+    if (normalizedQuery.startsWith('update reports set status =')) {
+      const dailyMemoryId = String(bindValues[0]);
+      const updatedAt = String(bindValues[1]);
+      const reportIds = new Set(
+        Array.from(this.reportSources.values())
+          .filter((source) => source.daily_memory_id === dailyMemoryId)
+          .map((source) => source.report_id),
+      );
+
+      for (const reportId of reportIds) {
+        const report = this.reports.get(reportId);
+
+        if (report) {
+          this.reports.set(reportId, {
+            ...report,
+            status: 'stale',
+            updated_at: updatedAt,
+          });
+        }
+      }
+
+      return;
+    }
+
     if (normalizedQuery.startsWith('delete from daily_memories')) {
       this.dailyMemories.clear();
       return;
@@ -236,9 +260,22 @@ export class TestDatabaseClient implements DatabaseClient {
     }
 
     if (normalizedQuery.startsWith('select * from report_sources where daily_memory_id =')) {
-      return Array.from(this.reportSources.values())
+      const rows = Array.from(this.reportSources.values())
         .filter((row) => row.daily_memory_id === String(bindValues[0]))
-        .slice(0, 1) as T;
+        .sort((first, second) => first.id.localeCompare(second.id));
+
+      return (normalizedQuery.includes('limit 1') ? rows.slice(0, 1) : rows) as T;
+    }
+
+    if (normalizedQuery.startsWith('select reports.* from reports inner join report_sources')) {
+      const reportIds = Array.from(this.reportSources.values())
+        .filter((row) => row.daily_memory_id === String(bindValues[0]))
+        .map((row) => row.report_id);
+
+      return reportIds
+        .map((reportId) => this.reports.get(reportId))
+        .filter((row): row is ReportRow => Boolean(row))
+        .sort(compareReportRowsByGeneratedTimeDesc) as T;
     }
 
     return [] as T;

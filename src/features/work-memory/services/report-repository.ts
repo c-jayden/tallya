@@ -106,7 +106,24 @@ export class SQLiteReportRepository {
     }, []);
   }
 
+  async getReportSourcesByDailyMemoryId(dailyMemoryId: string) {
+    return this.read(async (database) => {
+      const rows = await database.select<ReportSourceRow[]>(
+        'SELECT * FROM report_sources WHERE daily_memory_id = $1 ORDER BY id ASC',
+        [dailyMemoryId],
+      );
+
+      return rows
+        .map(normalizeReportSourceRow)
+        .filter((source): source is ReportSource => source !== null);
+    }, []);
+  }
+
   async hasReportSourceForDailyMemory(dailyMemoryId: string) {
+    return this.hasReportsUsingDailyMemory(dailyMemoryId);
+  }
+
+  async hasReportsUsingDailyMemory(dailyMemoryId: string) {
     return this.read(async (database) => {
       const rows = await database.select<ReportSourceRow[]>(
         'SELECT * FROM report_sources WHERE daily_memory_id = $1 LIMIT 1',
@@ -115,6 +132,43 @@ export class SQLiteReportRepository {
 
       return rows.length > 0;
     }, false);
+  }
+
+  async getReportsUsingDailyMemory(dailyMemoryId: string) {
+    return this.read(async (database) => {
+      const rows = await database.select<ReportRow[]>(
+        `
+          SELECT reports.*
+          FROM reports
+          INNER JOIN report_sources ON report_sources.report_id = reports.id
+          WHERE report_sources.daily_memory_id = $1
+          ORDER BY COALESCE(reports.generated_at, reports.created_at) DESC, reports.created_at DESC
+        `,
+        [dailyMemoryId],
+      );
+
+      return rows
+        .map(normalizeReportRow)
+        .filter((report): report is Report => report !== null);
+    }, []);
+  }
+
+  async markReportsStaleByDailyMemoryId(dailyMemoryId: string) {
+    await this.write(async (database) => {
+      await database.execute(
+        `
+          UPDATE reports
+          SET status = 'stale',
+              updated_at = $2
+          WHERE id IN (
+            SELECT report_id
+            FROM report_sources
+            WHERE daily_memory_id = $1
+          )
+        `,
+        [dailyMemoryId, new Date().toISOString()],
+      );
+    });
   }
 
   async saveReport(report: Report) {

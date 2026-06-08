@@ -286,6 +286,51 @@ describe('createReportService', () => {
     expect(saveReport).toHaveBeenCalledWith(report);
   });
 
+  it('restores a stale report to generated and rewrites sources when saving regeneration', async () => {
+    const existingReport = createReport({
+      id: 'stale-weekly-report',
+      status: 'stale',
+      createdAt: '2026-06-07T01:00:00.000Z',
+      updatedAt: '2026-06-08T01:00:00.000Z',
+      generatedAt: '2026-06-07T01:00:00.000Z',
+    });
+    const memory = createMemory('2026-06-01', 'generated');
+    const saveReport = vi.fn();
+    const saveReportSources = vi.fn();
+    const deleteReportSources = vi.fn();
+    const service = createService({
+      memories: [memory],
+      reportRepository: createReportRepository({
+        getReportByTypeAndRange: vi.fn().mockResolvedValue(existingReport),
+        saveReport,
+        saveReportSources,
+        deleteReportSources,
+      }),
+    });
+
+    const report = await service.saveWeeklyReport({
+      startDate: '2026-06-01',
+      endDate: '2026-06-07',
+      memories: [memory],
+      generated: generatedReport,
+      existingReport,
+    });
+
+    expect(report).toEqual(
+      expect.objectContaining({
+        id: existingReport.id,
+        status: 'generated',
+        createdAt: existingReport.createdAt,
+        updatedAt: '2026-06-03T10:00:00.000Z',
+        generatedAt: '2026-06-03T10:00:00.000Z',
+      }),
+    );
+    expect(deleteReportSources).toHaveBeenCalledWith(existingReport.id);
+    expect(saveReportSources).toHaveBeenCalledWith(existingReport.id, [
+      expect.objectContaining({ id: memory.id, updatedAt: memory.updatedAt }),
+    ]);
+  });
+
   it('returns a friendly error when AI weekly output cannot be parsed', async () => {
     const service = createService({
       memories: [createMemory('2026-06-01', 'generated')],

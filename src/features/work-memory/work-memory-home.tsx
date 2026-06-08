@@ -312,9 +312,9 @@ export function WorkMemoryHome() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>这一天的工作记忆已被报告引用</AlertDialogTitle>
+            <AlertDialogTitle>这天的记忆已被报告引用</AlertDialogTitle>
             <AlertDialogDescription>
-              修改后，相关报告可能需要重新生成。
+              更新后，相关报告可能需要重新生成。
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -323,7 +323,7 @@ export function WorkMemoryHome() {
               className="cursor-pointer"
               onClick={memory.confirmReferencedMemorySave}
             >
-              继续保存
+              继续更新
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

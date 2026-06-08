@@ -167,6 +167,71 @@ describe('SQLiteReportRepository', () => {
       false,
     );
   });
+
+  it('reads reports and sources that use a daily memory', async () => {
+    const repository = createRepository();
+    const firstReport = createReport({ id: 'weekly-2026-06-01' });
+    const secondReport = createReport({
+      id: 'custom-2026-06-01-2026-06-03',
+      type: 'custom',
+      startDate: '2026-06-01',
+      endDate: '2026-06-03',
+      generatedAt: '2026-06-09T01:00:00.000Z',
+      createdAt: '2026-06-09T01:00:00.000Z',
+      updatedAt: '2026-06-09T01:00:00.000Z',
+    });
+    const memory = createDailyMemory('2026-06-01');
+
+    await repository.saveReport(firstReport);
+    await repository.saveReport(secondReport);
+    await repository.saveReportSources(firstReport.id, [memory]);
+    await repository.saveReportSources(secondReport.id, [memory]);
+
+    await expect(repository.getReportSourcesByDailyMemoryId(memory.id)).resolves.toEqual([
+      expect.objectContaining({ reportId: secondReport.id, dailyMemoryId: memory.id }),
+      expect.objectContaining({ reportId: firstReport.id, dailyMemoryId: memory.id }),
+    ]);
+    await expect(repository.hasReportsUsingDailyMemory(memory.id)).resolves.toBe(true);
+    await expect(repository.getReportsUsingDailyMemory(memory.id)).resolves.toEqual([
+      expect.objectContaining({ id: secondReport.id }),
+      expect.objectContaining({ id: firstReport.id }),
+    ]);
+  });
+
+  it('marks every report using a daily memory as stale without deleting sources', async () => {
+    const repository = createRepository();
+    const firstReport = createReport({ id: 'weekly-2026-06-01' });
+    const secondReport = createReport({
+      id: 'custom-2026-06-01-2026-06-03',
+      type: 'custom',
+      startDate: '2026-06-01',
+      endDate: '2026-06-03',
+    });
+    const unrelatedReport = createReport({ id: 'weekly-2026-06-08' });
+    const memory = createDailyMemory('2026-06-01');
+    const unrelatedMemory = createDailyMemory('2026-06-08');
+
+    await repository.saveReport(firstReport);
+    await repository.saveReport(secondReport);
+    await repository.saveReport(unrelatedReport);
+    await repository.saveReportSources(firstReport.id, [memory]);
+    await repository.saveReportSources(secondReport.id, [memory]);
+    await repository.saveReportSources(unrelatedReport.id, [unrelatedMemory]);
+
+    await repository.markReportsStaleByDailyMemoryId(memory.id);
+
+    await expect(repository.getReportById(firstReport.id)).resolves.toEqual(
+      expect.objectContaining({ status: 'stale' }),
+    );
+    await expect(repository.getReportById(secondReport.id)).resolves.toEqual(
+      expect.objectContaining({ status: 'stale' }),
+    );
+    await expect(repository.getReportById(unrelatedReport.id)).resolves.toEqual(
+      expect.objectContaining({ status: 'generated' }),
+    );
+    await expect(repository.getReportSources(firstReport.id)).resolves.toHaveLength(1);
+    await expect(repository.getReportSources(secondReport.id)).resolves.toHaveLength(1);
+  });
 });
 
 function createRepository(database = new TestDatabaseClient()) {

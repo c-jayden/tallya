@@ -4,6 +4,7 @@ import {
   formatRecentMemoryDate,
   getMemoryStatusSummary,
   getWeeklySnapshotFromMemories,
+  shouldConfirmReferencedMemoryUpdate,
 } from './memory-view-model';
 import type { DailyMemory } from './types';
 
@@ -243,6 +244,41 @@ describe('getMemoryStatusSummary', () => {
 
     expect(summary.title).toBe('本周周报已生成');
     expect(summary.actions.canViewReports).toBe(true);
+  });
+});
+
+describe('shouldConfirmReferencedMemoryUpdate', () => {
+  it('prompts only when updating a referenced formal memory', () => {
+    expect(
+      shouldConfirmReferencedMemoryUpdate({
+        isReferenced: true,
+        currentStatus: 'generated',
+      }),
+    ).toBe(true);
+    expect(
+      shouldConfirmReferencedMemoryUpdate({
+        isReferenced: true,
+        currentStatus: 'locked',
+      }),
+    ).toBe(true);
+    expect(
+      shouldConfirmReferencedMemoryUpdate({
+        isReferenced: true,
+        currentStatus: 'draft',
+      }),
+    ).toBe(false);
+    expect(
+      shouldConfirmReferencedMemoryUpdate({
+        isReferenced: false,
+        currentStatus: 'generated',
+      }),
+    ).toBe(false);
+    expect(
+      shouldConfirmReferencedMemoryUpdate({
+        isReferenced: true,
+        currentStatus: null,
+      }),
+    ).toBe(false);
   });
 });
 

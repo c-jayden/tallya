@@ -294,6 +294,16 @@ export function getMemoryStatusSummary({
   };
 }
 
+export function shouldConfirmReferencedMemoryUpdate({
+  isReferenced,
+  currentStatus,
+}: {
+  isReferenced: boolean;
+  currentStatus: DailyMemory['status'] | null;
+}) {
+  return isReferenced && (currentStatus === 'generated' || currentStatus === 'locked');
+}
+
 function getWeekDateRange(currentDate: string) {
   const current = getMemoryDate(currentDate);
   const day = current.getDay();

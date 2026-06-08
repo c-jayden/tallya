@@ -15,6 +15,7 @@ import {
   getGeneratedMemories,
   getTodayMemoryState,
   getWeeklySnapshotFromMemories,
+  shouldConfirmReferencedMemoryUpdate,
 } from '../memory-view-model';
 import { aiService } from '../services/ai/ai-service';
 import { dailyMemoryRepository } from '../services/daily-memory-repository';
@@ -32,7 +33,7 @@ type UseWorkMemoryControllerOptions = {
   todayDate: string;
 };
 
-type PendingReferencedSaveAction = 'draft' | 'generated';
+type PendingReferencedSaveAction = 'generated';
 
 export function useWorkMemoryController({ currentDate, todayDate }: UseWorkMemoryControllerOptions) {
   const [workNote, setWorkNote] = useState('');
@@ -212,7 +213,7 @@ export function useWorkMemoryController({ currentDate, todayDate }: UseWorkMemor
     void Promise.all([dailyMemoryRepository.getByDate(currentDate), dailyMemoryRepository.list()])
       .then(async ([memory, memories]) => {
         const isReferenced = memory
-          ? await reportRepository.hasReportSourceForDailyMemory(memory.id)
+          ? await reportRepository.hasReportsUsingDailyMemory(memory.id)
           : false;
 
         return { memory, memories, isReferenced };
@@ -254,11 +255,6 @@ export function useWorkMemoryController({ currentDate, todayDate }: UseWorkMemor
   }
 
   async function saveDraft() {
-    if (shouldConfirmReferencedMemorySave()) {
-      setPendingReferencedSaveAction('draft');
-      return;
-    }
-
     await saveDraftWithoutReferenceCheck();
   }
 
@@ -313,6 +309,11 @@ export function useWorkMemoryController({ currentDate, todayDate }: UseWorkMemor
         ...buildDailyMemoryInput(),
         generated: generatedPreview,
       });
+
+      if (isCurrentMemoryReferenced && currentMemory) {
+        await reportRepository.markReportsStaleByDailyMemoryId(currentMemory.id);
+      }
+
       const memories = await dailyMemoryRepository.list();
 
       setCurrentMemory(memory);
@@ -324,7 +325,6 @@ export function useWorkMemoryController({ currentDate, todayDate }: UseWorkMemor
       }));
       setWeeklySnapshot(getWeeklySnapshotFromMemories(memories, todayDate));
       setIsPreviewOpen(false);
-      // TODO: Mark reports that reference this memory as stale after stale propagation is implemented.
       toast.success(getDailyMemorySaveSuccessToast(isSelectedDateToday));
     } catch (error) {
       const message = error instanceof Error ? error.message : '今日记忆保存失败，请稍后重试。';
@@ -340,11 +340,6 @@ export function useWorkMemoryController({ currentDate, todayDate }: UseWorkMemor
 
     setPendingReferencedSaveAction(null);
 
-    if (action === 'draft') {
-      await saveDraftWithoutReferenceCheck();
-      return;
-    }
-
     if (action === 'generated') {
       await saveGeneratedMemoryWithoutReferenceCheck();
     }
@@ -356,9 +351,10 @@ export function useWorkMemoryController({ currentDate, todayDate }: UseWorkMemor
 
   function shouldConfirmReferencedMemorySave() {
     return (
-      isCurrentMemoryReferenced &&
-      currentMemory !== null &&
-      currentMemory.status !== 'draft' &&
+      shouldConfirmReferencedMemoryUpdate({
+        isReferenced: isCurrentMemoryReferenced,
+        currentStatus: currentMemory?.status ?? null,
+      }) &&
       pendingReferencedSaveAction === null
     );
   }
