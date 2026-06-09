@@ -27,6 +27,10 @@ export function SettingsDialog({
   const settingsState = useSettingsDialogState({ open, onClearLocalData, onDataRestored });
 
   function handleOpenChange(nextOpen: boolean) {
+    if (!nextOpen && settingsState.isImportingBackup) {
+      return;
+    }
+
     if (!nextOpen) {
       settingsState.resetTransientState();
     }

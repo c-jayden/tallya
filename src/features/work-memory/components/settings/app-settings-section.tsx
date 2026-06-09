@@ -66,16 +66,6 @@ export function AppSettingsSection({ settings, onUpdateSettings }: AppSettingsSe
           onCheckedChange={(checked) => onUpdateSettings({ startMinimized: checked })}
         />
       </div>
-
-      <Separator />
-
-      <div className="space-y-2">
-        <h3 className="text-sm font-semibold text-app-ink">快捷键</h3>
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-app-ink-muted">搜索记忆</span>
-          <span className="font-medium text-app-ink">Ctrl/Cmd + K</span>
-        </div>
-      </div>
     </section>
   );
 }

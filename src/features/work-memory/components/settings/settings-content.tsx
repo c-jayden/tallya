@@ -5,6 +5,7 @@ import { AboutSettingsSection } from './about-settings-section';
 import { AISettingsSection } from './ai-settings-section';
 import { AppSettingsSection } from './app-settings-section';
 import { DataSettingsSection } from './data-settings-section';
+import { KeyboardShortcutsSettingsSection } from './keyboard-shortcuts-settings-section';
 import { NotificationSettingsSection } from './notification-settings-section';
 import { ReportPreferencesSettingsSection } from './report-preferences-settings-section';
 import type { ProviderHealth, SettingsSection } from './settings-types';
@@ -98,6 +99,10 @@ function SettingsSectionContent({
 
   if (activeSection === 'app') {
     return <AppSettingsSection settings={settings} onUpdateSettings={onUpdateSettings} />;
+  }
+
+  if (activeSection === 'shortcuts') {
+    return <KeyboardShortcutsSettingsSection />;
   }
 
   if (activeSection === 'data') {

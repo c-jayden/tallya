@@ -27,6 +27,7 @@ import { ReportListDialog } from './components/report-list-dialog';
 import { ReportPreviewDialog } from './components/report-preview-dialog';
 import { SettingsDialog } from './components/settings-dialog';
 import { SpotlightSearchPanel } from './components/spotlight-search-panel';
+import { getCommandKeyLabel } from '@/lib/platform';
 import { useHomeWindowSizing } from './hooks/use-home-window-sizing';
 import { useMemorySearch } from './hooks/use-memory-search';
 import { useTrayWindowEvents } from './hooks/use-tray-window-events';
@@ -43,17 +44,11 @@ import { getMemoryStatusSummary, getStatusVariant } from './memory-view-model';
 import { getDailyMemoryDate } from './services/daily-memory-repository';
 import type { DailyMemory } from './types';
 
-function getCommandKey() {
-  return typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/i.test(navigator.platform)
-    ? 'Cmd'
-    : 'Ctrl';
-}
-
 export function WorkMemoryHome() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const todayDate = getDailyMemoryDate(today);
   const [selectedDate, setSelectedDate] = useState(todayDate);
-  const commandKey = getCommandKey();
+  const commandKey = getCommandKeyLabel();
   const contentRef = useHomeWindowSizing();
   const memory = useWorkMemoryController({ currentDate: selectedDate, todayDate });
   const search = useMemorySearch({ onOpenMemory: memory.openMemoryDetail });

@@ -9,6 +9,7 @@ describe('settings menu order', () => {
       'ai',
       'reports',
       'notifications',
+      'shortcuts',
       'data',
       'about',
     ]);

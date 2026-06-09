@@ -205,7 +205,7 @@ export function useSettingsDialogState({
       toast.success('本地数据已清空');
       setIsClearConfirmOpen(false);
     } catch {
-      toast.error('清空本地数据失败，请稍后重试');
+      toast.error('清空本地数据失败');
     } finally {
       setIsClearingData(false);
     }
@@ -291,7 +291,8 @@ export function useSettingsDialogState({
 
     try {
       await backupService.openDataDirectory();
-    } catch {
+    } catch (error) {
+      console.error('Failed to open data directory', error);
       toast.error('打开数据目录失败');
     } finally {
       setIsOpeningDataDirectory(false);

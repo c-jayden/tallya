@@ -2,7 +2,14 @@ import type { AppTheme } from '../../services/app-settings-repository';
 import type { ProviderHealth } from '../../services/ai/ai-provider';
 import type { ReportFocus, ReportLength, ReportTone } from '../../types';
 
-export type SettingsSection = 'ai' | 'notifications' | 'reports' | 'app' | 'data' | 'about';
+export type SettingsSection =
+  | 'app'
+  | 'ai'
+  | 'reports'
+  | 'notifications'
+  | 'shortcuts'
+  | 'data'
+  | 'about';
 
 export type { ProviderHealth };
 
@@ -13,6 +20,7 @@ export const menuItems: { id: SettingsSection; label: string }[] = [
   { id: 'ai', label: 'AI 配置' },
   { id: 'reports', label: '报告偏好' },
   { id: 'notifications', label: '通知提醒' },
+  { id: 'shortcuts', label: '快捷键' },
   { id: 'data', label: '数据管理' },
   { id: 'about', label: '关于' },
 ];

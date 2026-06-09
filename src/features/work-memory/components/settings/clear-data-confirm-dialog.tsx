@@ -1,4 +1,5 @@
 import { Loader2 } from 'lucide-react';
+import { useState } from 'react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -9,6 +10,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Input } from '@/components/ui/input';
 
 type ClearDataConfirmDialogProps = {
   open: boolean;
@@ -17,29 +19,58 @@ type ClearDataConfirmDialogProps = {
   onConfirm: () => Promise<void>;
 };
 
+const CLEAR_DATA_CONFIRM_TEXT = '清空本地数据';
+
 export function ClearDataConfirmDialog({
   open,
   isClearingData,
   onOpenChange,
   onConfirm,
 }: ClearDataConfirmDialogProps) {
+  const [confirmText, setConfirmText] = useState('');
+  const canConfirm = confirmText === CLEAR_DATA_CONFIRM_TEXT;
+
+  function handleOpenChange(nextOpen: boolean) {
+    if (!nextOpen) {
+      setConfirmText('');
+    }
+
+    onOpenChange(nextOpen);
+  }
+
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
+    <AlertDialog open={open} onOpenChange={handleOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>确定要清空本地数据吗？</AlertDialogTitle>
+          <AlertDialogTitle>清空本地数据？</AlertDialogTitle>
           <AlertDialogDescription>
-            此操作会删除已保存的工作记忆和草稿，无法恢复。
+            此操作会删除已保存的工作记忆、草稿和报告。应用设置会保留。此操作无法恢复。
           </AlertDialogDescription>
         </AlertDialogHeader>
+        <div className="space-y-2">
+          <label htmlFor="clear-data-confirm-input" className="text-sm text-app-ink-muted">
+            请输入“清空本地数据”以确认。
+          </label>
+          <Input
+            id="clear-data-confirm-input"
+            value={confirmText}
+            onChange={(event) => setConfirmText(event.target.value)}
+            placeholder={CLEAR_DATA_CONFIRM_TEXT}
+            disabled={isClearingData}
+            autoComplete="off"
+          />
+        </div>
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={isClearingData}>取消</AlertDialogCancel>
+          <AlertDialogCancel className="cursor-pointer" disabled={isClearingData}>
+            取消
+          </AlertDialogCancel>
           <AlertDialogAction
             variant="destructive"
-            disabled={isClearingData}
+            disabled={isClearingData || !canConfirm}
+            className="cursor-pointer disabled:cursor-not-allowed"
             onClick={(event) => {
               event.preventDefault();
-              void onConfirm();
+              void onConfirm().then(() => setConfirmText(''));
             }}
           >
             {isClearingData && <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />}

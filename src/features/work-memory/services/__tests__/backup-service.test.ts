@@ -161,7 +161,28 @@ describe('backup-service', () => {
 
     await service.openDataDirectory();
 
+    expect(tauriMocks.mkdir).toHaveBeenCalledWith('/mock/app-data/tallya', {
+      recursive: true,
+    });
     expect(tauriMocks.openPath).toHaveBeenCalledWith('/mock/app-data/tallya');
+    expect(tauriMocks.mkdir.mock.invocationCallOrder[0]).toBeLessThan(
+      tauriMocks.openPath.mock.invocationCallOrder[0],
+    );
+  });
+
+  it('returns null without reading a file when backup import selection is cancelled', async () => {
+    const service = createBackupService({
+      appVersion: '0.1.0',
+      now: () => new Date('2026-06-08T10:00:00.000Z'),
+      dailyMemoryRepository: createDailyMemoryRepository(),
+      reportRepository: createReportRepository(),
+      appSettingsRepository: createAppSettingsRepository(),
+    });
+    tauriMocks.dialogOpen.mockResolvedValueOnce(null);
+
+    await expect(service.selectBackupFile()).resolves.toBeNull();
+
+    expect(tauriMocks.readTextFile).not.toHaveBeenCalled();
   });
 });
 

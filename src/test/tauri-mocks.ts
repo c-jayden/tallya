@@ -23,6 +23,9 @@ export const tauriMocks = {
   dialogSave: vi.fn<() => Promise<string | null>>(async () => null),
   readTextFile: vi.fn<(path: string) => Promise<string>>(async () => ''),
   writeTextFile: vi.fn<(path: string, contents: string) => Promise<void>>(async () => undefined),
+  mkdir: vi.fn<(path: string, options?: { recursive?: boolean }) => Promise<void>>(
+    async () => undefined,
+  ),
   openPath: vi.fn<(path: string) => Promise<void>>(async () => undefined),
   appDataDir: vi.fn<() => Promise<string>>(async () => '/mock/app-data'),
   sendNotification: vi.fn<(...args: unknown[]) => Promise<void>>(async () => undefined),
@@ -72,6 +75,7 @@ export function resetTauriMocks() {
   tauriMocks.dialogSave.mockResolvedValue(null);
   tauriMocks.readTextFile.mockResolvedValue('');
   tauriMocks.writeTextFile.mockResolvedValue(undefined);
+  tauriMocks.mkdir.mockResolvedValue(undefined);
   tauriMocks.openPath.mockResolvedValue(undefined);
   tauriMocks.appDataDir.mockResolvedValue('/mock/app-data');
   tauriMocks.sendNotification.mockResolvedValue(undefined);
@@ -115,6 +119,7 @@ vi.mock('@tauri-apps/plugin-dialog', () => ({
 }));
 
 vi.mock('@tauri-apps/plugin-fs', () => ({
+  mkdir: tauriMocks.mkdir,
   readTextFile: tauriMocks.readTextFile,
   writeTextFile: tauriMocks.writeTextFile,
 }));

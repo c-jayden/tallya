@@ -112,9 +112,12 @@ export function createBackupService(dependencies: BackupServiceDependencies) {
     },
 
     async openDataDirectory() {
+      const { mkdir } = await import('@tauri-apps/plugin-fs');
       const { openPath } = await import('@tauri-apps/plugin-opener');
+      const dataDirectory = await appDataDir();
 
-      await openPath(await appDataDir());
+      await mkdir(dataDirectory, { recursive: true });
+      await openPath(dataDirectory);
     },
   };
 }
