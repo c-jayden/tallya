@@ -138,7 +138,7 @@ export function WorkMemoryHome() {
 
   function editOriginalRecord(memoryItem: DailyMemory) {
     updateSelectedDate(memoryItem.date);
-    memory.editOriginalRecord(memoryItem);
+    void memory.editOriginalRecord(memoryItem);
   }
 
   return (
@@ -223,7 +223,9 @@ export function WorkMemoryHome() {
         open={memory.isMemoryListOpen}
         items={memory.memoryListItems}
         currentDate={todayDate}
+        referencedMemoryIds={memory.referencedMemoryIds}
         onOpenChange={memory.setIsMemoryListOpen}
+        onCopyDailyReport={memory.copyMemoryDailyReport}
         onEditOriginal={editOriginalRecord}
       />
       <SpotlightSearchPanel
@@ -246,8 +248,10 @@ export function WorkMemoryHome() {
       <MemoryDetailDialog
         open={memory.isMemoryDialogOpen}
         memory={memory.viewingMemory}
-        currentDate={todayDate}
+        currentDate={selectedDate}
+        isReferencedByReport={memory.isViewingMemoryReferenced}
         onOpenChange={memory.setIsMemoryDialogOpen}
+        onCopyDailyReport={memory.copyViewingMemoryDailyReport}
         onEditOriginal={() => {
           if (memory.viewingMemory) {
             editOriginalRecord(memory.viewingMemory);

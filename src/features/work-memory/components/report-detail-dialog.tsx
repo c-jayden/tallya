@@ -116,7 +116,7 @@ export function ReportDetailDialog({
             </Button>
             <Button
               type="button"
-              className="h-9 min-w-28 cursor-pointer gap-2 rounded-xl bg-app-accent px-3.5 text-app-accent-ink hover:bg-[color-mix(in_srgb,var(--app-accent)_86%,var(--app-surface-muted))] disabled:cursor-not-allowed disabled:bg-app-surface-muted disabled:text-app-ink-muted disabled:opacity-100 disabled:hover:bg-app-surface-muted"
+              className="cursor-pointer bg-app-accent text-app-accent-ink hover:bg-[color-mix(in_srgb,var(--app-accent)_86%,var(--app-surface-muted))] disabled:cursor-not-allowed disabled:bg-app-surface-muted disabled:text-app-ink-muted disabled:opacity-100 disabled:hover:bg-app-surface-muted"
               onClick={() => setIsConfirmOpen(true)}
               disabled={!report || isRegenerating}
               aria-busy={isRegenerating}

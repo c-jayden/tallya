@@ -18,6 +18,7 @@ import {
   shouldConfirmReferencedMemoryUpdate,
 } from '../memory-view-model';
 import { aiService } from '../services/ai/ai-service';
+import { copyDailyMemoryReport } from '../services/daily-memory-clipboard';
 import { dailyMemoryRepository } from '../services/daily-memory-repository';
 import { reportRepository } from '../services/report-repository';
 import type {
@@ -66,9 +67,11 @@ export function useWorkMemoryController({ currentDate, todayDate }: UseWorkMemor
     null,
   );
   const [viewingMemory, setViewingMemory] = useState<DailyMemory | null>(null);
+  const [isViewingMemoryReferenced, setIsViewingMemoryReferenced] = useState(false);
   const [isMemoryDialogOpen, setIsMemoryDialogOpen] = useState(false);
   const [isMemoryListOpen, setIsMemoryListOpen] = useState(false);
   const [memoryListItems, setMemoryListItems] = useState<DailyMemory[]>([]);
+  const [referencedMemoryIds, setReferencedMemoryIds] = useState<string[]>([]);
   const workNoteInputRef = useRef<HTMLTextAreaElement>(null);
   const primaryActionRef = useRef<HTMLButtonElement>(null);
   const pulseTimeoutsRef = useRef<number[]>([]);
@@ -370,7 +373,13 @@ export function useWorkMemoryController({ currentDate, todayDate }: UseWorkMemor
   }
 
   async function viewMemoryList() {
-    setMemoryListItems(await dailyMemoryRepository.getGeneratedMemories());
+    const [items, sources] = await Promise.all([
+      dailyMemoryRepository.getGeneratedMemories(),
+      reportRepository.getAllReportSources(),
+    ]);
+
+    setMemoryListItems(items);
+    setReferencedMemoryIds([...new Set(sources.map((source) => source.dailyMemoryId))]);
     setIsMemoryListOpen(true);
   }
 
@@ -388,7 +397,9 @@ export function useWorkMemoryController({ currentDate, todayDate }: UseWorkMemor
     setIsSupplementOpen(false);
     setGeneratedPreview(null);
     setViewingMemory(null);
+    setIsViewingMemoryReferenced(false);
     setMemoryListItems([]);
+    setReferencedMemoryIds([]);
     setIsPreviewOpen(false);
     setIsMemoryDialogOpen(false);
     setIsMemoryListOpen(false);
@@ -401,6 +412,7 @@ export function useWorkMemoryController({ currentDate, todayDate }: UseWorkMemor
     setIsCurrentMemoryReferenced(isReferenced);
     setGeneratedPreview(null);
     setViewingMemory(null);
+    setIsViewingMemoryReferenced(false);
     setMemoryListItems(getGeneratedMemories(memories));
     setIsPreviewOpen(false);
     setIsMemoryDialogOpen(false);
@@ -415,12 +427,20 @@ export function useWorkMemoryController({ currentDate, todayDate }: UseWorkMemor
     }
 
     setViewingMemory(memory);
+    setIsViewingMemoryReferenced(false);
     setIsMemoryListOpen(false);
     setIsMemoryDialogOpen(true);
+    void reportRepository
+      .hasReportsUsingDailyMemory(memory.id)
+      .then(setIsViewingMemoryReferenced)
+      .catch(() => setIsViewingMemoryReferenced(false));
   }
 
-  function editOriginalRecord(memory = viewingMemory) {
+  async function editOriginalRecord(memory = viewingMemory) {
     if (memory) {
+      const isReferenced = await reportRepository.hasReportsUsingDailyMemory(memory.id);
+
+      setIsCurrentMemoryReferenced(isReferenced);
       applyDailyMemory(memory, memories);
     }
 
@@ -428,10 +448,31 @@ export function useWorkMemoryController({ currentDate, todayDate }: UseWorkMemor
     setIsMemoryDialogOpen(false);
   }
 
+  async function copyMemoryDailyReport(memory: DailyMemory | null) {
+    if (!memory) {
+      return;
+    }
+
+    try {
+      await copyDailyMemoryReport(memory);
+      toast.success('日报已复制');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '复制失败，请稍后重试';
+
+      toast.error(message);
+    }
+  }
+
+  async function copyViewingMemoryDailyReport() {
+    await copyMemoryDailyReport(viewingMemory);
+  }
+
   return {
     activeSupplementFields,
     clearLocalData,
     currentMemory,
+    copyViewingMemoryDailyReport,
+    copyMemoryDailyReport,
     editOriginalRecord,
     generatedPreview,
     previewDescription: previewCopy.description,
@@ -442,12 +483,14 @@ export function useWorkMemoryController({ currentDate, todayDate }: UseWorkMemor
     isLocked,
     isMemoryDialogOpen,
     isMemoryListOpen,
+    isViewingMemoryReferenced,
     isPreviewOpen,
     isSavingDraft,
     isSavingGeneratedMemory,
     isSupplementOpen,
     isReferenceConfirmOpen: pendingReferencedSaveAction !== null,
     memoryListItems,
+    referencedMemoryIds,
     memories,
     openMemoryDetail,
     primaryActionLabel,

@@ -517,6 +517,7 @@ function getSearchableMemoryText(memory: DailyMemory) {
     generated?.problems,
     generated?.tomorrowPlan,
     generated?.extraNote,
+    generated?.dailyReportText,
   ];
 
   return parts
@@ -620,6 +621,7 @@ function normalizeGenerated(value: unknown): DailyMemoryGeneratedContent | null 
     problems: getOptionalString(input.problems),
     tomorrowPlan: getOptionalString(input.tomorrowPlan),
     extraNote: getOptionalString(input.extraNote),
+    dailyReportText: getOptionalString(input.dailyReportText),
   };
 }
 

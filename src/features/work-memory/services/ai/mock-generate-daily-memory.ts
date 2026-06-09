@@ -33,5 +33,6 @@ export async function mockGenerateDailyMemory(
     problems: undefined,
     tomorrowPlan: supplements.tomorrowPlan?.trim() || undefined,
     extraNote: supplements.extraNote?.trim() || undefined,
+    dailyReportText: `${summaryPrefix}${firstSentence(input.rawContent)}`,
   };
 }

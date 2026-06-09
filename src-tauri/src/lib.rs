@@ -76,6 +76,8 @@ struct GeneratedDailyMemory {
     tomorrow_plan: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     extra_note: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    daily_report_text: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -602,8 +604,9 @@ fn build_codex_prompt(input: &GenerateDailyMemoryInput) -> String {
     // instead of prose that would be hard to validate or recover from.
     format!(
         r#"把输入整理为中文今日工作记忆。只输出合法 JSON，不要 markdown、解释、代码块或工具调用。
-JSON keys: summary:string, completedItems:string[], keyOutcome?:string, problems?:string, tomorrowPlan?:string, extraNote?:string.
+JSON keys: summary:string, completedItems:string[], keyOutcome?:string, problems?:string, tomorrowPlan?:string, extraNote?:string, dailyReportText?:string.
 规则：不编造；只做轻度归纳和润色；未提及的可选字段用 "" 或省略。completedItems 必须是字符串数组，控制在 3-5 条；合并相近事项；每条尽量是完整动作；不要把同一件事拆成过多细碎步骤。keyOutcome 有明确可交付成果时直接提炼；没有明确成果但有多个完成事项时，保守总结一个阶段性产出；不要虚构业务结果或夸大价值。输入很少且无法判断时才留空。
+dailyReportText 是适合复制到企业微信、飞书、日报表格或公司日报系统的日报文本；基于输入和结构化结果轻度整理，不要照抄原文，不要写成周报、复盘报告或领导评价。默认优先一段自然文本；信息明显分为完成事项、问题、计划时可分点，但最多 3 个分组，不要为了分点而分点。总体控制在 80-300 字；不要使用 Markdown 标题符号；不要输出“本次未提及”；不要暴露 AI 分析痕迹。
 输入：{input_json}
 "#
     )
@@ -816,6 +819,7 @@ mod tests {
                     problems: None,
                     tomorrow_plan: Some("继续整理报告能力。".to_string()),
                     extra_note: None,
+                    daily_report_text: None,
                 }),
                 status: "generated".to_string(),
                 created_at: "2026-06-01T01:00:00.000Z".to_string(),
@@ -903,6 +907,7 @@ fn normalize_generated_daily_memory(
         problems: normalize_optional_string(generated.problems),
         tomorrow_plan: normalize_optional_string(generated.tomorrow_plan),
         extra_note: normalize_optional_string(generated.extra_note),
+        daily_report_text: normalize_optional_string(generated.daily_report_text),
     })
 }
 

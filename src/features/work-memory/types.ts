@@ -51,6 +51,7 @@ export type GeneratedDailyMemory = {
   problems?: string;
   tomorrowPlan?: string;
   extraNote?: string;
+  dailyReportText?: string;
 };
 
 export type DailyMemoryGeneratedContent = GeneratedDailyMemory;

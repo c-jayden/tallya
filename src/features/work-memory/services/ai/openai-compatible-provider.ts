@@ -558,8 +558,11 @@ function buildDailyMemoryPrompt(input: GenerateDailyMemoryInput) {
   return [
     '把输入整理为中文工作记忆。',
     '只输出合法 JSON，不要 markdown、解释、代码块或工具调用。',
-    'JSON keys: summary:string, completedItems:string[], keyOutcome?:string, problems?:string, tomorrowPlan?:string, extraNote?:string.',
+    'JSON keys: summary:string, completedItems:string[], keyOutcome?:string, problems?:string, tomorrowPlan?:string, extraNote?:string, dailyReportText?:string.',
     '不要编造输入中不存在的事实；可以做温和归纳和合并。',
+    'dailyReportText 是适合复制到企业微信、飞书、日报表格或公司日报系统的日报文本；基于输入和结构化结果轻度整理，不要照抄原文，不要写成周报、复盘报告或领导评价。',
+    'dailyReportText 默认优先一段自然文本；信息明显分为完成事项、问题、计划时可分点，但最多 3 个分组，不要为了分点而分点。',
+    'dailyReportText 总体控制在 80-300 字；不要使用 Markdown 标题符号；不要输出“本次未提及”；不要暴露 AI 分析痕迹。',
     `输入：${JSON.stringify(input)}`,
   ].join('\n');
 }
@@ -637,6 +640,7 @@ function parseGeneratedDailyMemory(rawOutput: string, input: GenerateDailyMemory
     problems: normalizeOptionalString(parsed.problems),
     tomorrowPlan: normalizeOptionalString(parsed.tomorrowPlan),
     extraNote: normalizeOptionalString(parsed.extraNote),
+    dailyReportText: normalizeOptionalString(parsed.dailyReportText),
   };
 }
 

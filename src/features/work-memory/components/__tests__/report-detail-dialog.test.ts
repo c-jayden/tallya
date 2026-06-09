@@ -14,4 +14,18 @@ describe('ReportDetailDialog copy', () => {
     expect(source).toContain('这份报告引用的工作记忆已更新，建议重新生成。');
     expect(source).toContain("report?.status === 'stale'");
   });
+
+  it('keeps the regenerate button on the standard Button size system', () => {
+    const detailSource = readFileSync(new URL('../report-detail-dialog.tsx', import.meta.url), 'utf8');
+    const previewSource = readFileSync(new URL('../report-preview-dialog.tsx', import.meta.url), 'utf8');
+
+    expect(detailSource).not.toContain('h-9 min-w-28');
+    expect(detailSource).not.toContain('rounded-xl');
+    expect(detailSource).not.toContain('px-3.5');
+    expect(previewSource).not.toContain('h-9 min-w-24');
+    expect(previewSource).not.toContain('rounded-xl');
+    expect(previewSource).not.toContain('px-3.5');
+    expect(detailSource).toContain('bg-app-accent text-app-accent-ink');
+    expect(previewSource).toContain('bg-app-accent text-app-accent-ink');
+  });
 });
