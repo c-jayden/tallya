@@ -23,6 +23,7 @@ export const tauriMocks = {
   dialogSave: vi.fn<() => Promise<string | null>>(async () => null),
   readTextFile: vi.fn<(path: string) => Promise<string>>(async () => ''),
   writeTextFile: vi.fn<(path: string, contents: string) => Promise<void>>(async () => undefined),
+  removeFile: vi.fn<(path: string) => Promise<void>>(async () => undefined),
   readDir: vi.fn<(path: string) => Promise<Array<{ name: string; isFile?: boolean }>>>(
     async () => [],
   ),
@@ -81,6 +82,7 @@ export function resetTauriMocks() {
   tauriMocks.dialogSave.mockResolvedValue(null);
   tauriMocks.readTextFile.mockResolvedValue('');
   tauriMocks.writeTextFile.mockResolvedValue(undefined);
+  tauriMocks.removeFile.mockResolvedValue(undefined);
   tauriMocks.readDir.mockResolvedValue([]);
   tauriMocks.mkdir.mockResolvedValue(undefined);
   tauriMocks.openPath.mockResolvedValue(undefined);
@@ -129,6 +131,7 @@ vi.mock('@tauri-apps/plugin-dialog', () => ({
 
 vi.mock('@tauri-apps/plugin-fs', () => ({
   mkdir: tauriMocks.mkdir,
+  remove: tauriMocks.removeFile,
   readDir: tauriMocks.readDir,
   readTextFile: tauriMocks.readTextFile,
   writeTextFile: tauriMocks.writeTextFile,

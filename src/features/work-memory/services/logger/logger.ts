@@ -33,6 +33,11 @@ const diagnosticLogService = createDiagnosticLogService({
 
     await writeTextFile(path, contents);
   },
+  async removeFile(path) {
+    const { remove } = await import('@tauri-apps/plugin-fs');
+
+    await remove(path);
+  },
   async openPath(path) {
     const { openPath } = await import('@tauri-apps/plugin-opener');
 

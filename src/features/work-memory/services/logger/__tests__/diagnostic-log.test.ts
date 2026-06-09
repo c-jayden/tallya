@@ -39,6 +39,34 @@ describe('diagnostic log service', () => {
     expect(written).toContain('"scope":"ai"');
   });
 
+  it('prunes old log files after writing a new entry', async () => {
+    const deps = createDependencies();
+    deps.readDir.mockResolvedValueOnce(
+      Array.from({ length: 10 }, (_, index) => ({
+        name: `tallya-2026-06-${String(index + 1).padStart(2, '0')}.log`,
+        isFile: true,
+      })),
+    );
+    deps.readTextFile.mockResolvedValueOnce('');
+    const service = createDiagnosticLogService(deps);
+
+    await service.info('app', 'app.started', 'app started');
+
+    expect(deps.removeFile).toHaveBeenCalledTimes(3);
+    expect(deps.removeFile).toHaveBeenNthCalledWith(
+      1,
+      '/mock/app-data/logs/tallya-2026-06-01.log',
+    );
+    expect(deps.removeFile).toHaveBeenNthCalledWith(
+      2,
+      '/mock/app-data/logs/tallya-2026-06-02.log',
+    );
+    expect(deps.removeFile).toHaveBeenNthCalledWith(
+      3,
+      '/mock/app-data/logs/tallya-2026-06-03.log',
+    );
+  });
+
   it('exports recent logs into one diagnostic file', async () => {
     const deps = createDependencies();
     deps.readDir.mockResolvedValueOnce([
@@ -91,6 +119,7 @@ function createDependencies() {
     readDir: vi.fn(async () => [] as Array<{ name: string; isFile?: boolean }>),
     readTextFile: vi.fn(async () => ''),
     writeTextFile: vi.fn(async () => undefined),
+    removeFile: vi.fn(async () => undefined),
     openPath: vi.fn(async () => undefined),
     save: vi.fn(async () => null as string | null),
   };

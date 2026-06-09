@@ -66,6 +66,7 @@
 - Trigger an AI Provider error and confirm a diagnostic log is written.
 - Open the logs directory from Settings > Data Management.
 - Export diagnostic logs from Settings > Data Management.
+- Confirm only the recent diagnostic log files are retained after repeated daily log writes.
 - Confirm exported logs do not contain API Key values.
 - Confirm exported logs do not contain Authorization headers or Bearer tokens.
 - Confirm logs include useful provider status, content type, response shape, and truncated response previews.

@@ -62,7 +62,7 @@ Codex integration tests may be added later as ignored/manual tests only, because
 
 ## Diagnostic Log Tests
 
-Logger tests cover `sanitizeLogData`, diagnostic log file naming, app data `logs/` directory writes, export of recent logs, and detailed logging gating.
+Logger tests cover `sanitizeLogData`, diagnostic log file naming, app data `logs/` directory writes, old log pruning, export of recent logs, and detailed logging gating.
 
 When adding diagnostics:
 

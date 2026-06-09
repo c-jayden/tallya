@@ -1,5 +1,7 @@
 import { sanitizeLogData } from './sanitize-log';
 
+const MAX_LOG_FILES = 7;
+
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 export type LogScope =
   | 'app'
@@ -29,6 +31,7 @@ export type DiagnosticLogDependencies = {
   readDir: (path: string) => Promise<Array<{ name: string; isFile?: boolean }>>;
   readTextFile: (path: string) => Promise<string>;
   writeTextFile: (path: string, contents: string) => Promise<void>;
+  removeFile: (path: string) => Promise<void>;
   openPath: (path: string) => Promise<void>;
   save: (options: {
     defaultPath: string;
@@ -59,8 +62,6 @@ export function createDiagnosticLogService(dependencies: DiagnosticLogDependenci
       let previous = '';
 
       await dependencies.mkdir(logsDirectory, { recursive: true });
-      // TODO: Prune logs older than the retention window after adding a safe
-      // cross-platform file removal path to the Tauri capability set.
 
       try {
         previous = await dependencies.readTextFile(logPath);
@@ -69,8 +70,28 @@ export function createDiagnosticLogService(dependencies: DiagnosticLogDependenci
       }
 
       await dependencies.writeTextFile(logPath, `${previous}${JSON.stringify(sanitizedEntry)}\n`);
+      await pruneOldLogFiles(logsDirectory);
     } catch (error) {
       console.warn('Failed to write diagnostic log', error);
+    }
+  }
+
+  async function pruneOldLogFiles(logsDirectory: string) {
+    try {
+      const logFileNames = (await dependencies.readDir(logsDirectory))
+        .filter(
+          (entry) =>
+            entry.isFile !== false && /^tallya-\d{4}-\d{2}-\d{2}\.log$/.test(entry.name),
+        )
+        .map((entry) => entry.name)
+        .sort();
+      const staleLogFileNames = logFileNames.slice(0, Math.max(0, logFileNames.length - MAX_LOG_FILES));
+
+      for (const fileName of staleLogFileNames) {
+        await dependencies.removeFile(await dependencies.joinPath(logsDirectory, fileName));
+      }
+    } catch {
+      // Retention cleanup is best-effort; a failed delete should not block logging.
     }
   }
 
