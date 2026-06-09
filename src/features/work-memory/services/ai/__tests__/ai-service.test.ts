@@ -65,7 +65,7 @@ const settings: AppSettings = {
   openAICompatible: {
     baseUrl: 'https://api.openai.com/v1',
     apiKey: '',
-    model: 'gpt-4.1-mini',
+    model: 'gpt-5.4-mini',
   },
   ollama: {
     baseUrl: 'http://localhost:11434',

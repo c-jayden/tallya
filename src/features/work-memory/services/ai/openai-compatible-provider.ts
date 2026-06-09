@@ -8,17 +8,33 @@ import { normalizeReportText } from '../report-text';
 import { AIProviderError, type AIProvider, type AIProviderOptions } from './ai-provider';
 
 const OPENAI_COMPATIBLE_PROVIDER_ID = 'openai-compatible';
+const API_VERSION_PATH = '/v1';
 const CHAT_COMPLETIONS_PATH = '/chat/completions';
+const RESPONSE_BODY_PREVIEW_LIMIT = 500;
+const SERVER_MESSAGE_LIMIT = 160;
 
 type FetchLike = typeof fetch;
 
-type ChatCompletionResponse = {
-  choices?: Array<{
-    message?: {
-      content?: string | null;
-    };
-  }>;
+type OpenAICompatibleConfig = {
+  baseUrl: string;
+  normalizedBaseUrl: string;
+  apiKey: string;
+  model: string;
 };
+
+type ChatRequestOptions = {
+  strictJsonMode: boolean;
+};
+
+export function normalizeOpenAICompatibleBaseUrl(baseUrl: string) {
+  const normalized = baseUrl.trim().replace(/\/+$/, '');
+
+  if (!normalized) {
+    return '';
+  }
+
+  return /\/v1$/i.test(normalized) ? normalized : `${normalized}${API_VERSION_PATH}`;
+}
 
 export function createOpenAICompatibleProvider(fetchImpl: FetchLike = fetch): AIProvider {
   async function requestJSON<T>(
@@ -27,71 +43,183 @@ export function createOpenAICompatibleProvider(fetchImpl: FetchLike = fetch): AI
     parseOutput: (rawOutput: string) => T,
   ) {
     const config = getOpenAICompatibleConfig(options);
-    const response = await fetchImpl(toChatCompletionsUrl(config.baseUrl), {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${config.apiKey}`,
-      },
-      body: JSON.stringify({
-        model: config.model,
-        messages: [
-          {
-            role: 'system',
-            content:
-              '你是 Tallya 的工作记忆整理助手。只输出合法 JSON，不要输出 markdown code fence、解释或额外文字。',
-          },
-          {
-            role: 'user',
-            content: prompt,
-          },
-        ],
-        temperature: 0.2,
-      }),
-    }).catch((error: unknown) => {
-      throw new AIProviderError(
-        '无法连接到 AI 服务，请检查 Base URL 或网络状态。',
-        OPENAI_COMPATIBLE_PROVIDER_ID,
-        error,
-      );
-    });
-
-    if (!response.ok) {
-      throw new AIProviderError(
-        getFriendlyHTTPError(response.status),
-        OPENAI_COMPATIBLE_PROVIDER_ID,
-      );
-    }
-
-    let payload: ChatCompletionResponse;
-
-    try {
-      payload = (await response.json()) as ChatCompletionResponse;
-    } catch (error) {
-      throw new AIProviderError(
-        'AI 服务返回内容格式不正确，请稍后重试。',
-        OPENAI_COMPATIBLE_PROVIDER_ID,
-        error,
-      );
-    }
-
-    const content = payload.choices?.[0]?.message?.content?.trim();
-
-    if (!content) {
-      throw new AIProviderError(
-        'AI 没有返回有效内容，请稍后重试。',
-        OPENAI_COMPATIBLE_PROVIDER_ID,
-      );
-    }
+    const content = await requestModelText(config, prompt, { strictJsonMode: true });
 
     try {
       return parseOutput(content);
     } catch (error) {
+      if (error instanceof AIProviderError) {
+        throw error;
+      }
+
       throw new AIProviderError(
-        error instanceof Error ? error.message : 'AI 返回内容格式不正确，请稍后重试。',
+        error instanceof Error
+          ? error.message
+          : '服务返回内容不是有效 JSON，请尝试更换模型或关闭严格 JSON 模式。',
         OPENAI_COMPATIBLE_PROVIDER_ID,
         error,
       );
+    }
+  }
+
+  async function requestModelText(
+    config: OpenAICompatibleConfig,
+    prompt: string,
+    requestOptions: ChatRequestOptions,
+  ): Promise<string> {
+    const firstAttempt = await sendChatCompletion(config, prompt, requestOptions);
+
+    if (
+      firstAttempt.status === 400 &&
+      requestOptions.strictJsonMode &&
+      shouldFallbackResponseFormat(firstAttempt.serverMessage ?? firstAttempt.bodyText)
+    ) {
+      logOpenAIDiagnostic('response_format fallback used', {
+        config,
+        httpStatus: firstAttempt.status,
+        contentType: firstAttempt.contentType,
+        errorMessage: firstAttempt.serverMessage,
+        responseBody: firstAttempt.bodyText,
+        responseFormatFallbackUsed: true,
+      });
+
+      const fallbackAttempt = await sendChatCompletion(config, prompt, {
+        strictJsonMode: false,
+      });
+
+      return parseChatCompletionAttempt(fallbackAttempt, config, {
+        responseFormatFallbackUsed: true,
+      });
+    }
+
+    return parseChatCompletionAttempt(firstAttempt, config, {
+      responseFormatFallbackUsed: false,
+    });
+  }
+
+  async function sendChatCompletion(
+    config: OpenAICompatibleConfig,
+    prompt: string,
+    requestOptions: ChatRequestOptions,
+  ) {
+    const requestBody: Record<string, unknown> = {
+      model: config.model,
+      messages: [
+        {
+          role: 'system',
+          content:
+            '你是 Tallya 的工作记忆整理助手。只输出合法 JSON，不要输出 markdown code fence、解释或额外文字。',
+        },
+        {
+          role: 'user',
+          content: prompt,
+        },
+      ],
+      temperature: 0.2,
+    };
+
+    if (requestOptions.strictJsonMode) {
+      requestBody.response_format = { type: 'json_object' };
+    }
+
+    let response: Response;
+
+    try {
+      response = await fetchImpl(toChatCompletionsUrl(config.normalizedBaseUrl), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${config.apiKey}`,
+        },
+        body: JSON.stringify(requestBody),
+      });
+    } catch (error) {
+      logOpenAIDiagnostic('network failure', {
+        config,
+        errorMessage: error instanceof Error ? error.message : String(error),
+      });
+
+      throw new AIProviderError(
+        '无法连接到 AI 服务，请检查 Base URL 或网络。',
+        OPENAI_COMPATIBLE_PROVIDER_ID,
+        error,
+      );
+    }
+
+    const bodyText = await response.text();
+    const contentType = response.headers.get('content-type') ?? '';
+    const serverMessage = extractServerErrorMessage(bodyText);
+
+    return {
+      ok: response.ok,
+      status: response.status,
+      contentType,
+      bodyText,
+      serverMessage,
+    };
+  }
+
+  function parseChatCompletionAttempt(
+    attempt: Awaited<ReturnType<typeof sendChatCompletion>>,
+    config: OpenAICompatibleConfig,
+    diagnosticOptions: { responseFormatFallbackUsed: boolean },
+  ) {
+    if (!attempt.ok) {
+      logOpenAIDiagnostic('http error', {
+        config,
+        httpStatus: attempt.status,
+        contentType: attempt.contentType,
+        errorMessage: attempt.serverMessage,
+        responseBody: attempt.bodyText,
+        responseFormatFallbackUsed: diagnosticOptions.responseFormatFallbackUsed,
+      });
+
+      throw new AIProviderError(
+        buildFriendlyHTTPError(attempt.status, attempt.serverMessage),
+        OPENAI_COMPATIBLE_PROVIDER_ID,
+      );
+    }
+
+    let payload: unknown;
+
+    try {
+      payload = JSON.parse(attempt.bodyText);
+    } catch (error) {
+      logOpenAIDiagnostic('invalid response body json', {
+        config,
+        httpStatus: attempt.status,
+        contentType: attempt.contentType,
+        errorMessage: error instanceof Error ? error.message : String(error),
+        responseBody: attempt.bodyText,
+        responseFormatFallbackUsed: diagnosticOptions.responseFormatFallbackUsed,
+      });
+
+      throw new AIProviderError(
+        'AI 服务响应不是有效 JSON，请检查服务是否兼容 OpenAI Chat Completions。',
+        OPENAI_COMPATIBLE_PROVIDER_ID,
+        error,
+      );
+    }
+
+    try {
+      return extractModelText(payload);
+    } catch (error) {
+      logOpenAIDiagnostic('unsupported response shape', {
+        config,
+        httpStatus: attempt.status,
+        contentType: attempt.contentType,
+        errorMessage: error instanceof Error ? error.message : String(error),
+        responseBody: attempt.bodyText,
+        responseFormatFallbackUsed: diagnosticOptions.responseFormatFallbackUsed,
+      });
+
+      throw error instanceof AIProviderError
+        ? error
+        : new AIProviderError(
+            '返回格式不像 OpenAI Compatible，请检查服务类型。',
+            OPENAI_COMPATIBLE_PROVIDER_ID,
+            error,
+          );
     }
   }
 
@@ -124,15 +252,18 @@ export function createOpenAICompatibleProvider(fetchImpl: FetchLike = fetch): AI
     },
     async checkHealth(options) {
       try {
-        await requestJSON(options, '请只返回 JSON：{"ok":true}', (rawOutput) => {
-          const parsed = parseStrictJSON<{ ok?: boolean }>(rawOutput);
-
-          if (parsed.ok !== true) {
-            throw new Error('AI 服务返回内容格式不正确，请稍后重试。');
-          }
-
-          return parsed;
+        const config = getOpenAICompatibleConfig(options);
+        const output = await requestModelText(config, '只输出 JSON：{"ok":true}', {
+          strictJsonMode: true,
         });
+        const parsed = parseStrictJSON<{ ok?: boolean }>(
+          output,
+          '服务可访问，但未返回预期 JSON，生成时可能失败。',
+        );
+
+        if (parsed.ok !== true) {
+          throw new Error('服务可访问，但未返回预期 JSON，生成时可能失败。');
+        }
 
         return {
           status: 'available',
@@ -144,7 +275,7 @@ export function createOpenAICompatibleProvider(fetchImpl: FetchLike = fetch): AI
           message: '检测失败',
           detail:
             error instanceof Error
-              ? error.message
+              ? normalizeHealthErrorMessage(error.message)
               : '无法连接到 AI 服务，请检查当前配置。',
         };
       }
@@ -154,11 +285,12 @@ export function createOpenAICompatibleProvider(fetchImpl: FetchLike = fetch): AI
 
 export const openAICompatibleProvider = createOpenAICompatibleProvider();
 
-function getOpenAICompatibleConfig(options: AIProviderOptions) {
+function getOpenAICompatibleConfig(options: AIProviderOptions): OpenAICompatibleConfig {
   const config = options.openAICompatible;
   const baseUrl = config?.baseUrl.trim() ?? '';
   const apiKey = config?.apiKey.trim() ?? '';
   const model = config?.model.trim() ?? '';
+  const normalizedBaseUrl = normalizeOpenAICompatibleBaseUrl(baseUrl);
 
   if (!baseUrl) {
     throw new AIProviderError('请填写 Base URL。', OPENAI_COMPATIBLE_PROVIDER_ID);
@@ -169,30 +301,257 @@ function getOpenAICompatibleConfig(options: AIProviderOptions) {
   }
 
   if (!model) {
-    throw new AIProviderError('请填写模型。', OPENAI_COMPATIBLE_PROVIDER_ID);
+    throw new AIProviderError('请填写模型名称。', OPENAI_COMPATIBLE_PROVIDER_ID);
   }
 
-  return { baseUrl, apiKey, model };
+  return { baseUrl, normalizedBaseUrl, apiKey, model };
 }
 
-function toChatCompletionsUrl(baseUrl: string) {
-  return `${baseUrl.replace(/\/+$/, '')}${CHAT_COMPLETIONS_PATH}`;
+function toChatCompletionsUrl(normalizedBaseUrl: string) {
+  return `${normalizedBaseUrl}${CHAT_COMPLETIONS_PATH}`;
+}
+
+function extractModelText(payload: unknown): string {
+  if (!isRecord(payload)) {
+    throw new AIProviderError(
+      '返回格式不像 OpenAI Compatible，请检查服务类型。',
+      OPENAI_COMPATIBLE_PROVIDER_ID,
+    );
+  }
+
+  if (isAnthropicContentArray(payload.content)) {
+    throw new AIProviderError(getAnthropicFormatMessage(), OPENAI_COMPATIBLE_PROVIDER_ID);
+  }
+
+  const choices = payload.choices;
+
+  if (Array.isArray(choices)) {
+    const firstChoice = choices[0];
+
+    if (isRecord(firstChoice)) {
+      const message = firstChoice.message;
+
+      if (isRecord(message)) {
+        if (typeof message.content === 'string' && message.content.trim()) {
+          return message.content.trim();
+        }
+
+        if (isAnthropicContentArray(message.content)) {
+          throw new AIProviderError(getAnthropicFormatMessage(), OPENAI_COMPATIBLE_PROVIDER_ID);
+        }
+      }
+
+      if (typeof firstChoice.text === 'string' && firstChoice.text.trim()) {
+        return firstChoice.text.trim();
+      }
+    }
+  }
+
+  if (typeof payload.output_text === 'string' && payload.output_text.trim()) {
+    return payload.output_text.trim();
+  }
+
+  const outputText = extractResponsesOutputText(payload.output);
+
+  if (outputText) {
+    return outputText;
+  }
+
+  if ('output' in payload) {
+    throw new AIProviderError(
+      '当前服务返回格式更像 Responses API，不是 Chat Completions 格式。',
+      OPENAI_COMPATIBLE_PROVIDER_ID,
+    );
+  }
+
+  throw new AIProviderError(
+    '返回格式不像 OpenAI Compatible，请检查服务类型。',
+    OPENAI_COMPATIBLE_PROVIDER_ID,
+  );
+}
+
+function extractResponsesOutputText(output: unknown) {
+  if (!Array.isArray(output)) {
+    return '';
+  }
+
+  const textParts: string[] = [];
+
+  for (const item of output) {
+    if (!isRecord(item) || !Array.isArray(item.content)) {
+      continue;
+    }
+
+    for (const contentItem of item.content) {
+      if (isRecord(contentItem) && typeof contentItem.text === 'string') {
+        const text = contentItem.text.trim();
+
+        if (text) {
+          textParts.push(text);
+        }
+      }
+    }
+  }
+
+  return textParts.join('\n').trim();
+}
+
+function isAnthropicContentArray(value: unknown) {
+  return (
+    Array.isArray(value) &&
+    value.some(
+      (item) =>
+        isRecord(item) && item.type === 'text' && typeof item.text === 'string',
+    )
+  );
+}
+
+function getAnthropicFormatMessage() {
+  return '当前服务可能是 Anthropic / Claude 格式，暂不适用于 OpenAI Compatible。请切换到 OpenAI Compatible 网关，或等待后续支持 Anthropic Compatible。';
+}
+
+function buildFriendlyHTTPError(status: number, serverMessage?: string) {
+  const baseMessage = getFriendlyHTTPError(status);
+  const trimmedServerMessage = truncate(serverMessage?.trim() ?? '', SERVER_MESSAGE_LIMIT);
+
+  return trimmedServerMessage ? `${baseMessage} 服务返回：${trimmedServerMessage}` : baseMessage;
 }
 
 function getFriendlyHTTPError(status: number) {
+  if (status === 400) {
+    return '请求参数可能不被当前服务支持，请检查模型或关闭严格 JSON 模式后重试。';
+  }
+
   if (status === 401 || status === 403) {
-    return 'API Key 无效或没有权限。';
+    return 'API Key 无效或没有权限，请检查密钥。';
   }
 
   if (status === 404) {
-    return '接口地址或模型可能不正确。';
+    return '接口地址或模型可能不正确，请检查 Base URL 和模型名称。';
   }
 
   if (status === 429) {
-    return '请求过于频繁或额度不足。';
+    return '请求过于频繁或额度不足，请稍后再试。';
   }
 
-  return 'AI 服务请求失败，请稍后重试。';
+  if (status >= 500 && status <= 599) {
+    return 'AI 服务暂时不可用，请稍后再试。';
+  }
+
+  return 'AI 服务请求失败，请检查当前配置。';
+}
+
+function shouldFallbackResponseFormat(message: string | undefined) {
+  if (!message) {
+    return false;
+  }
+
+  return /response_format|json_object|unsupported|invalid parameter|not supported|不支持|无效参数/i.test(
+    message,
+  );
+}
+
+function extractServerErrorMessage(bodyText: string) {
+  if (!bodyText.trim()) {
+    return '';
+  }
+
+  try {
+    const payload = JSON.parse(bodyText) as unknown;
+
+    if (!isRecord(payload)) {
+      return '';
+    }
+
+    if (isRecord(payload.error) && typeof payload.error.message === 'string') {
+      return payload.error.message;
+    }
+
+    if (typeof payload.message === 'string') {
+      return payload.message;
+    }
+
+    if (typeof payload.error === 'string') {
+      return payload.error;
+    }
+  } catch {
+    return truncate(bodyText.trim(), SERVER_MESSAGE_LIMIT);
+  }
+
+  return '';
+}
+
+function logOpenAIDiagnostic(
+  label: string,
+  diagnostic: {
+    config: OpenAICompatibleConfig;
+    httpStatus?: number;
+    contentType?: string;
+    errorMessage?: string;
+    responseBody?: string;
+    responseFormatFallbackUsed?: boolean;
+  },
+) {
+  console.debug('[Tallya AI]', {
+    label,
+    provider: OPENAI_COMPATIBLE_PROVIDER_ID,
+    normalizedBaseUrl: diagnostic.config.normalizedBaseUrl,
+    model: diagnostic.config.model,
+    httpStatus: diagnostic.httpStatus,
+    contentType: diagnostic.contentType,
+    errorMessage: truncate(diagnostic.errorMessage ?? '', SERVER_MESSAGE_LIMIT),
+    responsePreview: buildSafeResponsePreview(diagnostic.responseBody ?? ''),
+    responseFormatFallbackUsed: diagnostic.responseFormatFallbackUsed ?? false,
+  });
+}
+
+function buildSafeResponsePreview(bodyText: string) {
+  if (!bodyText) {
+    return '';
+  }
+
+  try {
+    return truncate(
+      JSON.stringify(sanitizeDiagnosticValue(JSON.parse(bodyText))),
+      RESPONSE_BODY_PREVIEW_LIMIT,
+    );
+  } catch {
+    return truncate(bodyText.replace(/\s+/g, ' '), RESPONSE_BODY_PREVIEW_LIMIT);
+  }
+}
+
+function sanitizeDiagnosticValue(value: unknown): unknown {
+  if (typeof value === 'string') {
+    return truncate(value, 24);
+  }
+
+  if (Array.isArray(value)) {
+    return value.slice(0, 4).map(sanitizeDiagnosticValue);
+  }
+
+  if (!isRecord(value)) {
+    return value;
+  }
+
+  const sanitized: Record<string, unknown> = {};
+
+  for (const [key, item] of Object.entries(value)) {
+    if (/api.?key|authorization|token|secret/i.test(key)) {
+      sanitized[key] = '[redacted]';
+    } else {
+      sanitized[key] = sanitizeDiagnosticValue(item);
+    }
+  }
+
+  return sanitized;
+}
+
+function normalizeHealthErrorMessage(message: string) {
+  if (message === '返回格式不像 OpenAI Compatible，请检查服务类型。') {
+    return '服务可访问，但返回格式不像 OpenAI Compatible。';
+  }
+
+  return message;
 }
 
 function buildDailyMemoryPrompt(input: GenerateDailyMemoryInput) {
@@ -309,7 +668,10 @@ function parseGeneratedRangeReport(rawOutput: string, input: GenerateRangeReport
   return report;
 }
 
-function parseStrictJSON<T>(rawOutput: string): T {
+function parseStrictJSON<T>(
+  rawOutput: string,
+  invalidJSONMessage = '服务返回内容不是有效 JSON，请尝试更换模型或关闭严格 JSON 模式。',
+): T {
   const normalized = stripMarkdownFence(rawOutput.trim());
 
   if (!normalized) {
@@ -319,7 +681,7 @@ function parseStrictJSON<T>(rawOutput: string): T {
   try {
     return JSON.parse(normalized) as T;
   } catch {
-    throw new Error('AI 返回内容格式不正确，请稍后重试。');
+    throw new Error(invalidJSONMessage);
   }
 }
 
@@ -378,4 +740,12 @@ function pushMarkdownList(sections: string[], title: string, items: string[]) {
   }
 
   sections.push(`## ${title}`, items.map((item) => `- ${item}`).join('\n'));
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function truncate(value: string, maxLength: number) {
+  return value.length <= maxLength ? value : value.slice(0, maxLength);
 }

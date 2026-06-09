@@ -1,7 +1,7 @@
 import type { AIProviderId } from './ai-provider';
 
 export const DEFAULT_CODEX_MODEL = 'gpt-5.4-mini';
-export const DEFAULT_OPENAI_COMPATIBLE_MODEL = 'gpt-4.1-mini';
+export const DEFAULT_OPENAI_COMPATIBLE_MODEL = 'gpt-5.4-mini';
 
 export type AIModelOption = {
   value: string;

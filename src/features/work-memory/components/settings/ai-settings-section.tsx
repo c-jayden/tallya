@@ -11,6 +11,7 @@ import {
 import type { AppSettings } from '../../services/app-settings-repository';
 import type { AIProviderId } from '../../services/ai/ai-provider';
 import {
+  DEFAULT_OPENAI_COMPATIBLE_MODEL,
   getDefaultProviderModel,
   getKnownProviderModels,
   normalizeProviderModel,
@@ -28,9 +29,11 @@ const visibleProviderOptions: { value: AIProviderId; label: string; description:
     value: 'openai-compatible',
     label: 'OpenAI Compatible',
     description:
-      '用于兼容 OpenAI 格式的 API 服务，可填写 OpenAI、DeepSeek、Kimi、OpenRouter 或其他中转服务商的地址和模型。',
+      '用于兼容 OpenAI 格式的 API 服务，可填写 OpenAI、DeepSeek、Kimi、OpenRouter、CC Switch 或公司网关的地址和模型。如果该 Provider 是 Claude / Anthropic 格式，当前 OpenAI Compatible 可能无法使用。',
   },
 ];
+
+const openAIInputClassName = 'placeholder:text-slate-400';
 
 type AISettingsSectionProps = {
   settings: AppSettings;
@@ -112,6 +115,7 @@ export function AISettingsSection({
           <div className="space-y-5">
             <Field label="Base URL">
               <Input
+                className={openAIInputClassName}
                 value={settings.openAICompatible.baseUrl}
                 onChange={(event) =>
                   onUpdateSettings({
@@ -127,6 +131,7 @@ export function AISettingsSection({
 
             <Field label="API Key">
               <Input
+                className={openAIInputClassName}
                 type="password"
                 value={settings.openAICompatible.apiKey}
                 onChange={(event) =>
@@ -137,13 +142,14 @@ export function AISettingsSection({
                     },
                   })
                 }
-                placeholder="sk-..."
+                placeholder="sk-xxxxxx"
                 autoComplete="off"
               />
             </Field>
 
             <Field label="模型">
               <Input
+                className={openAIInputClassName}
                 value={settings.openAICompatible.model}
                 onChange={(event) =>
                   onUpdateSettings({
@@ -153,7 +159,7 @@ export function AISettingsSection({
                     },
                   })
                 }
-                placeholder="gpt-4.1-mini"
+                placeholder={DEFAULT_OPENAI_COMPATIBLE_MODEL}
               />
             </Field>
           </div>

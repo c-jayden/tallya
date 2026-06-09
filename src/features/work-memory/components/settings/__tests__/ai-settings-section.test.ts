@@ -15,6 +15,21 @@ describe('AISettingsSection', () => {
     expect(source).toContain('type="password"');
   });
 
+  it('uses the requested API Key placeholder without exposing a real key', () => {
+    expect(source).toContain('placeholder="sk-xxxxxx"');
+    expect(source).not.toContain('placeholder="sk-..."');
+  });
+
+  it('uses a lighter placeholder color for OpenAI Compatible inputs', () => {
+    expect(source).toContain("const openAIInputClassName = 'placeholder:text-slate-400'");
+    expect(source.match(/className={openAIInputClassName}/g)).toHaveLength(3);
+  });
+
+  it('uses the shared OpenAI Compatible default model placeholder', () => {
+    expect(source).toContain('placeholder={DEFAULT_OPENAI_COMPATIBLE_MODEL}');
+    expect(source).not.toContain('placeholder="gpt-4.1-mini"');
+  });
+
   it('stores OpenAI Compatible configuration through settings patches', () => {
     expect(source).toContain('openAICompatible');
     expect(source).toContain('baseUrl: event.target.value');
