@@ -1,5 +1,5 @@
 ﻿import { describe, expect, it, vi } from 'vitest';
-import type { AppSettings } from '../../app-settings-repository';
+import { DEFAULT_APP_SETTINGS, type AppSettings } from '../../app-settings-repository';
 import type {
   GeneratedDailyMemory,
   GeneratedReportContent,
@@ -81,6 +81,13 @@ const settings: AppSettings = {
   reportLength: 'brief',
   reportTone: 'retrospective',
   reportFocus: 'risks',
+  reportStyleHint: '请尽量用 3 条分点，最后一句说明计划。',
+  reportStyleProfile: {
+    enabled: true,
+    summary: '偏简洁，常用分点。',
+    promptHint: '保持简洁自然，使用 3-5 条分点。',
+    updatedAt: '2026-06-09T10:00:00.000Z',
+  },
   theme: 'system',
   launchAtStartup: false,
   closeToTray: true,
@@ -171,6 +178,8 @@ describe('createAIService', () => {
         reportLength: 'brief',
         reportTone: 'retrospective',
         reportFocus: 'risks',
+        reportStyleHint: '请尽量用 3 条分点，最后一句说明计划。',
+        reportStyleProfile: DEFAULT_APP_SETTINGS.reportStyleProfile,
       },
       {
         codexCommand: 'custom-codex',
@@ -204,6 +213,8 @@ describe('createAIService', () => {
         reportLength: 'brief',
         reportTone: 'retrospective',
         reportFocus: 'risks',
+        reportStyleHint: '请尽量用 3 条分点，最后一句说明计划。',
+        reportStyleProfile: DEFAULT_APP_SETTINGS.reportStyleProfile,
       },
       {
         codexCommand: 'custom-codex',
@@ -256,5 +267,39 @@ describe('createAIService', () => {
         model: 'gpt-test',
       },
     });
+  });
+
+  it('analyzes report style with the selected provider', async () => {
+    const analyzeReportStyle = vi.fn<NonNullable<AIProvider['analyzeReportStyle']>>()
+      .mockResolvedValue({
+        summary: '偏简洁，常用分点。',
+        promptHint: '生成报告时保持简洁自然。',
+      });
+    const service = createAIService({
+      settingsRepository: {
+        getSettings: vi.fn().mockResolvedValue(settings),
+      },
+      codexProvider: {
+        id: 'ai-codex-cli',
+        name: 'Codex CLI',
+        generateDailyMemory: vi.fn(),
+        generateWeeklyReport: vi.fn(),
+        generateRangeReport: vi.fn(),
+        analyzeReportStyle,
+      },
+    });
+
+    await expect(service.analyzeReportStyle({ sampleText: '今日完成：整理需求。' })).resolves.toEqual({
+      summary: '偏简洁，常用分点。',
+      promptHint: '生成报告时保持简洁自然。',
+    });
+    expect(analyzeReportStyle).toHaveBeenCalledWith(
+      { sampleText: '今日完成：整理需求。' },
+      {
+        codexCommand: 'custom-codex',
+        codexModel: 'gpt-5.4-mini',
+        openAICompatible: settings.openAICompatible,
+      },
+    );
   });
 });

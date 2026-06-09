@@ -1,11 +1,17 @@
 import type {
   GeneratedDailyMemory,
   GeneratedReportContent,
+  AnalyzeReportStyleInput,
+  AnalyzedReportStyle,
   GenerateDailyMemoryInput,
   RangeReportSourceInput,
   WeeklyReportSourceInput,
 } from '../../types';
-import { appSettingsRepository, type AppSettings } from '../app-settings-repository';
+import {
+  DEFAULT_APP_SETTINGS,
+  appSettingsRepository,
+  type AppSettings,
+} from '../app-settings-repository';
 import { type AIProvider, type ProviderHealth } from './ai-provider';
 import { codexCliProvider } from './codex-cli-provider';
 import { mockProvider } from './mock-provider';
@@ -47,6 +53,8 @@ export function createAIService({
         reportLength: settings.reportLength,
         reportTone: settings.reportTone,
         reportFocus: settings.reportFocus,
+        reportStyleHint: settings.reportStyleHint,
+        reportStyleProfile: DEFAULT_APP_SETTINGS.reportStyleProfile,
       },
       getProviderOptions(settings),
     );
@@ -90,6 +98,20 @@ export function createAIService({
     },
 
     generateRangeReport,
+
+    async analyzeReportStyle(input: AnalyzeReportStyleInput): Promise<AnalyzedReportStyle> {
+      const settings = await settingsRepository.getSettings();
+      const provider = getProviderForSettings(settings, {
+        codexProvider,
+        openAICompatibleProvider: configuredOpenAICompatibleProvider,
+      });
+
+      if (!provider.analyzeReportStyle) {
+        throw new Error('当前 AI 服务暂不支持风格分析。');
+      }
+
+      return provider.analyzeReportStyle(input, getProviderOptions(settings));
+    },
 
     async checkHealth(): Promise<ProviderHealth> {
       const settings = await settingsRepository.getSettings();

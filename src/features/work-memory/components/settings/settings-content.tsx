@@ -21,6 +21,7 @@ export type SettingsContentProps = {
   isOpeningDataDirectory: boolean;
   isOpeningLogDirectory: boolean;
   isExportingDiagnosticLog: boolean;
+  isExtractingReportStyle: boolean;
   isSendingTestNotification: boolean;
   onUpdateSettings: (patch: Partial<AppSettings>) => void;
   onCheckHealth: () => void;
@@ -29,6 +30,7 @@ export type SettingsContentProps = {
   onOpenDataDirectory: () => void;
   onOpenLogDirectory: () => void;
   onRequestExportDiagnosticLog: () => void;
+  onExtractReportStylePrompt: (sampleText: string) => Promise<string>;
   onSendTestNotification: () => void;
   onRequestClear: () => void;
 };
@@ -62,6 +64,7 @@ function SettingsSectionContent({
   isOpeningDataDirectory,
   isOpeningLogDirectory,
   isExportingDiagnosticLog,
+  isExtractingReportStyle,
   isSendingTestNotification,
   onUpdateSettings,
   onCheckHealth,
@@ -70,6 +73,7 @@ function SettingsSectionContent({
   onOpenDataDirectory,
   onOpenLogDirectory,
   onRequestExportDiagnosticLog,
+  onExtractReportStylePrompt,
   onSendTestNotification,
   onRequestClear,
 }: SettingsContentProps) {
@@ -100,7 +104,9 @@ function SettingsSectionContent({
     return (
       <ReportPreferencesSettingsSection
         settings={settings}
+        isExtractingReportStyle={isExtractingReportStyle}
         onUpdateSettings={onUpdateSettings}
+        onExtractReportStylePrompt={onExtractReportStylePrompt}
       />
     );
   }

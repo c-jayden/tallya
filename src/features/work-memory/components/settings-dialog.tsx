@@ -71,6 +71,7 @@ export function SettingsDialog({
               isOpeningDataDirectory={settingsState.isOpeningDataDirectory}
               isOpeningLogDirectory={settingsState.isOpeningLogDirectory}
               isExportingDiagnosticLog={settingsState.isExportingDiagnosticLog}
+              isExtractingReportStyle={settingsState.isExtractingReportStyle}
               isSendingTestNotification={settingsState.isSendingTestNotification}
               onUpdateSettings={settingsState.updateSettings}
               onCheckHealth={settingsState.checkProviderHealth}
@@ -81,6 +82,7 @@ export function SettingsDialog({
               onRequestExportDiagnosticLog={() =>
                 settingsState.setIsDiagnosticLogConfirmOpen(true)
               }
+              onExtractReportStylePrompt={settingsState.extractReportStylePrompt}
               onSendTestNotification={settingsState.sendTestNotification}
               onRequestClear={() => settingsState.setIsClearConfirmOpen(true)}
             />

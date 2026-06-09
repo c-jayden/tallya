@@ -20,6 +20,13 @@ const reportInput: GenerateRangeReportInput = {
   reportLength: 'brief',
   reportTone: 'formal',
   reportFocus: 'risks',
+  reportStyleHint: '请保持简洁，用 3 条分点。',
+  reportStyleProfile: {
+    enabled: true,
+    summary: '偏简洁，常用分点。',
+    promptHint: '生成报告时使用 3-5 条分点，最后一句说明计划。',
+    updatedAt: '2026-06-09T10:00:00.000Z',
+  },
   memories: [
     {
       id: 'daily-memory-2026-06-01',
@@ -80,6 +87,28 @@ describe('OpenAI Compatible Provider', () => {
     });
 
     expect(fetch).toHaveBeenCalledWith(expectedUrl, expect.any(Object));
+  });
+
+  it('reports a friendly timeout when the OpenAI Compatible request does not finish', async () => {
+    vi.useFakeTimers();
+    try {
+      const fetchMock = vi.fn((_input: Parameters<typeof globalThis.fetch>[0], init?: RequestInit) => {
+        return new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => {
+            reject(Object.assign(new Error('aborted'), { name: 'AbortError' }));
+          });
+        });
+      }) as unknown as typeof globalThis.fetch;
+      const provider = createOpenAICompatibleProvider(fetchMock);
+      const request = expect(provider.generateDailyMemory(dailyInput, options)).rejects.toMatchObject({
+        message: 'AI 服务响应超时，请检查网关或稍后再试。',
+      });
+
+      await vi.advanceTimersByTimeAsync(45_000);
+      await request;
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('requires Base URL, API Key, and model before sending requests', async () => {
@@ -337,7 +366,54 @@ describe('OpenAI Compatible Provider', () => {
     expect(prompt).toContain('报告详略：精简');
     expect(prompt).toContain('报告语气：正式');
     expect(prompt).toContain('报告重点：问题风险优先');
+    expect(prompt).toContain('请保持简洁，用 3 条分点。');
+    expect(prompt).not.toContain('生成报告时使用 3-5 条分点，最后一句说明计划。');
+    expect(prompt).not.toContain('已识别风格提示');
     expect(body.model).toBe('gpt-test');
+  });
+
+  it('analyzes report style without asking to save the original sample text', async () => {
+    const fetch = vi.fn().mockResolvedValue(
+      chatResponse({
+        summary: '偏简洁，常用分点结构。',
+        promptHint: '生成报告时保持简洁自然，使用 3-5 条分点。',
+      }),
+    );
+    const provider = createOpenAICompatibleProvider(fetch);
+
+    await expect(
+      provider.analyzeReportStyle?.({ sampleText: '今日完成：处理客户 A 项目排期。' }, options),
+    ).resolves.toEqual({
+      summary: '偏简洁，常用分点结构。',
+      promptHint: '生成报告时保持简洁自然，使用 3-5 条分点。',
+    });
+
+    const body = JSON.parse(String(fetch.mock.calls[0]?.[1]?.body)) as {
+      messages: Array<{ content: string }>;
+    };
+    const prompt = body.messages[1]?.content ?? '';
+
+    expect(prompt).toContain('只分析写作风格、表达习惯、结构倾向、语气、篇幅和信息组织方式');
+    expect(prompt).toContain('不要保存原始样本文本');
+    expect(prompt).toContain('可直接回填到“风格偏好”输入框');
+    expect(prompt).toContain('promptHint 建议控制在 80-160 个中文字符之间');
+    expect(prompt).toContain('今日完成：处理客户 A 项目排期。');
+  });
+
+  it('logs style analysis failures without full sample text', async () => {
+    const fetch = vi.fn().mockRejectedValue(new Error('network down'));
+    const provider = createOpenAICompatibleProvider(fetch);
+    const sampleText = '今日完成：'.repeat(100);
+
+    await expect(provider.analyzeReportStyle?.({ sampleText }, options)).rejects.toBeInstanceOf(
+      AIProviderError,
+    );
+    await waitForAsyncLogs();
+
+    const logs = tauriMocks.writeTextFile.mock.calls.map((call) => String(call[1])).join('\n');
+    expect(logs).toContain('openai-compatible.style_analysis_failed');
+    expect(logs).toContain(`"sampleTextLength":${sampleText.length}`);
+    expect(logs).not.toContain(sampleText);
   });
 });
 

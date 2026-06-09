@@ -92,6 +92,10 @@ struct GenerateWeeklyReportInput {
     report_tone: String,
     #[serde(default = "default_report_focus")]
     report_focus: String,
+    #[serde(default)]
+    report_style_hint: String,
+    #[serde(default)]
+    report_style_profile: ReportStyleProfileInput,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -108,6 +112,38 @@ struct GenerateRangeReportInput {
     report_tone: String,
     #[serde(default = "default_report_focus")]
     report_focus: String,
+    #[serde(default)]
+    report_style_hint: String,
+    #[serde(default)]
+    report_style_profile: ReportStyleProfileInput,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ReportStyleProfileInput {
+    #[serde(default)]
+    enabled: bool,
+    #[serde(default)]
+    summary: String,
+    #[serde(default)]
+    prompt_hint: String,
+    #[serde(default)]
+    updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AnalyzeReportStyleInput {
+    sample_text: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AnalyzedReportStyle {
+    #[serde(default)]
+    summary: String,
+    #[serde(default)]
+    prompt_hint: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -168,6 +204,8 @@ impl GenerateWeeklyReportInput {
             report_length: self.report_length,
             report_tone: self.report_tone,
             report_focus: self.report_focus,
+            report_style_hint: self.report_style_hint,
+            report_style_profile: self.report_style_profile,
         }
     }
 }
@@ -231,6 +269,22 @@ async fn generate_range_report_with_codex(
     .map_err(|error| {
         eprintln!("Codex range report task join failed: {error}");
         "Codex 生成失败，请检查 Codex CLI 是否可用。".to_string()
+    })?
+}
+
+#[tauri::command]
+async fn analyze_report_style_with_codex(
+    input: AnalyzeReportStyleInput,
+    codex_command: String,
+    codex_model: String,
+) -> Result<AnalyzedReportStyle, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        run_codex_report_style_analysis(input, codex_command, codex_model)
+    })
+    .await
+    .map_err(|error| {
+        eprintln!("Codex style analysis task join failed: {error}");
+        "Codex 风格分析失败，请检查 Codex CLI 是否可用。".to_string()
     })?
 }
 
@@ -379,6 +433,21 @@ fn run_codex_range_report_generation(
         codex_model,
         "range-report",
         |raw_output| parse_generated_range_report(raw_output, &input),
+    )
+}
+
+fn run_codex_report_style_analysis(
+    input: AnalyzeReportStyleInput,
+    codex_command: String,
+    codex_model: String,
+) -> Result<AnalyzedReportStyle, String> {
+    let prompt = build_codex_report_style_prompt(&input);
+    run_codex_prompt_generation(
+        prompt,
+        codex_command,
+        codex_model,
+        "report-style",
+        parse_analyzed_report_style,
     )
 }
 
@@ -618,10 +687,13 @@ fn build_codex_weekly_report_prompt(input: &GenerateWeeklyReportInput) -> String
 }
 
 fn build_codex_range_report_prompt(input: &GenerateRangeReportInput) -> String {
-    let input_json = serde_json::to_string(input).unwrap_or_else(|_| "{}".to_string());
+    let mut prompt_input = input.clone();
+    prompt_input.report_style_profile = ReportStyleProfileInput::default();
+    let input_json = serde_json::to_string(&prompt_input).unwrap_or_else(|_| "{}".to_string());
     let length_instruction = report_length_instruction(&input.report_length);
     let tone_instruction = report_tone_instruction(&input.report_tone);
     let focus_instruction = report_focus_instruction(&input.report_focus);
+    let style_instruction = report_style_instruction(input);
     let single_memory_instruction = report_single_memory_instruction(input);
     let is_custom = input.report_type == "custom";
     let report_name = if is_custom {
@@ -651,6 +723,7 @@ JSON keys: title:string, summary:string, highlights:string[], completedItems:str
 - {single_memory_instruction}
 - {tone_instruction}
 - {focus_instruction}
+- {style_instruction}
 - completedItems 合并相近事项，避免把同一件事拆得过碎。
 - problems 只总结 daily memories 中提到的问题或风险；没有则返回空字符串。
 - {plan_key_instruction}
@@ -659,6 +732,51 @@ JSON keys: title:string, summary:string, highlights:string[], completedItems:str
 输入：{input_json}
 "#
     )
+}
+
+fn build_codex_report_style_prompt(input: &AnalyzeReportStyleInput) -> String {
+    format!(
+        r#"请分析用户粘贴的历史日报或周报样本。只输出合法 JSON，不要输出解释、markdown 或代码块。
+JSON keys: summary:string, promptHint:string.
+分析目标：
+- 只分析写作风格、表达习惯、结构倾向、语气、篇幅和信息组织方式。
+- 不提取具体业务内容。
+- 不提取具体项目名、公司名、客户名、人名、系统名、模块名、任务编号。
+- 不要把样本中的具体业务场景、字段结构或一次性表达直接复制到 promptHint。
+- 不要保存原始样本文本。
+
+summary 要求：
+- 用一句话概括样本的写作风格。
+- 可以写成“风格偏简洁、克制，重视进展、原因和结果”这类分析总结。
+
+promptHint 要求：
+- 必须写成可直接回填到“风格偏好”输入框的长期报告写作提示。
+- promptHint 应适用于日报、周报和自定义范围报告，不要只适用于某一次工作进展说明。
+- promptHint 应描述“后续报告应该怎么写”，不要写成“你的风格是……”这类分析总结。
+- promptHint 只能影响表达方式、结构、语气和篇幅，不能要求模型编造事实。
+- promptHint 不要包含具体业务名词。
+- promptHint 不要绑定过细的栏目，例如“页面/交互/结果”；可以抽象成“先概括主要进展，再按事项说明动作、原因和结果”。
+- promptHint 建议控制在 80-160 个中文字符之间。
+- 使用克制、清晰、可执行的中文表达。
+
+样本文本：
+{}"#,
+        input.sample_text
+    )
+}
+
+fn report_style_instruction(input: &GenerateRangeReportInput) -> String {
+    let mut instructions = vec![
+        "风格提示只影响表达方式，不允许改变事实内容，也不允许加入样本里的具体业务信息。"
+            .to_string(),
+    ];
+    let report_style_hint = input.report_style_hint.trim();
+
+    if !report_style_hint.is_empty() {
+        instructions.push(format!("用户风格偏好：{report_style_hint}"));
+    }
+
+    instructions.join("\n")
 }
 
 fn report_length_instruction(value: &str) -> &'static str {
@@ -744,6 +862,40 @@ mod tests {
     }
 
     #[test]
+    fn range_report_prompt_includes_style_hints() {
+        let mut input = weekly_input("standard", "natural", "outcomes").into_range_report_input();
+        input.report_style_hint = "请尽量简洁，用 3 条分点。".to_string();
+        input.report_style_profile = ReportStyleProfileInput {
+            enabled: true,
+            summary: "偏简洁。".to_string(),
+            prompt_hint: "保持自然表达，最后说明计划。".to_string(),
+            updated_at: "2026-06-09T10:00:00.000Z".to_string(),
+        };
+
+        let prompt = build_codex_range_report_prompt(&input);
+
+        assert!(prompt.contains("用户风格偏好：请尽量简洁，用 3 条分点。"));
+        assert!(!prompt.contains("已识别风格提示：保持自然表达，最后说明计划。"));
+    }
+
+    #[test]
+    fn parse_analyzed_report_style_rejects_empty_or_invalid_json() {
+        assert!(parse_analyzed_report_style("").is_err());
+        assert!(parse_analyzed_report_style("not json").is_err());
+        assert!(parse_analyzed_report_style(r#"{"summary":"","promptHint":""}"#).is_err());
+        assert_eq!(
+            parse_analyzed_report_style(
+                r#"{"summary":"偏简洁。","promptHint":"使用 3 条以内分点。"}"#
+            )
+            .expect("style analysis"),
+            AnalyzedReportStyle {
+                summary: "偏简洁。".to_string(),
+                prompt_hint: "使用 3 条以内分点。".to_string(),
+            },
+        );
+    }
+
+    #[test]
     fn normalize_codex_model_uses_fast_default_for_empty_input() {
         assert_eq!(normalize_codex_model(""), "gpt-5.4-mini");
         assert_eq!(normalize_codex_model("  gpt-5.5  "), "gpt-5.5");
@@ -803,6 +955,8 @@ mod tests {
             report_length: report_length.to_string(),
             report_tone: report_tone.to_string(),
             report_focus: report_focus.to_string(),
+            report_style_hint: String::new(),
+            report_style_profile: ReportStyleProfileInput::default(),
             memories: vec![DailyMemoryForReport {
                 id: "daily-memory-2026-06-01".to_string(),
                 date: "2026-06-01".to_string(),
@@ -927,6 +1081,30 @@ fn parse_generated_range_report(
     })?;
 
     normalize_generated_range_report(parsed, input)
+}
+
+fn parse_analyzed_report_style(raw_output: &str) -> Result<AnalyzedReportStyle, String> {
+    let raw_output = raw_output.trim();
+
+    if raw_output.is_empty() {
+        return Err("AI 没有返回有效风格分析结果，请重试。".to_string());
+    }
+
+    let parsed = serde_json::from_str::<AnalyzedReportStyle>(raw_output).map_err(|error| {
+        eprintln!("Codex style analysis output is not valid JSON: {error}");
+        "AI 返回内容不是合法 JSON，请重试。".to_string()
+    })?;
+    let summary = parsed.summary.trim().to_string();
+    let prompt_hint = parsed.prompt_hint.trim().to_string();
+
+    if summary.is_empty() && prompt_hint.is_empty() {
+        return Err("AI 没有返回有效风格分析结果，请重试。".to_string());
+    }
+
+    Ok(AnalyzedReportStyle {
+        summary,
+        prompt_hint,
+    })
 }
 
 fn normalize_generated_range_report(
@@ -1179,6 +1357,7 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            analyze_report_style_with_codex,
             check_codex_cli,
             generate_daily_memory_with_codex,
             generate_range_report_with_codex,

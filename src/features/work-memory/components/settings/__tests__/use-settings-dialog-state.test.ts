@@ -20,4 +20,14 @@ describe('useSettingsDialogState', () => {
     expect(source).toContain("logger.error('backup', 'backup.restore_failed'");
     expect(source).not.toContain('backup.import_cancelled');
   });
+
+  it('extracts report style prompt without saving pasted samples or settings directly', () => {
+    expect(source).toContain('extractReportStylePrompt');
+    expect(source).toContain('return result.promptHint');
+    expect(source).toContain('sampleTextLength');
+    expect(source).not.toContain('先粘贴一些历史日报或周报');
+    expect(source).not.toContain('reportStyleProfile: {');
+    expect(source).not.toContain('enabled: true');
+    expect(source).not.toContain('reportStyleSample');
+  });
 });

@@ -29,6 +29,7 @@ const initialProviderHealth: ProviderHealth = {
 };
 
 const SETTINGS_SAVE_DEBOUNCE_MS = 500;
+const REPORT_STYLE_EXTRACT_TIMEOUT_MS = 60_000;
 
 export function useSettingsDialogState({
   open,
@@ -51,6 +52,7 @@ export function useSettingsDialogState({
   const [isOpeningLogDirectory, setIsOpeningLogDirectory] = useState(false);
   const [isExportingDiagnosticLog, setIsExportingDiagnosticLog] = useState(false);
   const [isDiagnosticLogConfirmOpen, setIsDiagnosticLogConfirmOpen] = useState(false);
+  const [isExtractingReportStyle, setIsExtractingReportStyle] = useState(false);
   const [isSendingTestNotification, setIsSendingTestNotification] = useState(false);
   const [isClearingData, setIsClearingData] = useState(false);
   const [isClearConfirmOpen, setIsClearConfirmOpen] = useState(false);
@@ -350,6 +352,39 @@ export function useSettingsDialogState({
     }
   }
 
+  async function extractReportStylePrompt(sampleText: string) {
+    const trimmedSampleText = sampleText.trim();
+
+    if (!trimmedSampleText) {
+      throw new Error('先粘贴样本');
+    }
+
+    setIsExtractingReportStyle(true);
+
+    try {
+      const result = await withTimeout(
+        aiService.analyzeReportStyle({ sampleText: trimmedSampleText }),
+        REPORT_STYLE_EXTRACT_TIMEOUT_MS,
+        '风格提取等待时间较长，请检查 AI 服务配置后再试。',
+      );
+      const promptHint = result.promptHint.trim();
+
+      if (!promptHint) {
+        throw new Error('没有提取到可用风格，请换一段样本再试。');
+      }
+
+      return result.promptHint.trim();
+    } catch (error) {
+      logger.error('settings', 'report_style.extract_failed', 'Failed to extract report style', {
+        sampleTextLength: trimmedSampleText.length,
+        error,
+      });
+      throw error instanceof Error ? error : new Error('风格提取失败，请稍后重试');
+    } finally {
+      setIsExtractingReportStyle(false);
+    }
+  }
+
   async function sendTestNotification() {
     setIsSendingTestNotification(true);
 
@@ -377,6 +412,7 @@ export function useSettingsDialogState({
     setIsOpeningLogDirectory(false);
     setIsExportingDiagnosticLog(false);
     setIsDiagnosticLogConfirmOpen(false);
+    setIsExtractingReportStyle(false);
     setIsSendingTestNotification(false);
     setPendingBackupPayload(null);
     setProviderHealth(initialProviderHealth);
@@ -400,7 +436,9 @@ export function useSettingsDialogState({
     isOpeningLogDirectory,
     isExportingDiagnosticLog,
     isDiagnosticLogConfirmOpen,
+    isExtractingReportStyle,
     isSendingTestNotification,
+    extractReportStylePrompt,
     exportDiagnosticLog,
     openDataDirectory,
     openLogDirectory,
@@ -437,4 +475,17 @@ function applyPersistedSettings(settings: AppSettings) {
   logger.setDetailedLoggingEnabled(settings.diagnosticLoggingEnabled);
   void reminderService.reschedule(settings);
   void syncWindowBehaviorSettings(settings);
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string) {
+  let timeoutId: ReturnType<typeof globalThis.setTimeout>;
+  const timeoutPromise = new Promise<T>((_resolve, reject) => {
+    timeoutId = globalThis.setTimeout(() => {
+      reject(new Error(message));
+    }, timeoutMs);
+  });
+
+  return Promise.race([promise, timeoutPromise]).finally(() => {
+    globalThis.clearTimeout(timeoutId);
+  });
 }

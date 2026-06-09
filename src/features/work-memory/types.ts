@@ -62,10 +62,28 @@ export type ReportTone = 'natural' | 'formal' | 'retrospective';
 
 export type ReportFocus = 'outcomes' | 'completed-items' | 'risks';
 
+export type ReportStyleProfile = {
+  enabled: boolean;
+  summary: string;
+  promptHint: string;
+  updatedAt: string;
+};
+
 export type ReportPreferences = {
   reportLength: ReportLength;
   reportTone: ReportTone;
   reportFocus: ReportFocus;
+  reportStyleHint: string;
+  reportStyleProfile: ReportStyleProfile;
+};
+
+export type AnalyzeReportStyleInput = {
+  sampleText: string;
+};
+
+export type AnalyzedReportStyle = {
+  summary: string;
+  promptHint: string;
 };
 
 export type ReportGenerationType = 'weekly' | 'custom';

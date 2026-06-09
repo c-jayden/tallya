@@ -1,6 +1,8 @@
 import type {
   GeneratedDailyMemory,
   GeneratedReportContent,
+  AnalyzedReportStyle,
+  AnalyzeReportStyleInput,
   GenerateDailyMemoryInput,
   GenerateRangeReportInput,
   GenerateWeeklyReportInput,
@@ -43,6 +45,10 @@ export type AIProvider = {
     input: GenerateRangeReportInput,
     options: AIProviderOptions,
   ): Promise<GeneratedReportContent>;
+  analyzeReportStyle?(
+    input: AnalyzeReportStyleInput,
+    options: AIProviderOptions,
+  ): Promise<AnalyzedReportStyle>;
   checkHealth?(options: AIProviderOptions): Promise<ProviderHealth>;
 };
 

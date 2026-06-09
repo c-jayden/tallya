@@ -1,6 +1,6 @@
 [package]
 name = "tallya"
-version = "0.1.1"
+version = "0.1.2"
 description = "Local-first AI work memory tool"
 authors = ["Tallya contributors"]
 edition = "2021"

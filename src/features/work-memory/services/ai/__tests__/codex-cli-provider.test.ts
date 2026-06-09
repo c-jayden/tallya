@@ -26,6 +26,13 @@ const weeklyInput: GenerateWeeklyReportInput = {
   reportLength: 'standard',
   reportTone: 'natural',
   reportFocus: 'outcomes',
+  reportStyleHint: '',
+  reportStyleProfile: {
+    enabled: false,
+    summary: '',
+    promptHint: '',
+    updatedAt: '',
+  },
   memories: [
     {
       id: 'daily-memory-2026-06-01',
@@ -146,6 +153,28 @@ describe('createCodexCliProvider', () => {
       name: 'AIProviderError',
       providerId: 'ai-codex-cli',
     } satisfies AIProviderError & { cause: string });
+  });
+
+  it('passes report style analysis input to the Tauri Codex command', async () => {
+    const result = {
+      summary: '偏简洁，常用分点结构。',
+      promptHint: '生成报告时保持简洁自然。',
+    };
+    const invoke = vi.fn().mockResolvedValue(result);
+    const provider = createCodexCliProvider(invoke);
+
+    await expect(
+      provider.analyzeReportStyle?.(
+        { sampleText: '今日完成：整理需求。' },
+        { codexCommand: 'custom-codex', codexModel: 'gpt-5.4-mini' },
+      ),
+    ).resolves.toEqual(result);
+
+    expect(invoke).toHaveBeenCalledWith('analyze_report_style_with_codex', {
+      input: { sampleText: '今日完成：整理需求。' },
+      codexCommand: 'custom-codex',
+      codexModel: 'gpt-5.4-mini',
+    });
   });
 
   it('checks command availability for health', async () => {

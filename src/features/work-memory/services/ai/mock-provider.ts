@@ -46,4 +46,10 @@ export const mockProvider: AIProvider = {
     });
   },
   generateRangeReport: generateMockRangeReport,
+  async analyzeReportStyle() {
+    return {
+      summary: '偏简洁，常用分点结构，语气自然。',
+      promptHint: '生成报告时保持简洁自然，优先使用 3-5 条分点表达完成事项。',
+    };
+  },
 };

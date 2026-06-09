@@ -30,6 +30,13 @@ describe('mockProvider', () => {
           reportLength: 'brief',
           reportTone: 'natural',
           reportFocus: 'outcomes',
+          reportStyleHint: '',
+          reportStyleProfile: {
+            enabled: false,
+            summary: '',
+            promptHint: '',
+            updatedAt: '',
+          },
           memories: [memory],
         },
         { codexCommand: 'codex', codexModel: 'gpt-5.4-mini' },
@@ -51,6 +58,13 @@ describe('mockProvider', () => {
           reportLength: 'brief',
           reportTone: 'natural',
           reportFocus: 'outcomes',
+          reportStyleHint: '',
+          reportStyleProfile: {
+            enabled: false,
+            summary: '',
+            promptHint: '',
+            updatedAt: '',
+          },
           memories: [memory],
         },
         { codexCommand: 'codex', codexModel: 'gpt-5.4-mini' },
@@ -58,6 +72,18 @@ describe('mockProvider', () => {
     ).resolves.toMatchObject({
       title: expect.stringContaining('2026-06-08'),
       markdown: expect.any(String),
+    });
+  });
+
+  it('analyzes report style for development tests', async () => {
+    await expect(
+      mockProvider.analyzeReportStyle?.(
+        { sampleText: '今日完成：整理需求。' },
+        { codexCommand: 'codex', codexModel: 'gpt-5.4-mini' },
+      ),
+    ).resolves.toMatchObject({
+      summary: expect.any(String),
+      promptHint: expect.any(String),
     });
   });
 });

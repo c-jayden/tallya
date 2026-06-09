@@ -1,6 +1,8 @@
 import type {
   GeneratedDailyMemory,
   GeneratedReportContent,
+  AnalyzeReportStyleInput,
+  AnalyzedReportStyle,
   GenerateDailyMemoryInput,
   GenerateRangeReportInput,
 } from '../../types';
@@ -9,6 +11,7 @@ import { normalizeReportText } from '../report-text';
 import { AIProviderError, type AIProvider, type AIProviderOptions } from './ai-provider';
 
 const OPENAI_COMPATIBLE_PROVIDER_ID = 'openai-compatible';
+const OPENAI_COMPATIBLE_REQUEST_TIMEOUT_MS = 45_000;
 const API_VERSION_PATH = '/v1';
 const CHAT_COMPLETIONS_PATH = '/chat/completions';
 const RESPONSE_BODY_PREVIEW_LIMIT = 500;
@@ -140,7 +143,7 @@ export function createOpenAICompatibleProvider(fetchImpl: FetchLike = fetch): AI
         strictJsonMode: requestOptions.strictJsonMode,
         hasApiKey: Boolean(config.apiKey),
       });
-      response = await fetchImpl(toChatCompletionsUrl(config.normalizedBaseUrl), {
+      response = await fetchWithTimeout(toChatCompletionsUrl(config.normalizedBaseUrl), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -162,7 +165,9 @@ export function createOpenAICompatibleProvider(fetchImpl: FetchLike = fetch): AI
       });
 
       throw new AIProviderError(
-        '无法连接到 AI 服务，请检查 Base URL 或网络。',
+        isAbortError(error)
+          ? 'AI 服务响应超时，请检查网关或稍后再试。'
+          : '无法连接到 AI 服务，请检查 Base URL 或网络。',
         OPENAI_COMPATIBLE_PROVIDER_ID,
         error,
       );
@@ -189,6 +194,22 @@ export function createOpenAICompatibleProvider(fetchImpl: FetchLike = fetch): AI
       bodyText,
       serverMessage,
     };
+  }
+
+  async function fetchWithTimeout(url: string, init: RequestInit) {
+    const abortController = new AbortController();
+    const timeoutId = globalThis.setTimeout(() => {
+      abortController.abort();
+    }, OPENAI_COMPATIBLE_REQUEST_TIMEOUT_MS);
+
+    try {
+      return await fetchImpl(url, {
+        ...init,
+        signal: abortController.signal,
+      });
+    } finally {
+      globalThis.clearTimeout(timeoutId);
+    }
   }
 
   function parseChatCompletionAttempt(
@@ -283,6 +304,25 @@ export function createOpenAICompatibleProvider(fetchImpl: FetchLike = fetch): AI
       return requestJSON(options, buildRangeReportPrompt(input), (rawOutput) =>
         parseGeneratedRangeReport(rawOutput, input),
       );
+    },
+    async analyzeReportStyle(input, options) {
+      try {
+        return await requestJSON(options, buildReportStyleAnalysisPrompt(input), parseAnalyzedReportStyle);
+      } catch (error) {
+        await logger.error(
+          'ai',
+          'openai-compatible.style_analysis_failed',
+          'OpenAI Compatible style analysis failed',
+          {
+            provider: OPENAI_COMPATIBLE_PROVIDER_ID,
+            model: options.openAICompatible?.model,
+            sampleTextLength: input.sampleText.trim().length,
+            errorMessage: error instanceof Error ? error.message : String(error),
+          },
+        );
+
+        throw error;
+      }
     },
     async checkHealth(options) {
       try {
@@ -475,6 +515,18 @@ function getFriendlyHTTPError(status: number) {
   return 'AI 服务请求失败，请检查当前配置。';
 }
 
+function isAbortError(error: unknown) {
+  if (error instanceof DOMException && error.name === 'AbortError') {
+    return true;
+  }
+
+  if (error instanceof Error) {
+    return error.name === 'AbortError' || /abort/i.test(error.message);
+  }
+
+  return false;
+}
+
 function shouldFallbackResponseFormat(message: string | undefined) {
   if (!message) {
     return false;
@@ -631,6 +683,16 @@ function buildDailyMemoryPrompt(input: GenerateDailyMemoryInput) {
 
 function buildRangeReportPrompt(input: GenerateRangeReportInput) {
   const reportName = input.reportType === 'custom' ? '自定义范围工作总结' : '周报';
+  const promptInput = {
+    reportType: input.reportType,
+    startDate: input.startDate,
+    endDate: input.endDate,
+    memories: input.memories,
+    reportLength: input.reportLength,
+    reportTone: input.reportTone,
+    reportFocus: input.reportFocus,
+    reportStyleHint: input.reportStyleHint,
+  };
 
   return [
     `请根据输入中的 daily memories 整理一份中文${reportName}。`,
@@ -640,9 +702,49 @@ function buildRangeReportPrompt(input: GenerateRangeReportInput) {
     reportLengthInstruction(input.reportLength, input.memories.length),
     reportToneInstruction(input.reportTone),
     reportFocusInstruction(input.reportFocus),
+    reportStyleInstruction(input),
     'markdown 是可直接复制的报告文本；不要包含多余空行，section 之间最多一个空行，不要输出空 section。',
-    `输入：${JSON.stringify(input)}`,
+    `输入：${JSON.stringify(promptInput)}`,
   ].join('\n');
+}
+
+function buildReportStyleAnalysisPrompt(input: AnalyzeReportStyleInput) {
+  return [
+    '请分析用户粘贴的历史日报或周报样本，只输出合法 JSON，不要输出解释或 markdown。',
+    'JSON keys: summary:string, promptHint:string.',
+    '分析目标：',
+    '- 只分析写作风格、表达习惯、结构倾向、语气、篇幅和信息组织方式。',
+    '- 不提取具体业务内容。',
+    '- 不提取具体项目名、公司名、客户名、人名、系统名、模块名、任务编号。',
+    '- 不要把样本中的具体业务场景、字段结构或一次性表达直接复制到 promptHint。',
+    '- 不要保存原始样本文本。',
+    'summary 要求：',
+    '- 用一句话概括样本的写作风格。',
+    '- 可以写成“风格偏简洁、克制，重视进展、原因和结果”这类分析总结。',
+    'promptHint 要求：',
+    '- 必须写成可直接回填到“风格偏好”输入框的长期报告写作提示。',
+    '- promptHint 应适用于日报、周报和自定义范围报告，不要只适用于某一次工作进展说明。',
+    '- promptHint 应描述“后续报告应该怎么写”，不要写成“你的风格是……”这类分析总结。',
+    '- promptHint 只能影响表达方式、结构、语气和篇幅，不能要求模型编造事实。',
+    '- promptHint 不要包含具体业务名词。',
+    '- promptHint 不要绑定过细的栏目，例如“页面/交互/结果”；可以抽象成“先概括主要进展，再按事项说明动作、原因和结果”。',
+    '- promptHint 建议控制在 80-160 个中文字符之间。',
+    '- 使用克制、清晰、可执行的中文表达。',
+    `样本文本：${input.sampleText}`,
+  ].join('\n');
+}
+
+function reportStyleInstruction(input: GenerateRangeReportInput) {
+  const instructions = [
+    '风格提示只影响表达方式，不允许改变事实内容，也不允许加入样本里的具体业务信息。',
+  ];
+  const reportStyleHint = input.reportStyleHint.trim();
+
+  if (reportStyleHint) {
+    instructions.push(`用户风格偏好：${reportStyleHint}`);
+  }
+
+  return instructions.join('\n');
 }
 
 function reportLengthInstruction(reportLength: string, memoryCount: number) {
@@ -732,6 +834,20 @@ function parseGeneratedRangeReport(rawOutput: string, input: GenerateRangeReport
   }
 
   return report;
+}
+
+function parseAnalyzedReportStyle(rawOutput: string): AnalyzedReportStyle {
+  const parsed = parseStrictJSON<AnalyzedReportStyle>(rawOutput);
+  const style = {
+    summary: parsed.summary?.trim() ?? '',
+    promptHint: parsed.promptHint?.trim() ?? '',
+  };
+
+  if (!style.summary && !style.promptHint) {
+    throw new Error('AI 没有返回有效风格分析结果，请稍后重试。');
+  }
+
+  return style;
 }
 
 function parseStrictJSON<T>(
