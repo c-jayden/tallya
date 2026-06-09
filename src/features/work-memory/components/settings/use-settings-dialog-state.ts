@@ -466,6 +466,8 @@ function normalizeProviderSettings(settings: AppSettings) {
       model:
         settings.openAICompatible.model.trim() ||
         DEFAULT_APP_SETTINGS.openAICompatible.model,
+      apiMode:
+        settings.openAICompatible.apiMode || DEFAULT_APP_SETTINGS.openAICompatible.apiMode,
     },
   };
 }

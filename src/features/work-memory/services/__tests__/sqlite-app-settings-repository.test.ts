@@ -63,6 +63,9 @@ describe('SQLiteAppSettingsRepository', () => {
 
     expect(database.appSettings.get('theme')?.value).toBe('dark');
     expect(database.appSettings.get('codexModel')?.value).toBe(DEFAULT_APP_SETTINGS.codexModel);
+    expect(database.appSettings.get('openAICompatibleApiMode')?.value).toBe(
+      'chat-completions',
+    );
     expect(database.appSettings.get('closeToTray')?.value).toBe('false');
     expect(database.appSettings.get('dailyReminderEnabled')?.value).toBe('true');
     expect(database.appSettings.get('reportLength')?.value).toBe('standard');
@@ -92,6 +95,41 @@ describe('SQLiteAppSettingsRepository', () => {
     await expect(repository.getSettings()).resolves.toEqual({
       ...DEFAULT_APP_SETTINGS,
       theme: 'dark',
+    });
+  });
+
+  it('fills missing OpenAI Compatible api mode from defaults when reading older settings rows', async () => {
+    const database = new TestDatabaseClient();
+    database.appSettings.set('aiProviderId', {
+      key: 'aiProviderId',
+      value: 'openai-compatible',
+      updated_at: '2026-06-09T01:00:00.000Z',
+    });
+    database.appSettings.set('openAICompatibleBaseUrl', {
+      key: 'openAICompatibleBaseUrl',
+      value: 'https://gateway.example.com/v1',
+      updated_at: '2026-06-09T01:00:00.000Z',
+    });
+    database.appSettings.set('openAICompatibleApiKey', {
+      key: 'openAICompatibleApiKey',
+      value: 'legacy-key',
+      updated_at: '2026-06-09T01:00:00.000Z',
+    });
+    database.appSettings.set('openAICompatibleModel', {
+      key: 'openAICompatibleModel',
+      value: 'legacy-model',
+      updated_at: '2026-06-09T01:00:00.000Z',
+    });
+    const repository = new SQLiteAppSettingsRepository(Promise.resolve(database));
+
+    await expect(repository.getSettings()).resolves.toMatchObject({
+      aiProviderId: 'openai-compatible',
+      openAICompatible: {
+        baseUrl: 'https://gateway.example.com/v1',
+        apiKey: 'legacy-key',
+        model: 'legacy-model',
+        apiMode: 'chat-completions',
+      },
     });
   });
 

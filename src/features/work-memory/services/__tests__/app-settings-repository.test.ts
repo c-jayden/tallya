@@ -61,6 +61,7 @@ describe('LocalStorageAppSettingsRepository', () => {
         baseUrl: 'https://api.example.com/v1',
         apiKey: 'test-key',
         model: 'gpt-test',
+        apiMode: 'responses',
       },
       ollama: {
         baseUrl: 'http://localhost:11434',
@@ -78,6 +79,7 @@ describe('LocalStorageAppSettingsRepository', () => {
         baseUrl: 'https://api.example.com/v1',
         apiKey: 'test-key',
         model: 'gpt-test',
+        apiMode: 'responses',
       },
       ollama: {
         baseUrl: 'http://localhost:11434',
@@ -117,6 +119,30 @@ describe('LocalStorageAppSettingsRepository', () => {
         baseUrl: 'https://api.openai.com/v1',
         apiKey: '',
         model: 'gpt-5.4-mini',
+        apiMode: 'chat-completions',
+      },
+    });
+
+    storage.setItem(
+      'tallya.app-settings.v1',
+      JSON.stringify({
+        aiProviderId: 'openai-compatible',
+        openAICompatible: {
+          baseUrl: 'https://gateway.example.com/v1',
+          apiKey: 'legacy-key',
+          model: 'legacy-model',
+        },
+      }),
+    );
+
+    await expect(repository.getSettings()).resolves.toEqual({
+      ...DEFAULT_APP_SETTINGS,
+      aiProviderId: 'openai-compatible',
+      openAICompatible: {
+        baseUrl: 'https://gateway.example.com/v1',
+        apiKey: 'legacy-key',
+        model: 'legacy-model',
+        apiMode: 'chat-completions',
       },
     });
 

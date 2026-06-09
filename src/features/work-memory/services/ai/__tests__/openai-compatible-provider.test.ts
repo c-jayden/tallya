@@ -51,6 +51,15 @@ const options: AIProviderOptions = {
     baseUrl: 'https://api.example.com/v1',
     apiKey: 'secret-api-key',
     model: 'gpt-test',
+    apiMode: 'chat-completions',
+  },
+};
+
+const responsesOptions: AIProviderOptions = {
+  ...options,
+  openAICompatible: {
+    ...options.openAICompatible!,
+    apiMode: 'responses',
   },
 };
 
@@ -87,6 +96,28 @@ describe('OpenAI Compatible Provider', () => {
     });
 
     expect(fetch).toHaveBeenCalledWith(expectedUrl, expect.any(Object));
+  });
+
+  it.each([
+    ['https://api.example.com', 'https://api.example.com/v1/responses'],
+    ['https://api.example.com/', 'https://api.example.com/v1/responses'],
+    ['https://api.example.com/v1', 'https://api.example.com/v1/responses'],
+    ['https://api.example.com/v1/', 'https://api.example.com/v1/responses'],
+  ])('sends responses requests to the normalized URL', async (baseUrl, expectedUrl) => {
+    const fetch = vi.fn().mockResolvedValue(responsesOutputTextResponse(dailyMemoryPayload()));
+    const provider = createOpenAICompatibleProvider(fetch);
+
+    await provider.generateDailyMemory(dailyInput, {
+      ...responsesOptions,
+      openAICompatible: { ...responsesOptions.openAICompatible!, baseUrl },
+    });
+
+    expect(fetch).toHaveBeenCalledWith(expectedUrl, expect.any(Object));
+    expect(JSON.parse(String(fetch.mock.calls[0]?.[1]?.body))).toMatchObject({
+      model: 'gpt-test',
+      input: expect.stringContaining('JSON'),
+      temperature: 0.2,
+    });
   });
 
   it('reports a friendly timeout when the OpenAI Compatible request does not finish', async () => {
@@ -159,7 +190,7 @@ describe('OpenAI Compatible Provider', () => {
     });
   });
 
-  it('parses output_text from Responses API style payloads', async () => {
+  it('parses output_text from Responses API payloads in responses mode', async () => {
     const fetch = vi.fn().mockResolvedValue(
       jsonResponse({
         output_text: JSON.stringify(dailyMemoryPayload()),
@@ -167,12 +198,12 @@ describe('OpenAI Compatible Provider', () => {
     );
     const provider = createOpenAICompatibleProvider(fetch);
 
-    await expect(provider.generateDailyMemory(dailyInput, options)).resolves.toMatchObject({
+    await expect(provider.generateDailyMemory(dailyInput, responsesOptions)).resolves.toMatchObject({
       summary: '整理需求并同步计划。',
     });
   });
 
-  it('parses output content text from Responses API style payloads', async () => {
+  it('parses output content text from Responses API payloads in responses mode', async () => {
     const fetch = vi.fn().mockResolvedValue(
       jsonResponse({
         output: [
@@ -184,8 +215,44 @@ describe('OpenAI Compatible Provider', () => {
     );
     const provider = createOpenAICompatibleProvider(fetch);
 
-    await expect(provider.generateDailyMemory(dailyInput, options)).resolves.toMatchObject({
+    await expect(provider.generateDailyMemory(dailyInput, responsesOptions)).resolves.toMatchObject({
       summary: '整理需求并同步计划。',
+    });
+  });
+
+  it('suggests Responses API when chat mode is sent to a codex responses channel', async () => {
+    const fetch = vi.fn().mockResolvedValue(
+      jsonResponse(
+        {
+          error: {
+            message: 'codex channel: only /v1/responses and /v1/responses/compact are supported',
+          },
+        },
+        400,
+      ),
+    );
+    const provider = createOpenAICompatibleProvider(fetch);
+
+    await expect(provider.generateDailyMemory(dailyInput, options)).rejects.toMatchObject({
+      message: expect.stringContaining('接口模式切换为 Responses API'),
+    });
+  });
+
+  it('suggests Chat Completions when responses mode is not supported', async () => {
+    const fetch = vi.fn().mockResolvedValue(
+      jsonResponse(
+        {
+          error: {
+            message: 'chat/completions endpoint is required; responses not supported',
+          },
+        },
+        400,
+      ),
+    );
+    const provider = createOpenAICompatibleProvider(fetch);
+
+    await expect(provider.generateDailyMemory(dailyInput, responsesOptions)).rejects.toMatchObject({
+      message: expect.stringContaining('尝试切换为 Chat Completions'),
     });
   });
 
@@ -316,6 +383,28 @@ describe('OpenAI Compatible Provider', () => {
     });
   });
 
+  it('checks provider health through Responses API mode', async () => {
+    const fetch = vi.fn().mockResolvedValue(responsesOutputTextResponse({ ok: true }));
+    const provider = createOpenAICompatibleProvider(fetch);
+
+    await expect(provider.checkHealth?.(responsesOptions)).resolves.toEqual({
+      status: 'available',
+      message: '服务可用',
+    });
+    expect(fetch).toHaveBeenCalledWith('https://api.example.com/v1/responses', expect.any(Object));
+  });
+
+  it('returns a friendly health detail when Responses API output is not JSON', async () => {
+    const fetch = vi.fn().mockResolvedValue(responsesOutputTextResponse('ok'));
+    const provider = createOpenAICompatibleProvider(fetch);
+
+    await expect(provider.checkHealth?.(responsesOptions)).resolves.toMatchObject({
+      status: 'unavailable',
+      message: '检测失败',
+      detail: expect.stringContaining('未返回预期 JSON'),
+    });
+  });
+
   it('returns a specific health detail when the service returns non-JSON text', async () => {
     const fetch = vi.fn().mockResolvedValue(chatResponse('ok'));
     const provider = createOpenAICompatibleProvider(fetch);
@@ -372,6 +461,35 @@ describe('OpenAI Compatible Provider', () => {
     expect(body.model).toBe('gpt-test');
   });
 
+  it('generates daily memory through Responses API mode', async () => {
+    const fetch = vi.fn().mockResolvedValue(responsesOutputTextResponse(dailyMemoryPayload()));
+    const provider = createOpenAICompatibleProvider(fetch);
+
+    await expect(provider.generateDailyMemory(dailyInput, responsesOptions)).resolves.toMatchObject({
+      summary: '整理需求并同步计划。',
+    });
+  });
+
+  it('generates weekly reports through Responses API mode', async () => {
+    const fetch = vi.fn().mockResolvedValue(responsesOutputTextResponse(reportPayload()));
+    const provider = createOpenAICompatibleProvider(fetch);
+
+    await expect(provider.generateWeeklyReport(reportInput, responsesOptions)).resolves.toMatchObject({
+      title: '本周工作总结',
+      summary: '完成存储迁移。',
+    });
+  });
+
+  it('generates range reports through Responses API mode', async () => {
+    const fetch = vi.fn().mockResolvedValue(responsesOutputTextResponse(reportPayload()));
+    const provider = createOpenAICompatibleProvider(fetch);
+
+    await expect(provider.generateRangeReport(reportInput, responsesOptions)).resolves.toMatchObject({
+      title: '本周工作总结',
+      summary: '完成存储迁移。',
+    });
+  });
+
   it('analyzes report style without asking to save the original sample text', async () => {
     const fetch = vi.fn().mockResolvedValue(
       chatResponse({
@@ -424,6 +542,16 @@ function dailyMemoryPayload() {
   };
 }
 
+function reportPayload() {
+  return {
+    title: '本周工作总结',
+    summary: '完成存储迁移。',
+    highlights: ['完成存储迁移'],
+    completedItems: ['迁移到 SQLite'],
+    markdown: '# 本周工作总结\n\n完成存储迁移。',
+  };
+}
+
 function chatResponse(content: unknown, status = 200) {
   return jsonResponse(
     {
@@ -444,6 +572,15 @@ function jsonResponse(payload: unknown, status = 200) {
     status,
     headers: { 'Content-Type': 'application/json' },
   });
+}
+
+function responsesOutputTextResponse(content: unknown, status = 200) {
+  return jsonResponse(
+    {
+      output_text: typeof content === 'string' ? content : JSON.stringify(content),
+    },
+    status,
+  );
 }
 
 async function waitForAsyncLogs() {

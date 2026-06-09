@@ -1,4 +1,4 @@
-import type { AIProviderId } from './ai/ai-provider';
+import type { AIProviderId, OpenAICompatibleApiMode } from './ai/ai-provider';
 import {
   DEFAULT_CODEX_MODEL,
   DEFAULT_OPENAI_COMPATIBLE_MODEL,
@@ -16,6 +16,7 @@ export type OpenAICompatibleSettings = {
   baseUrl: string;
   apiKey: string;
   model: string;
+  apiMode: OpenAICompatibleApiMode;
 };
 
 export type OllamaSettings = {
@@ -62,6 +63,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
     baseUrl: 'https://api.openai.com/v1',
     apiKey: '',
     model: DEFAULT_OPENAI_COMPATIBLE_MODEL,
+    apiMode: 'chat-completions',
   },
   ollama: {
     baseUrl: 'http://localhost:11434',
@@ -278,6 +280,7 @@ function appSettingsToRows(settings: AppSettings): Record<string, string> {
     openAICompatibleBaseUrl: settings.openAICompatible.baseUrl,
     openAICompatibleApiKey: settings.openAICompatible.apiKey,
     openAICompatibleModel: settings.openAICompatible.model,
+    openAICompatibleApiMode: settings.openAICompatible.apiMode,
     ollamaBaseUrl: settings.ollama.baseUrl,
     ollamaModel: settings.ollama.model,
     dailyReminderEnabled: String(settings.dailyReminderEnabled),
@@ -311,6 +314,7 @@ function rowsToAppSettingsInput(rows: AppSettingsRow[]) {
       baseUrl: values.openAICompatibleBaseUrl,
       apiKey: values.openAICompatibleApiKey,
       model: values.openAICompatibleModel,
+      apiMode: values.openAICompatibleApiMode,
     },
     ollama: {
       baseUrl: values.ollamaBaseUrl,
@@ -473,7 +477,14 @@ function normalizeOpenAICompatibleSettings(value: unknown): OpenAICompatibleSett
     baseUrl: getString(input.baseUrl, DEFAULT_APP_SETTINGS.openAICompatible.baseUrl),
     apiKey: getString(input.apiKey, DEFAULT_APP_SETTINGS.openAICompatible.apiKey),
     model: getString(input.model, DEFAULT_APP_SETTINGS.openAICompatible.model),
+    apiMode: getOpenAICompatibleApiMode(input.apiMode),
   };
+}
+
+function getOpenAICompatibleApiMode(value: unknown): OpenAICompatibleApiMode {
+  return value === 'responses' || value === 'chat-completions'
+    ? value
+    : DEFAULT_APP_SETTINGS.openAICompatible.apiMode;
 }
 
 function normalizeOllamaSettings(value: unknown): OllamaSettings {

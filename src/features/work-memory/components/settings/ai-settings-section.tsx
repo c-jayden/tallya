@@ -1,6 +1,7 @@
 import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
 import {
   Select,
   SelectContent,
@@ -9,7 +10,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import type { AppSettings } from '../../services/app-settings-repository';
-import type { AIProviderId } from '../../services/ai/ai-provider';
+import type { AIProviderId, OpenAICompatibleApiMode } from '../../services/ai/ai-provider';
 import {
   DEFAULT_OPENAI_COMPATIBLE_MODEL,
   getDefaultProviderModel,
@@ -23,17 +24,33 @@ const visibleProviderOptions: { value: AIProviderId; label: string; description:
   {
     value: 'ai-codex-cli',
     label: 'Codex CLI',
-    description: '通过本机 Codex CLI 整理工作记忆。',
+    description: '使用本机 Codex CLI。',
   },
   {
     value: 'openai-compatible',
     label: 'OpenAI Compatible',
-    description:
-      '用于兼容 OpenAI 格式的 API 服务，可填写 OpenAI、DeepSeek、Kimi、OpenRouter、CC Switch 或公司网关的地址和模型。如果该 Provider 是 Claude / Anthropic 格式，当前 OpenAI Compatible 可能无法使用。',
+    description: '填写 OpenAI 兼容服务、CC Switch 或公司网关。',
   },
 ];
 
 const openAIInputClassName = 'placeholder:text-slate-400';
+
+const apiModeOptions: {
+  value: OpenAICompatibleApiMode;
+  label: string;
+  description: string;
+}[] = [
+  {
+    value: 'chat-completions',
+    label: 'Chat Completions',
+    description: '常用兼容接口。',
+  },
+  {
+    value: 'responses',
+    label: 'Responses API',
+    description: '仅支持 /v1/responses 时使用。',
+  },
+];
 
 type AISettingsSectionProps = {
   settings: AppSettings;
@@ -162,6 +179,52 @@ export function AISettingsSection({
                 placeholder={DEFAULT_OPENAI_COMPATIBLE_MODEL}
               />
             </Field>
+
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between gap-3 text-sm">
+                <span className="font-medium text-app-ink-muted">接口模式</span>
+                <div className="inline-flex w-fit gap-1 rounded-xl bg-gray-100 p-1 dark:bg-app-surface-muted">
+                  {apiModeOptions.map((option) => {
+                    const isSelected = settings.openAICompatible.apiMode === option.value;
+
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        className={cn(
+                          'h-8 cursor-pointer rounded-lg bg-transparent px-3.5 text-sm text-app-ink-muted transition-colors hover:text-app-ink focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none disabled:cursor-not-allowed',
+                          isSelected &&
+                            'bg-white font-semibold text-app-ink shadow-[0_1px_1px_rgb(15_23_42/0.04)] dark:bg-app-surface dark:text-app-ink',
+                        )}
+                        aria-pressed={isSelected}
+                        onClick={() => {
+                          const mode = option.value;
+
+                          onUpdateSettings({
+                            openAICompatible: {
+                              ...settings.openAICompatible,
+                              apiMode: mode,
+                            },
+                          });
+                        }}
+                      >
+                        {option.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="space-y-1">
+                {apiModeOptions.map((option) => (
+                  <p key={option.value} className="text-[13px] leading-5 text-app-ink-subtle">
+                    {option.label}：{option.description}
+                  </p>
+                ))}
+              </div>
+              <p className="text-[13px] leading-5 text-app-ink-subtle">
+                CC Switch 或公司网关遇到 “only /v1/responses” 时，切换到 Responses API。
+              </p>
+            </div>
           </div>
         )}
 

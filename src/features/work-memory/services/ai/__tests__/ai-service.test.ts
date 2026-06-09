@@ -66,6 +66,7 @@ const settings: AppSettings = {
     baseUrl: 'https://api.openai.com/v1',
     apiKey: '',
     model: 'gpt-5.4-mini',
+    apiMode: 'chat-completions',
   },
   ollama: {
     baseUrl: 'http://localhost:11434',
@@ -244,6 +245,7 @@ describe('createAIService', () => {
             baseUrl: 'https://api.example.com/v1',
             apiKey: 'secret',
             model: 'gpt-test',
+            apiMode: 'responses',
           },
         }),
       },
@@ -265,6 +267,7 @@ describe('createAIService', () => {
         baseUrl: 'https://api.example.com/v1',
         apiKey: 'secret',
         model: 'gpt-test',
+        apiMode: 'responses',
       },
     });
   });
