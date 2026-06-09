@@ -8,4 +8,9 @@ describe('SettingsDialog', () => {
     expect(source).toContain('!nextOpen && settingsState.isImportingBackup');
     expect(source).toContain('settingsState.resetTransientState()');
   });
+
+  it('requires confirmation before exporting diagnostic logs', () => {
+    expect(source).toContain('ExportDiagnosticLogConfirmDialog');
+    expect(source).toContain('settingsState.exportDiagnosticLog');
+  });
 });

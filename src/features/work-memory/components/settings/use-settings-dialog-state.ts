@@ -8,6 +8,7 @@ import {
 } from '../../services/app-settings-repository';
 import { applyAppTheme } from '../../services/app-theme';
 import { backupService, type BackupPayload } from '../../services/backup-service';
+import { logger } from '../../services/logger/logger';
 import { reminderService } from '../../services/reminder-service';
 import { syncWindowBehaviorSettings } from '../../services/window-service';
 import {
@@ -47,6 +48,9 @@ export function useSettingsDialogState({
   const [isSelectingBackupFile, setIsSelectingBackupFile] = useState(false);
   const [isImportingBackup, setIsImportingBackup] = useState(false);
   const [isOpeningDataDirectory, setIsOpeningDataDirectory] = useState(false);
+  const [isOpeningLogDirectory, setIsOpeningLogDirectory] = useState(false);
+  const [isExportingDiagnosticLog, setIsExportingDiagnosticLog] = useState(false);
+  const [isDiagnosticLogConfirmOpen, setIsDiagnosticLogConfirmOpen] = useState(false);
   const [isSendingTestNotification, setIsSendingTestNotification] = useState(false);
   const [isClearingData, setIsClearingData] = useState(false);
   const [isClearConfirmOpen, setIsClearConfirmOpen] = useState(false);
@@ -158,6 +162,10 @@ export function useSettingsDialogState({
       applyAppTheme(nextSettings.theme);
     }
 
+    if (patch.diagnosticLoggingEnabled !== undefined) {
+      logger.setDetailedLoggingEnabled(nextSettings.diagnosticLoggingEnabled);
+    }
+
     if (
       patch.closeToTray !== undefined ||
       patch.startMinimized !== undefined ||
@@ -204,7 +212,8 @@ export function useSettingsDialogState({
       await onClearLocalData();
       toast.success('本地数据已清空');
       setIsClearConfirmOpen(false);
-    } catch {
+    } catch (error) {
+      logger.error('sqlite', 'data.clear_failed', 'Failed to clear local data', { error });
       toast.error('清空本地数据失败');
     } finally {
       setIsClearingData(false);
@@ -221,7 +230,8 @@ export function useSettingsDialogState({
       if (result.status === 'exported') {
         toast.success('备份已导出');
       }
-    } catch {
+    } catch (error) {
+      logger.error('backup', 'backup.export_failed', 'Failed to export backup', { error });
       toast.error('导出备份失败，请稍后重试');
     } finally {
       setIsExportingBackup(false);
@@ -241,6 +251,9 @@ export function useSettingsDialogState({
     } catch (error) {
       const message = error instanceof Error ? error.message : '备份文件格式不正确';
 
+      logger.error('backup', 'backup.import_file_failed', 'Failed to read backup file', {
+        error,
+      });
       toast.error(message);
     } finally {
       setIsSelectingBackupFile(false);
@@ -267,7 +280,8 @@ export function useSettingsDialogState({
       toast.success('备份已导入');
       setPendingBackupPayload(null);
       setIsImportConfirmOpen(false);
-    } catch {
+    } catch (error) {
+      logger.error('backup', 'backup.restore_failed', 'Failed to restore backup', { error });
       toast.error('导入备份失败，请稍后重试');
     } finally {
       setIsImportingBackup(false);
@@ -292,10 +306,47 @@ export function useSettingsDialogState({
     try {
       await backupService.openDataDirectory();
     } catch (error) {
-      console.error('Failed to open data directory', error);
+      logger.error('backup', 'backup.open_data_directory_failed', 'Failed to open data directory', {
+        error,
+      });
       toast.error('打开数据目录失败');
     } finally {
       setIsOpeningDataDirectory(false);
+    }
+  }
+
+  async function openLogDirectory() {
+    setIsOpeningLogDirectory(true);
+
+    try {
+      await logger.openLogsDirectory();
+    } catch (error) {
+      logger.error('settings', 'diagnostic_log.open_directory_failed', 'Failed to open log directory', {
+        error,
+      });
+      toast.error('打开日志目录失败');
+    } finally {
+      setIsOpeningLogDirectory(false);
+    }
+  }
+
+  async function exportDiagnosticLog() {
+    setIsExportingDiagnosticLog(true);
+
+    try {
+      const result = await logger.exportDiagnosticLogs();
+
+      if (result.status === 'exported') {
+        toast.success('诊断日志已导出');
+      }
+      setIsDiagnosticLogConfirmOpen(false);
+    } catch (error) {
+      logger.error('settings', 'diagnostic_log.export_failed', 'Failed to export diagnostic logs', {
+        error,
+      });
+      toast.error('导出诊断日志失败');
+    } finally {
+      setIsExportingDiagnosticLog(false);
     }
   }
 
@@ -323,6 +374,9 @@ export function useSettingsDialogState({
     setIsSelectingBackupFile(false);
     setIsImportingBackup(false);
     setIsOpeningDataDirectory(false);
+    setIsOpeningLogDirectory(false);
+    setIsExportingDiagnosticLog(false);
+    setIsDiagnosticLogConfirmOpen(false);
     setIsSendingTestNotification(false);
     setPendingBackupPayload(null);
     setProviderHealth(initialProviderHealth);
@@ -343,12 +397,18 @@ export function useSettingsDialogState({
     isImportingBackup: isSelectingBackupFile || isImportingBackup,
     isLoadingSettings,
     isOpeningDataDirectory,
+    isOpeningLogDirectory,
+    isExportingDiagnosticLog,
+    isDiagnosticLogConfirmOpen,
     isSendingTestNotification,
+    exportDiagnosticLog,
     openDataDirectory,
+    openLogDirectory,
     requestImportBackup,
     setActiveSection,
     setIsClearConfirmOpen,
     setIsImportConfirmOpen: updateImportConfirmOpen,
+    setIsDiagnosticLogConfirmOpen,
     settings,
     sendTestNotification,
     updateSettings,
@@ -374,6 +434,7 @@ function normalizeProviderSettings(settings: AppSettings) {
 
 function applyPersistedSettings(settings: AppSettings) {
   applyAppTheme(settings.theme);
+  logger.setDetailedLoggingEnabled(settings.diagnosticLoggingEnabled);
   void reminderService.reschedule(settings);
   void syncWindowBehaviorSettings(settings);
 }

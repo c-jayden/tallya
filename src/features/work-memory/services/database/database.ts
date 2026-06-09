@@ -1,5 +1,6 @@
 import { DATABASE_PATH } from './schema';
 import { runMigrations } from './migrations';
+import { logger } from '../logger/logger';
 import { createFriendlyError } from '../service-error';
 
 export type DatabaseClient = {
@@ -32,7 +33,10 @@ async function loadDatabase() {
 
     return database;
   } catch (error) {
-    console.error('Failed to initialize SQLite database', error);
+    logger.error('sqlite', 'database.initialize_failed', 'Failed to initialize SQLite database', {
+      databasePath: DATABASE_PATH,
+      error,
+    });
     throw createFriendlyError('本地数据库初始化失败，请稍后重试。', error);
   }
 }

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { tauriMocks } from '@/test/tauri-mocks';
 import type { GenerateDailyMemoryInput, GenerateRangeReportInput } from '../../../types';
 import { AIProviderError, type AIProviderOptions } from '../ai-provider';
 import {
@@ -255,7 +256,6 @@ describe('OpenAI Compatible Provider', () => {
   });
 
   it('writes redacted diagnostics without API Key, authorization header, or full user content', async () => {
-    const debug = vi.spyOn(console, 'debug').mockImplementation(() => undefined);
     const fetch = vi
       .fn()
       .mockResolvedValue(
@@ -266,8 +266,9 @@ describe('OpenAI Compatible Provider', () => {
     await expect(provider.generateDailyMemory(dailyInput, options)).rejects.toBeInstanceOf(
       AIProviderError,
     );
+    await waitForAsyncLogs();
 
-    const logs = debug.mock.calls.map((call) => JSON.stringify(call)).join('\n');
+    const logs = tauriMocks.writeTextFile.mock.calls.map((call) => String(call[1])).join('\n');
     expect(logs).toContain('openai-compatible');
     expect(logs).toContain('https://api.example.com/v1');
     expect(logs).toContain('gpt-test');
@@ -367,4 +368,8 @@ function jsonResponse(payload: unknown, status = 200) {
     status,
     headers: { 'Content-Type': 'application/json' },
   });
+}
+
+async function waitForAsyncLogs() {
+  await new Promise((resolve) => setTimeout(resolve, 0));
 }

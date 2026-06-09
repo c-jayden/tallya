@@ -4,6 +4,7 @@ import type {
   GenerateDailyMemoryInput,
   GenerateRangeReportInput,
 } from '../../types';
+import { logger } from '../logger/logger';
 import { normalizeReportText } from '../report-text';
 import { AIProviderError, type AIProvider, type AIProviderOptions } from './ai-provider';
 
@@ -48,6 +49,13 @@ export function createOpenAICompatibleProvider(fetchImpl: FetchLike = fetch): AI
     try {
       return parseOutput(content);
     } catch (error) {
+      logger.error('ai', 'openai-compatible.json_parse_failed', 'AI output JSON parse failed', {
+        provider: OPENAI_COMPATIBLE_PROVIDER_ID,
+        model: config.model,
+        outputPreview: content,
+        errorMessage: error instanceof Error ? error.message : String(error),
+      });
+
       if (error instanceof AIProviderError) {
         throw error;
       }
@@ -74,7 +82,7 @@ export function createOpenAICompatibleProvider(fetchImpl: FetchLike = fetch): AI
       requestOptions.strictJsonMode &&
       shouldFallbackResponseFormat(firstAttempt.serverMessage ?? firstAttempt.bodyText)
     ) {
-      logOpenAIDiagnostic('response_format fallback used', {
+      logOpenAIDiagnostic('openai-compatible.response_format_fallback', {
         config,
         httpStatus: firstAttempt.status,
         contentType: firstAttempt.contentType,
@@ -125,6 +133,13 @@ export function createOpenAICompatibleProvider(fetchImpl: FetchLike = fetch): AI
     let response: Response;
 
     try {
+      logger.debug('ai', 'openai-compatible.request_start', 'OpenAI Compatible request started', {
+        provider: OPENAI_COMPATIBLE_PROVIDER_ID,
+        normalizedBaseUrl: config.normalizedBaseUrl,
+        model: config.model,
+        strictJsonMode: requestOptions.strictJsonMode,
+        hasApiKey: Boolean(config.apiKey),
+      });
       response = await fetchImpl(toChatCompletionsUrl(config.normalizedBaseUrl), {
         method: 'POST',
         headers: {
@@ -134,7 +149,14 @@ export function createOpenAICompatibleProvider(fetchImpl: FetchLike = fetch): AI
         body: JSON.stringify(requestBody),
       });
     } catch (error) {
-      logOpenAIDiagnostic('network failure', {
+      logger.error('ai', 'openai-compatible.network_failed', 'OpenAI Compatible request failed', {
+        provider: OPENAI_COMPATIBLE_PROVIDER_ID,
+        normalizedBaseUrl: config.normalizedBaseUrl,
+        model: config.model,
+        errorMessage: error instanceof Error ? error.message : String(error),
+      });
+
+      logOpenAIDiagnostic('openai-compatible.network_failed', {
         config,
         errorMessage: error instanceof Error ? error.message : String(error),
       });
@@ -149,6 +171,16 @@ export function createOpenAICompatibleProvider(fetchImpl: FetchLike = fetch): AI
     const bodyText = await response.text();
     const contentType = response.headers.get('content-type') ?? '';
     const serverMessage = extractServerErrorMessage(bodyText);
+
+    logger.debug('ai', 'openai-compatible.response_received', 'OpenAI Compatible response received', {
+      provider: OPENAI_COMPATIBLE_PROVIDER_ID,
+      normalizedBaseUrl: config.normalizedBaseUrl,
+      model: config.model,
+      status: response.status,
+      contentType,
+      bodyPreview: bodyText,
+      responseFormatFallbackUsed: !requestOptions.strictJsonMode,
+    });
 
     return {
       ok: response.ok,
@@ -165,7 +197,7 @@ export function createOpenAICompatibleProvider(fetchImpl: FetchLike = fetch): AI
     diagnosticOptions: { responseFormatFallbackUsed: boolean },
   ) {
     if (!attempt.ok) {
-      logOpenAIDiagnostic('http error', {
+      logOpenAIDiagnostic('openai-compatible.server_error', {
         config,
         httpStatus: attempt.status,
         contentType: attempt.contentType,
@@ -185,13 +217,14 @@ export function createOpenAICompatibleProvider(fetchImpl: FetchLike = fetch): AI
     try {
       payload = JSON.parse(attempt.bodyText);
     } catch (error) {
-      logOpenAIDiagnostic('invalid response body json', {
+      logOpenAIDiagnostic('openai-compatible.response_parse_failed', {
         config,
         httpStatus: attempt.status,
         contentType: attempt.contentType,
         errorMessage: error instanceof Error ? error.message : String(error),
         responseBody: attempt.bodyText,
         responseFormatFallbackUsed: diagnosticOptions.responseFormatFallbackUsed,
+        detectedShape: 'unknown',
       });
 
       throw new AIProviderError(
@@ -204,13 +237,14 @@ export function createOpenAICompatibleProvider(fetchImpl: FetchLike = fetch): AI
     try {
       return extractModelText(payload);
     } catch (error) {
-      logOpenAIDiagnostic('unsupported response shape', {
+      logOpenAIDiagnostic('openai-compatible.response_parse_failed', {
         config,
         httpStatus: attempt.status,
         contentType: attempt.contentType,
         errorMessage: error instanceof Error ? error.message : String(error),
         responseBody: attempt.bodyText,
         responseFormatFallbackUsed: diagnosticOptions.responseFormatFallbackUsed,
+        detectedShape: detectResponseShape(payload),
       });
 
       throw error instanceof AIProviderError
@@ -482,7 +516,7 @@ function extractServerErrorMessage(bodyText: string) {
 }
 
 function logOpenAIDiagnostic(
-  label: string,
+  event: string,
   diagnostic: {
     config: OpenAICompatibleConfig;
     httpStatus?: number;
@@ -490,19 +524,47 @@ function logOpenAIDiagnostic(
     errorMessage?: string;
     responseBody?: string;
     responseFormatFallbackUsed?: boolean;
+    detectedShape?: string;
   },
 ) {
-  console.debug('[Tallya AI]', {
-    label,
+  const metadata = {
     provider: OPENAI_COMPATIBLE_PROVIDER_ID,
     normalizedBaseUrl: diagnostic.config.normalizedBaseUrl,
     model: diagnostic.config.model,
-    httpStatus: diagnostic.httpStatus,
+    status: diagnostic.httpStatus,
     contentType: diagnostic.contentType,
     errorMessage: truncate(diagnostic.errorMessage ?? '', SERVER_MESSAGE_LIMIT),
-    responsePreview: buildSafeResponsePreview(diagnostic.responseBody ?? ''),
+    bodyPreview: buildSafeResponsePreview(diagnostic.responseBody ?? ''),
     responseFormatFallbackUsed: diagnostic.responseFormatFallbackUsed ?? false,
-  });
+    detectedShape: diagnostic.detectedShape,
+  };
+
+  if (event.includes('server_error') || event.includes('parse_failed')) {
+    logger.error('ai', event, 'OpenAI Compatible diagnostic event', metadata);
+    return;
+  }
+
+  logger.warn('ai', event, 'OpenAI Compatible diagnostic event', metadata);
+}
+
+function detectResponseShape(payload: unknown) {
+  if (!isRecord(payload)) {
+    return 'unknown';
+  }
+
+  if (isAnthropicContentArray(payload.content)) {
+    return 'anthropic-like';
+  }
+
+  if (Array.isArray(payload.choices)) {
+    return 'chat-completions';
+  }
+
+  if ('output_text' in payload || 'output' in payload) {
+    return 'responses-api';
+  }
+
+  return 'unknown';
 }
 
 function buildSafeResponsePreview(bodyText: string) {

@@ -192,6 +192,12 @@ Tauri 后端。
 
 SQLite 使用 Tauri SQL 插件，当前数据库配置为 `sqlite:tallya.db`。该路径相对 Tauri `BaseDirectory::App`，也就是应用数据目录，不是项目根目录，也不是 `~/.tallya`。Windows 通常位于 `AppData/Roaming/<bundle identifier>/tallya.db`，macOS / Linux 根据 Tauri 应用数据目录规则存放。
 
+## 诊断日志
+
+Tallya 会把关键错误和脱敏诊断信息写入 Tauri 应用数据目录下的 `logs/` 目录。日志用于排查 AI Provider、SQLite、备份恢复、通知和托盘等问题，不会自动上传。
+
+用户可以在 设置 → 数据管理 中打开日志目录，或导出最近诊断日志后手动发给开发者。日志会脱敏 API Key、Authorization header、Bearer token，并且只保留截断后的响应片段；使用远程 AI Provider 时，不会记录完整工作内容或完整 prompt。
+
 ## License
 
 暂未指定。

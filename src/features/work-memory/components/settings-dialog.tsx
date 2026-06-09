@@ -6,6 +6,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { ClearDataConfirmDialog } from './settings/clear-data-confirm-dialog';
+import { ExportDiagnosticLogConfirmDialog } from './settings/export-diagnostic-log-confirm-dialog';
 import { ImportBackupConfirmDialog } from './settings/import-backup-confirm-dialog';
 import { SettingsContent } from './settings/settings-content';
 import { SettingsMenu } from './settings/settings-menu';
@@ -68,12 +69,18 @@ export function SettingsDialog({
               isExportingBackup={settingsState.isExportingBackup}
               isImportingBackup={settingsState.isImportingBackup}
               isOpeningDataDirectory={settingsState.isOpeningDataDirectory}
+              isOpeningLogDirectory={settingsState.isOpeningLogDirectory}
+              isExportingDiagnosticLog={settingsState.isExportingDiagnosticLog}
               isSendingTestNotification={settingsState.isSendingTestNotification}
               onUpdateSettings={settingsState.updateSettings}
               onCheckHealth={settingsState.checkProviderHealth}
               onExportBackup={settingsState.exportBackup}
               onImportBackup={settingsState.requestImportBackup}
               onOpenDataDirectory={settingsState.openDataDirectory}
+              onOpenLogDirectory={settingsState.openLogDirectory}
+              onRequestExportDiagnosticLog={() =>
+                settingsState.setIsDiagnosticLogConfirmOpen(true)
+              }
               onSendTestNotification={settingsState.sendTestNotification}
               onRequestClear={() => settingsState.setIsClearConfirmOpen(true)}
             />
@@ -92,6 +99,12 @@ export function SettingsDialog({
         isImportingBackup={settingsState.isImportingBackup}
         onOpenChange={settingsState.setIsImportConfirmOpen}
         onConfirm={settingsState.confirmImportBackup}
+      />
+      <ExportDiagnosticLogConfirmDialog
+        open={settingsState.isDiagnosticLogConfirmOpen}
+        isExporting={settingsState.isExportingDiagnosticLog}
+        onOpenChange={settingsState.setIsDiagnosticLogConfirmOpen}
+        onConfirm={settingsState.exportDiagnosticLog}
       />
     </>
   );

@@ -1,6 +1,7 @@
 import type { DailyMemory, Report, ReportSource, ReportStatus, ReportType } from '../types';
 import type { DatabaseClient } from './database/database';
 import { getDatabase } from './database/database';
+import { logger } from './logger/logger';
 import { createFriendlyError } from './service-error';
 
 type ReportRow = {
@@ -245,7 +246,11 @@ export class SQLiteReportRepository {
 
       return await operation(database);
     } catch (error) {
-      console.error('Failed to read reports from SQLite', error);
+      logger.error('report', 'report-repository.read_failed', 'Failed to read reports from SQLite', {
+        operation: 'select',
+        table: 'reports',
+        error,
+      });
 
       return fallback;
     }
@@ -257,7 +262,11 @@ export class SQLiteReportRepository {
 
       await operation(database);
     } catch (error) {
-      console.error('Failed to write reports to SQLite', error);
+      logger.error('report', 'report-repository.write_failed', 'Failed to write reports to SQLite', {
+        operation: 'write',
+        table: 'reports',
+        error,
+      });
       throw createFriendlyError('报告保存失败，请稍后重试。', error);
     }
   }

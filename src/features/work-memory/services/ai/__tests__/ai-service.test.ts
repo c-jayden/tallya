@@ -85,6 +85,7 @@ const settings: AppSettings = {
   launchAtStartup: false,
   closeToTray: true,
   startMinimized: false,
+  diagnosticLoggingEnabled: false,
 };
 
 describe('createAIService', () => {

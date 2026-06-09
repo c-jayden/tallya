@@ -6,6 +6,7 @@ import {
   createReportSourcesTableSql,
   createReportsTableSql,
 } from './schema';
+import { logger } from '../logger/logger';
 
 export async function runMigrations(database: DatabaseClient) {
   await database.execute(createDailyMemoriesTableSql);
@@ -43,6 +44,9 @@ async function dropLegacyAppSettingsJsonTable(database: DatabaseClient) {
   } catch (error) {
     // The legacy cleanup is not required for current reads/writes. SQLite
     // inspection tools can hold read locks, so cleanup must not block startup.
-    console.warn('Failed to clean up legacy app settings table', error);
+    logger.warn('sqlite', 'database.legacy_app_settings_cleanup_failed', 'Failed to clean up legacy app settings table', {
+      table: 'app_settings_legacy_json',
+      error,
+    });
   }
 }

@@ -1,4 +1,5 @@
 import type { AppSettings } from './app-settings-repository';
+import { logger } from './logger/logger';
 
 export const trayEvents = {
   focusEntry: 'tray://focus-entry',
@@ -66,7 +67,9 @@ export async function registerTrayEventHandlers(handlers: TrayEventHandlers) {
       unlisteners.forEach((unlisten) => unlisten());
     };
   } catch (error) {
-    console.warn('Failed to register tray event handlers', error);
+    logger.warn('tray', 'tray.register_event_handlers_failed', 'Failed to register tray event handlers', {
+      error,
+    });
 
     return () => {};
   }
@@ -78,6 +81,9 @@ async function invokeWindowCommand(command: string, args?: Record<string, unknow
 
     await invoke(command, args);
   } catch (error) {
-    console.warn(`Window command failed: ${command}`, error);
+    logger.warn('tray', 'window.command_failed', 'Window command failed', {
+      command,
+      error,
+    });
   }
 }

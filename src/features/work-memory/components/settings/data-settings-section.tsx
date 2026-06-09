@@ -1,23 +1,37 @@
 import type { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
+import type { AppSettings } from '../../services/app-settings-repository';
 
 type DataSettingsSectionProps = {
+  settings: AppSettings;
   isExportingBackup: boolean;
   isImportingBackup: boolean;
   isOpeningDataDirectory: boolean;
+  isOpeningLogDirectory: boolean;
+  isExportingDiagnosticLog: boolean;
   onExportBackup: () => void;
   onImportBackup: () => void;
   onOpenDataDirectory: () => void;
+  onOpenLogDirectory: () => void;
+  onRequestExportDiagnosticLog: () => void;
+  onUpdateSettings: (patch: Partial<AppSettings>) => void;
   onRequestClear: () => void;
 };
 
 export function DataSettingsSection({
+  settings,
   isExportingBackup,
   isImportingBackup,
   isOpeningDataDirectory,
+  isOpeningLogDirectory,
+  isExportingDiagnosticLog,
   onExportBackup,
   onImportBackup,
   onOpenDataDirectory,
+  onOpenLogDirectory,
+  onRequestExportDiagnosticLog,
+  onUpdateSettings,
   onRequestClear,
 }: DataSettingsSectionProps) {
   return (
@@ -72,6 +86,47 @@ export function DataSettingsSection({
           >
             打开数据目录
           </Button>
+        }
+      />
+
+      <DataActionRow
+        title="诊断日志"
+        description="记录应用运行中的错误和诊断信息，方便排查问题。"
+        action={
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={isOpeningLogDirectory}
+              className="cursor-pointer disabled:cursor-not-allowed"
+              onClick={onOpenLogDirectory}
+            >
+              打开日志目录
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={isExportingDiagnosticLog}
+              className="cursor-pointer disabled:cursor-not-allowed"
+              onClick={onRequestExportDiagnosticLog}
+            >
+              {isExportingDiagnosticLog ? '正在导出' : '导出诊断日志'}
+            </Button>
+          </div>
+        }
+      />
+
+      <DataActionRow
+        title="启用详细诊断日志"
+        description="记录更多响应结构信息，但不会记录 API Key。"
+        action={
+          <Switch
+            checked={settings.diagnosticLoggingEnabled}
+            className="cursor-pointer data-[disabled]:cursor-not-allowed"
+            onCheckedChange={(checked) =>
+              onUpdateSettings({ diagnosticLoggingEnabled: checked })
+            }
+          />
         }
       />
 

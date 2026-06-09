@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import type { GeneratedDailyMemory, GeneratedReportContent } from '../../types';
+import { logger } from '../logger/logger';
 import { AIProviderError, type AIProvider } from './ai-provider';
 
 type TauriInvoke = typeof invoke;
@@ -18,6 +19,12 @@ export function createCodexCliProvider(invokeCommand: TauriInvoke = invoke): AIP
         codexModel: options.codexModel,
       });
     } catch (error) {
+      logger.error('ai', 'codex-cli.generate_report_failed', 'Codex CLI report generation failed', {
+        reportType: input.reportType,
+        commandConfigured: Boolean(options.codexCommand),
+        model: options.codexModel,
+        errorMessage: getFriendlyCodexError(error),
+      });
       throw new AIProviderError(getFriendlyCodexError(error), CODEX_PROVIDER_ID, error);
     }
   }
@@ -33,6 +40,11 @@ export function createCodexCliProvider(invokeCommand: TauriInvoke = invoke): AIP
           codexModel: options.codexModel,
         });
       } catch (error) {
+        logger.error('ai', 'codex-cli.generate_daily_memory_failed', 'Codex CLI daily memory generation failed', {
+          commandConfigured: Boolean(options.codexCommand),
+          model: options.codexModel,
+          errorMessage: getFriendlyCodexError(error),
+        });
         throw new AIProviderError(getFriendlyCodexError(error), CODEX_PROVIDER_ID, error);
       }
     },
@@ -48,14 +60,27 @@ export function createCodexCliProvider(invokeCommand: TauriInvoke = invoke): AIP
     generateRangeReport,
     async checkHealth(options) {
       try {
+        logger.debug('provider', 'codex-cli.check_start', 'Codex CLI health check started', {
+          commandConfigured: Boolean(options.codexCommand),
+          model: options.codexModel,
+        });
         const version = await checkCodexCli(invokeCommand, options.codexCommand);
 
+        logger.info('provider', 'codex-cli.check_available', 'Codex CLI is available', {
+          model: options.codexModel,
+          versionPreview: version,
+        });
         return {
           status: 'available',
           message: '服务可用',
           detail: version,
         };
       } catch (error) {
+        logger.warn('provider', 'codex-cli.check_failed', 'Codex CLI health check failed', {
+          commandConfigured: Boolean(options.codexCommand),
+          model: options.codexModel,
+          errorMessage: getFriendlyCodexCheckError(error),
+        });
         return {
           status: 'unavailable',
           message: '检测失败',

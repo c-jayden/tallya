@@ -38,6 +38,7 @@ describe('LocalStorageAppSettingsRepository', () => {
       reportLength: 'standard',
       reportTone: 'natural',
       reportFocus: 'outcomes',
+      diagnosticLoggingEnabled: false,
     });
   });
 
@@ -125,6 +126,18 @@ describe('LocalStorageAppSettingsRepository', () => {
       ...DEFAULT_APP_SETTINGS,
       reportTone: 'formal',
       reportFocus: 'risks',
+    });
+
+    storage.setItem(
+      'tallya.app-settings.v1',
+      JSON.stringify({
+        diagnosticLoggingEnabled: true,
+      }),
+    );
+
+    await expect(repository.getSettings()).resolves.toEqual({
+      ...DEFAULT_APP_SETTINGS,
+      diagnosticLoggingEnabled: true,
     });
   });
 

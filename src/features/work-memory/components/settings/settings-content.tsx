@@ -19,12 +19,16 @@ export type SettingsContentProps = {
   isExportingBackup: boolean;
   isImportingBackup: boolean;
   isOpeningDataDirectory: boolean;
+  isOpeningLogDirectory: boolean;
+  isExportingDiagnosticLog: boolean;
   isSendingTestNotification: boolean;
   onUpdateSettings: (patch: Partial<AppSettings>) => void;
   onCheckHealth: () => void;
   onExportBackup: () => void;
   onImportBackup: () => void;
   onOpenDataDirectory: () => void;
+  onOpenLogDirectory: () => void;
+  onRequestExportDiagnosticLog: () => void;
   onSendTestNotification: () => void;
   onRequestClear: () => void;
 };
@@ -56,12 +60,16 @@ function SettingsSectionContent({
   isExportingBackup,
   isImportingBackup,
   isOpeningDataDirectory,
+  isOpeningLogDirectory,
+  isExportingDiagnosticLog,
   isSendingTestNotification,
   onUpdateSettings,
   onCheckHealth,
   onExportBackup,
   onImportBackup,
   onOpenDataDirectory,
+  onOpenLogDirectory,
+  onRequestExportDiagnosticLog,
   onSendTestNotification,
   onRequestClear,
 }: SettingsContentProps) {
@@ -108,12 +116,18 @@ function SettingsSectionContent({
   if (activeSection === 'data') {
     return (
       <DataSettingsSection
+        settings={settings}
         isExportingBackup={isExportingBackup}
         isImportingBackup={isImportingBackup}
         isOpeningDataDirectory={isOpeningDataDirectory}
+        isOpeningLogDirectory={isOpeningLogDirectory}
+        isExportingDiagnosticLog={isExportingDiagnosticLog}
         onExportBackup={onExportBackup}
         onImportBackup={onImportBackup}
         onOpenDataDirectory={onOpenDataDirectory}
+        onOpenLogDirectory={onOpenLogDirectory}
+        onRequestExportDiagnosticLog={onRequestExportDiagnosticLog}
+        onUpdateSettings={onUpdateSettings}
         onRequestClear={onRequestClear}
       />
     );

@@ -6,6 +6,7 @@ import {
 } from './ai/known-models';
 import type { DatabaseClient } from './database/database';
 import { getDatabase } from './database/database';
+import { logger } from './logger/logger';
 import { createFriendlyError } from './service-error';
 import type { ReportFocus, ReportLength, ReportTone } from '../types';
 
@@ -42,6 +43,7 @@ export type AppSettings = {
   launchAtStartup: boolean;
   closeToTray: boolean;
   startMinimized: boolean;
+  diagnosticLoggingEnabled: boolean;
 };
 
 const STORAGE_KEY = 'tallya.app-settings.v1';
@@ -77,6 +79,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   launchAtStartup: false,
   closeToTray: true,
   startMinimized: false,
+  diagnosticLoggingEnabled: false,
 };
 
 function getBrowserStorage() {
@@ -153,7 +156,11 @@ export class SQLiteAppSettingsRepository {
 
       return rows.length > 0 ? normalizeAppSettings(rowsToAppSettingsInput(rows)) : DEFAULT_APP_SETTINGS;
     } catch (error) {
-      console.error('Failed to read app settings from SQLite', error);
+      logger.error('settings', 'app-settings.read_failed', 'Failed to read app settings from SQLite', {
+        operation: 'select',
+        table: 'app_settings',
+        error,
+      });
 
       return DEFAULT_APP_SETTINGS;
     }
@@ -169,7 +176,11 @@ export class SQLiteAppSettingsRepository {
 
       return normalizedSettings;
     } catch (error) {
-      console.error('Failed to save app settings to SQLite', error);
+      logger.error('settings', 'app-settings.write_failed', 'Failed to save app settings to SQLite', {
+        operation: 'upsert',
+        table: 'app_settings',
+        error,
+      });
       throw createFriendlyError('设置保存失败，请稍后重试。', error);
     }
   }
@@ -215,7 +226,10 @@ export class SQLiteAppSettingsRepository {
       await saveAppSettingsRow(database, legacySettings, this.now().toISOString());
       this.legacyStorage.setItem(LEGACY_MIGRATION_KEY, '1');
     } catch (error) {
-      console.warn('Failed to migrate legacy app settings to SQLite', error);
+      logger.warn('settings', 'app-settings.legacy_migration_failed', 'Failed to migrate legacy app settings to SQLite', {
+        table: 'app_settings',
+        error,
+      });
     }
   }
 }
@@ -271,6 +285,7 @@ function appSettingsToRows(settings: AppSettings): Record<string, string> {
     launchAtStartup: String(settings.launchAtStartup),
     closeToTray: String(settings.closeToTray),
     startMinimized: String(settings.startMinimized),
+    diagnosticLoggingEnabled: String(settings.diagnosticLoggingEnabled),
   };
 }
 
@@ -304,6 +319,7 @@ function rowsToAppSettingsInput(rows: AppSettingsRow[]) {
     launchAtStartup: getBooleanString(values.launchAtStartup),
     closeToTray: getBooleanString(values.closeToTray),
     startMinimized: getBooleanString(values.startMinimized),
+    diagnosticLoggingEnabled: getBooleanString(values.diagnosticLoggingEnabled),
   };
 }
 
@@ -359,6 +375,10 @@ function normalizeAppSettings(value: unknown): AppSettings {
     launchAtStartup: getBoolean(input.launchAtStartup, DEFAULT_APP_SETTINGS.launchAtStartup),
     closeToTray: getBoolean(input.closeToTray, DEFAULT_APP_SETTINGS.closeToTray),
     startMinimized: getBoolean(input.startMinimized, DEFAULT_APP_SETTINGS.startMinimized),
+    diagnosticLoggingEnabled: getBoolean(
+      input.diagnosticLoggingEnabled,
+      DEFAULT_APP_SETTINGS.diagnosticLoggingEnabled,
+    ),
   };
 }
 

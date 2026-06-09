@@ -1,6 +1,7 @@
 import type { AppSettings } from './app-settings-repository';
 import { appSettingsRepository } from './app-settings-repository';
 import { dailyMemoryRepository, getDailyMemoryDate } from './daily-memory-repository';
+import { logger } from './logger/logger';
 
 type Weekday =
   | 'monday'
@@ -161,7 +162,10 @@ export class ReminderService {
         await this.sendSystemNotification(settings.dailyReminderMessage);
       }
     } catch (error) {
-      console.warn('Failed to send daily reminder', error);
+      logger.warn('notification', 'reminder.daily_send_failed', 'Failed to send daily reminder', {
+        reminderType: 'daily',
+        error,
+      });
     } finally {
       await this.reschedule();
     }
@@ -173,7 +177,10 @@ export class ReminderService {
 
       await this.sendSystemNotification(settings.weeklyReminderMessage);
     } catch (error) {
-      console.warn('Failed to send weekly reminder', error);
+      logger.warn('notification', 'reminder.weekly_send_failed', 'Failed to send weekly reminder', {
+        reminderType: 'weekly',
+        error,
+      });
     } finally {
       await this.reschedule();
     }

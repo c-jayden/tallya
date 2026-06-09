@@ -60,6 +60,18 @@ Unit tests must not invoke the real Codex CLI. Test Codex provider behavior by m
 
 Codex integration tests may be added later as ignored/manual tests only, because they depend on the user's local Codex installation and login state.
 
+## Diagnostic Log Tests
+
+Logger tests cover `sanitizeLogData`, diagnostic log file naming, app data `logs/` directory writes, export of recent logs, and detailed logging gating.
+
+When adding diagnostics:
+
+- Do not assert on real filesystem paths outside the mock app data directory.
+- Verify API Key, Authorization header, Bearer token, and response previews are redacted.
+- Verify `diagnosticLoggingEnabled=false` skips debug logs.
+- Verify `diagnosticLoggingEnabled=true` can write debug logs without leaking sensitive fields.
+- Treat user-cancelled file dialogs as neutral outcomes, not errors.
+
 ## E2E TODO
 
 Later desktop smoke coverage can use Tauri WebDriver / WebDriverIO:

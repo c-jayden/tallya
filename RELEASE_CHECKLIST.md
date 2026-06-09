@@ -61,6 +61,15 @@
 - Send a test notification.
 - Click a notification and confirm the app is shown and focused.
 
+## Diagnostic Logs
+
+- Trigger an AI Provider error and confirm a diagnostic log is written.
+- Open the logs directory from Settings > Data Management.
+- Export diagnostic logs from Settings > Data Management.
+- Confirm exported logs do not contain API Key values.
+- Confirm exported logs do not contain Authorization headers or Bearer tokens.
+- Confirm logs include useful provider status, content type, response shape, and truncated response previews.
+
 ## SQLite Data
 
 - Confirm SQLite data is stored in the Tauri app data directory.

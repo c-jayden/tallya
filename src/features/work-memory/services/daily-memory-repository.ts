@@ -1,6 +1,7 @@
 import type { DailyMemory, DailyMemoryGeneratedContent, DailyMemorySupplements } from '../types';
 import type { DatabaseClient } from './database/database';
 import { getDatabase } from './database/database';
+import { logger } from './logger/logger';
 import { createFriendlyError } from './service-error';
 
 const STORAGE_KEY = 'tallya.daily-memories.v1';
@@ -352,7 +353,11 @@ export class SQLiteDailyMemoryRepository {
 
       return await operation(database);
     } catch (error) {
-      console.error('Failed to read daily memories from SQLite', error);
+      logger.error('sqlite', 'daily-memory.read_failed', 'Failed to read daily memories from SQLite', {
+        operation: 'select',
+        table: 'daily_memories',
+        error,
+      });
 
       return fallback;
     }
@@ -364,7 +369,11 @@ export class SQLiteDailyMemoryRepository {
 
       await operation(database);
     } catch (error) {
-      console.error('Failed to write daily memories to SQLite', error);
+      logger.error('sqlite', 'daily-memory.write_failed', 'Failed to write daily memories to SQLite', {
+        operation: 'write',
+        table: 'daily_memories',
+        error,
+      });
       throw createFriendlyError('本地工作记忆保存失败，请稍后重试。', error);
     }
   }
@@ -411,7 +420,10 @@ export class SQLiteDailyMemoryRepository {
 
       this.legacyStorage.setItem(LEGACY_MIGRATION_KEY, '1');
     } catch (error) {
-      console.warn('Failed to migrate legacy daily memories to SQLite', error);
+      logger.warn('sqlite', 'daily-memory.legacy_migration_failed', 'Failed to migrate legacy daily memories to SQLite', {
+        table: 'daily_memories',
+        error,
+      });
     }
   }
 }
