@@ -43,6 +43,7 @@ type ReportGenerateDialogProps = {
   onCustomStartDateChange: (date: string) => void;
   onCustomEndDateChange: (date: string) => void;
   onGenerate: () => void;
+  onViewReports: () => void;
 };
 
 export function ReportGenerateDialog({
@@ -58,9 +59,10 @@ export function ReportGenerateDialog({
   onCustomStartDateChange,
   onCustomEndDateChange,
   onGenerate,
+  onViewReports,
 }: ReportGenerateDialogProps) {
   const [isOverwriteConfirmOpen, setIsOverwriteConfirmOpen] = useState(false);
-  const availableMemoryCount = context?.memories.length ?? 0;
+  const availableMemoryCount = context?.entries.length ?? 0;
   const hasAvailableMemories = availableMemoryCount > 0;
   const hasExistingReport = Boolean(context?.existingReport);
   const isRangeValid =
@@ -79,8 +81,8 @@ export function ReportGenerateDialog({
       : '本周周报已存在，重新生成会覆盖原报告。';
   const countCopy =
     reportType === 'custom'
-      ? `该范围内可用 ${availableMemoryCount} 条工作记忆`
-      : `本周可用 ${availableMemoryCount} 条工作记忆`;
+      ? `该范围内可用 ${availableMemoryCount} 条记录`
+      : `本周可用 ${availableMemoryCount} 条记录`;
 
   function handleOpenChange(nextOpen: boolean) {
     if (shouldAllowReportDialogOpenChange(nextOpen, !dialogState.canClose)) {
@@ -125,7 +127,7 @@ export function ReportGenerateDialog({
               生成报告
             </DialogTitle>
             <DialogDescription className="text-[13px] leading-[1.5] text-app-ink-muted">
-              从已沉淀的工作记忆中整理一份报告。
+              从这段时间记录的内容整理一份报告。
             </DialogDescription>
           </DialogHeader>
           <div className="grid shrink-0 gap-3.5 px-6 pb-4">
@@ -183,12 +185,12 @@ export function ReportGenerateDialog({
               ) : null}
               {!isLoading && availableMemoryCount === 1 ? (
                 <p className="rounded-lg bg-app-surface-muted px-3 py-2 text-[13px] leading-[1.5] text-app-ink-muted">
-                  记忆较少时，报告内容可能偏简短。
+                  记录较少时，报告内容可能偏简短。
                 </p>
               ) : null}
               {!isLoading && !hasAvailableMemories ? (
                 <p className="rounded-lg bg-app-surface-muted px-3 py-2 text-[13px] leading-[1.5] text-app-ink-muted">
-                  这个时间范围内还没有可用于生成报告的工作记忆。
+                  这个时间范围内还没有可用于生成报告的记录。
                 </p>
               ) : null}
               {!isLoading && hasExistingReport ? (
@@ -198,32 +200,43 @@ export function ReportGenerateDialog({
               ) : null}
             </div>
           </TallyaScrollArea>
-          <TallyaDialogFooter>
-            {dialogState.showCancel ? (
-              <Button
-                type="button"
-                variant="ghost"
-                className="cursor-pointer text-app-ink-muted hover:bg-app-surface-muted hover:text-app-ink disabled:cursor-not-allowed"
-                onClick={() => handleOpenChange(false)}
-                disabled={dialogState.cancelDisabled}
-              >
-                取消
-              </Button>
-            ) : null}
-            {dialogState.showPrimary ? (
-              <Button
-                type="button"
-                className="h-9 min-w-24 cursor-pointer gap-2 rounded-xl bg-app-accent px-3.5 text-app-accent-ink hover:bg-[color-mix(in_srgb,var(--app-accent)_86%,var(--app-surface-muted))] disabled:cursor-not-allowed disabled:bg-app-surface-muted disabled:text-app-ink-muted disabled:opacity-100 disabled:hover:bg-app-surface-muted"
-                onClick={handleGenerateClick}
-                disabled={dialogState.primaryDisabled}
-                aria-busy={isGenerating}
-              >
-                {isGenerating ? (
-                  <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden="true" />
-                ) : null}
-                {dialogState.primaryLabel}
-              </Button>
-            ) : null}
+          <TallyaDialogFooter className="sm:justify-between">
+            <Button
+              type="button"
+              variant="ghost"
+              className="cursor-pointer text-app-ink-muted hover:bg-app-surface-muted hover:text-app-ink disabled:cursor-not-allowed"
+              onClick={onViewReports}
+              disabled={!dialogState.canClose}
+            >
+              历史报告
+            </Button>
+            <div className="flex items-center gap-2">
+              {dialogState.showCancel ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="cursor-pointer text-app-ink-muted hover:bg-app-surface-muted hover:text-app-ink disabled:cursor-not-allowed"
+                  onClick={() => handleOpenChange(false)}
+                  disabled={dialogState.cancelDisabled}
+                >
+                  取消
+                </Button>
+              ) : null}
+              {dialogState.showPrimary ? (
+                <Button
+                  type="button"
+                  className="h-9 min-w-24 cursor-pointer gap-2 rounded-xl bg-app-accent px-3.5 text-app-accent-ink hover:bg-[color-mix(in_srgb,var(--app-accent)_86%,var(--app-surface-muted))] disabled:cursor-not-allowed disabled:bg-app-surface-muted disabled:text-app-ink-muted disabled:opacity-100 disabled:hover:bg-app-surface-muted"
+                  onClick={handleGenerateClick}
+                  disabled={dialogState.primaryDisabled}
+                  aria-busy={isGenerating}
+                >
+                  {isGenerating ? (
+                    <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden="true" />
+                  ) : null}
+                  {dialogState.primaryLabel}
+                </Button>
+              ) : null}
+            </div>
           </TallyaDialogFooter>
         </DialogContent>
       </Dialog>

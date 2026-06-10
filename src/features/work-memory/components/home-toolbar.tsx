@@ -1,5 +1,5 @@
 import type { Ref } from 'react';
-import { ChevronDown, ListTree, Search, Settings } from 'lucide-react';
+import { ChevronDown, FileText, ListTree, Search, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Kbd, KbdGroup } from '@/components/ui/kbd';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -12,11 +12,13 @@ type HomeToolbarProps = {
   maxDate: string;
   searchButtonRef: Ref<HTMLButtonElement>;
   threadsButtonRef: Ref<HTMLButtonElement>;
+  reportsButtonRef: Ref<HTMLButtonElement>;
   selectedDate: string;
   weekday: string;
   onDateChange: (date: string) => void;
   onSearchClick: () => void;
   onThreadsClick: () => void;
+  onReportsClick: () => void;
   onSettingsClick: () => void;
 };
 
@@ -27,11 +29,13 @@ export function HomeToolbar({
   maxDate,
   searchButtonRef,
   threadsButtonRef,
+  reportsButtonRef,
   selectedDate,
   weekday,
   onDateChange,
   onSearchClick,
   onThreadsClick,
+  onReportsClick,
   onSettingsClick,
 }: HomeToolbarProps) {
   return (
@@ -87,6 +91,23 @@ export function HomeToolbar({
             </Button>
           </TooltipTrigger>
           <TooltipContent>线索</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              ref={reportsButtonRef}
+              variant="ghost"
+              size="icon-sm"
+              type="button"
+              className="size-8.75 cursor-pointer rounded-xl text-app-ink-muted hover:bg-app-surface-muted hover:text-app-ink focus-visible:bg-app-surface-muted focus-visible:text-app-ink [&_svg]:size-3.5"
+              aria-label="报告"
+              onClick={onReportsClick}
+            >
+              <FileText aria-hidden="true" />
+              <span className="sr-only">报告</span>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>报告</TooltipContent>
         </Tooltip>
         <Tooltip>
           <TooltipTrigger asChild>

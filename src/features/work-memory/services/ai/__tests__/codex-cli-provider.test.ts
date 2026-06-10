@@ -33,19 +33,12 @@ const weeklyInput: GenerateWeeklyReportInput = {
     promptHint: '',
     updatedAt: '',
   },
-  memories: [
+  entries: [
     {
-      id: 'daily-memory-2026-06-01',
-      date: '2026-06-01',
-      rawContent: '完成 SQLite 迁移。',
-      supplements: {},
-      generated: {
-        summary: '完成 SQLite 迁移。',
-        completedItems: ['迁移本地存储到 SQLite'],
-      },
-      status: 'generated',
-      createdAt: '2026-06-01T01:00:00.000Z',
-      updatedAt: '2026-06-01T02:00:00.000Z',
+      occurredOn: '2026-06-01',
+      content: '完成 SQLite 迁移。',
+      clarifications: ['迁移本地存储到 SQLite'],
+      threadTitle: null,
     },
   ],
 };

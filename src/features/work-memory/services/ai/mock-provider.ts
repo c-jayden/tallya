@@ -2,7 +2,7 @@ import { mockGenerateDailyMemory } from './mock-generate-daily-memory';
 import type { AIProvider } from './ai-provider';
 
 const generateMockRangeReport: AIProvider['generateRangeReport'] = async (input) => {
-  const completedItems = input.memories.flatMap((memory) => memory.generated?.completedItems ?? []);
+  const completedItems = input.entries.map((entry) => entry.content);
   const highlights = completedItems.slice(0, 3);
   const title =
     input.reportType === 'custom'
@@ -11,21 +11,15 @@ const generateMockRangeReport: AIProvider['generateRangeReport'] = async (input)
 
   return {
     title,
-    summary: input.memories.map((memory) => memory.generated?.summary).filter(Boolean).join('；'),
+    summary: input.entries.map((entry) => entry.content).join('；'),
     highlights,
     completedItems,
-    problems: input.memories
-      .map((memory) => memory.generated?.problems)
-      .filter(Boolean)
-      .join('；'),
-    nextWeekPlan: input.memories
-      .map((memory) => memory.generated?.tomorrowPlan ?? memory.supplements.tomorrowPlan)
-      .filter(Boolean)
-      .join('；'),
+    problems: '',
+    nextWeekPlan: '',
     markdown: [
       `# ${title}`,
       '',
-      ...input.memories.map((memory) => `- ${memory.date}：${memory.generated?.summary ?? ''}`),
+      ...input.entries.map((entry) => `- ${entry.occurredOn}：${entry.content}`),
     ].join('\n'),
   };
 };

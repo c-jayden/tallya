@@ -4,6 +4,10 @@ import { EntryComposer } from './components/entry-composer';
 import { EntryFeed } from './components/entry-feed';
 import { HomeToolbar } from './components/home-toolbar';
 import { MemoryHero } from './components/memory-hero';
+import { ReportDetailDialog } from './components/report-detail-dialog';
+import { ReportGenerateDialog } from './components/report-generate-dialog';
+import { ReportListDialog } from './components/report-list-dialog';
+import { ReportPreviewDialog } from './components/report-preview-dialog';
 import { SettingsDialog } from './components/settings-dialog';
 import { SpotlightSearchPanel } from './components/spotlight-search-panel';
 import { ThreadsPanel } from './components/threads-panel';
@@ -13,6 +17,7 @@ import { useEntriesController } from './hooks/use-entries-controller';
 import { useHomeWindowSizing } from './hooks/use-home-window-sizing';
 import { useMemorySearch } from './hooks/use-memory-search';
 import { useThreadsPanel } from './hooks/use-threads-panel';
+import { useWeeklyReportFlow } from './hooks/use-weekly-report-flow';
 import { useTrayWindowEvents } from './hooks/use-tray-window-events';
 import { useWorkMemoryShortcuts } from './hooks/use-work-memory-shortcuts';
 import {
@@ -62,10 +67,19 @@ export function WorkMemoryHome() {
 
   const search = useMemorySearch({ onOpenMemory: openEntry });
   const threads = useThreadsPanel();
+  const weeklyReport = useWeeklyReportFlow();
+  const reportsButtonRef = useRef<HTMLButtonElement>(null);
 
   function openEntryFromThread(entry: Entry) {
     threads.closeThreadsPanel();
     openEntry(entry);
+  }
+
+  function closeOverlays() {
+    search.closeSearchPanel();
+    threads.closeThreadsPanel();
+    setIsSettingsOpen(false);
+    weeklyReport.closeReportDialogs();
   }
 
   const toolbarDate = formatToolbarDate(selectedDate);
@@ -92,19 +106,15 @@ export function WorkMemoryHome() {
 
   useTrayWindowEvents({
     onFocusEntry: () => {
-      setIsSettingsOpen(false);
-      search.closeSearchPanel();
-      threads.closeThreadsPanel();
+      closeOverlays();
       window.setTimeout(() => entries.composerRef.current?.focus(), 0);
     },
     onOpenSearch: () => {
-      setIsSettingsOpen(false);
-      threads.closeThreadsPanel();
+      closeOverlays();
       search.openSearchPanel();
     },
     onOpenSettings: () => {
-      search.closeSearchPanel();
-      threads.closeThreadsPanel();
+      closeOverlays();
       setIsSettingsOpen(true);
     },
   });
@@ -139,20 +149,24 @@ export function WorkMemoryHome() {
             maxDate={todayDate}
             searchButtonRef={search.searchButtonRef}
             threadsButtonRef={threads.threadsButtonRef}
+            reportsButtonRef={reportsButtonRef}
             selectedDate={selectedDate}
             weekday={toolbarDate.weekday}
             onDateChange={updateSelectedDate}
             onSearchClick={() => {
-              threads.closeThreadsPanel();
+              closeOverlays();
               search.openSearchPanel();
             }}
             onThreadsClick={() => {
-              search.closeSearchPanel();
-              setIsSettingsOpen(false);
+              closeOverlays();
               threads.openThreadsPanel();
             }}
+            onReportsClick={() => {
+              closeOverlays();
+              weeklyReport.openGenerateDialog();
+            }}
             onSettingsClick={() => {
-              threads.closeThreadsPanel();
+              closeOverlays();
               setIsSettingsOpen(true);
             }}
           />
@@ -215,6 +229,49 @@ export function WorkMemoryHome() {
         onOpenThread={threads.openThread}
         onBackThreadList={threads.backToThreadList}
         onOpenEntry={openEntryFromThread}
+      />
+
+      <ReportGenerateDialog
+        open={weeklyReport.isGenerateDialogOpen}
+        context={weeklyReport.reportContext}
+        reportType={weeklyReport.reportType}
+        customStartDate={weeklyReport.customStartDate}
+        customEndDate={weeklyReport.customEndDate}
+        isLoading={weeklyReport.isLoadingContext}
+        isGenerating={weeklyReport.isGeneratingReport}
+        onOpenChange={weeklyReport.setIsGenerateDialogOpen}
+        onReportTypeChange={weeklyReport.setReportType}
+        onCustomStartDateChange={weeklyReport.updateCustomStartDate}
+        onCustomEndDateChange={weeklyReport.updateCustomEndDate}
+        onGenerate={weeklyReport.generateReport}
+        onViewReports={weeklyReport.openReportList}
+      />
+
+      <ReportPreviewDialog
+        open={weeklyReport.isPreviewDialogOpen}
+        draft={weeklyReport.reportDraft}
+        isSaving={weeklyReport.isSavingReport}
+        onOpenChange={weeklyReport.setIsPreviewDialogOpen}
+        onCopyText={weeklyReport.copyPlainText}
+        onCopyMarkdown={weeklyReport.copyMarkdown}
+        onSave={weeklyReport.saveReportPreview}
+      />
+
+      <ReportListDialog
+        open={weeklyReport.isReportListOpen}
+        reports={weeklyReport.reportListItems}
+        onOpenChange={weeklyReport.setIsReportListOpen}
+        onOpenReport={weeklyReport.openReportDetail}
+      />
+
+      <ReportDetailDialog
+        open={weeklyReport.isReportDetailOpen}
+        report={weeklyReport.selectedReport}
+        isRegenerating={weeklyReport.isGeneratingReport}
+        onOpenChange={weeklyReport.setIsReportDetailOpen}
+        onCopyText={weeklyReport.copySavedReportPlainText}
+        onCopyMarkdown={weeklyReport.copySavedReportMarkdown}
+        onRegenerate={weeklyReport.regenerateSelectedReport}
       />
 
       <SettingsDialog

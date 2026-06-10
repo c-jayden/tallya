@@ -7,6 +7,7 @@ describe('settings menu order', () => {
     expect(menuItems.map((item) => item.id)).toEqual([
       'app',
       'ai',
+      'reports',
       'notifications',
       'shortcuts',
       'data',

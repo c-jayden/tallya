@@ -966,7 +966,7 @@ function buildRangeReportPrompt(input: GenerateRangeReportInput) {
     reportType: input.reportType,
     startDate: input.startDate,
     endDate: input.endDate,
-    memories: input.memories,
+    entries: input.entries,
     reportLength: input.reportLength,
     reportTone: input.reportTone,
     reportFocus: input.reportFocus,
@@ -974,11 +974,12 @@ function buildRangeReportPrompt(input: GenerateRangeReportInput) {
   };
 
   return [
-    `请根据输入中的 daily memories 整理一份中文${reportName}。`,
+    `请根据输入中的 entries（工作记录）整理一份中文${reportName}。`,
     '只输出合法 JSON，不要 markdown code fence、解释、代码块或工具调用。',
     'JSON keys: title:string, summary:string, highlights:string[], completedItems:string[], problems?:string, nextWeekPlan?:string, markdown:string.',
-    '不要编造 daily memories 中不存在的事实；可以做归纳、合并和润色。',
-    reportLengthInstruction(input.reportLength, input.memories.length),
+    '不要编造 entries 中不存在的事实；可以做归纳、合并和润色。',
+    '按线索聚合脉络：threadTitle 相同的 entries 归为同一条线索（跨天进展串起来讲），threadTitle 为 null 的各自独立；clarifications 是对该条记录的补充细节，可用来展开。',
+    reportLengthInstruction(input.reportLength, input.entries.length),
     reportToneInstruction(input.reportTone),
     reportFocusInstruction(input.reportFocus),
     reportStyleInstruction(input),

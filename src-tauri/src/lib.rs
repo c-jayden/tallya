@@ -85,7 +85,7 @@ struct GeneratedDailyMemory {
 struct GenerateWeeklyReportInput {
     start_date: String,
     end_date: String,
-    memories: Vec<DailyMemoryForReport>,
+    entries: Vec<ReportSourceEntry>,
     #[serde(default = "default_report_length")]
     report_length: String,
     #[serde(default = "default_report_tone")]
@@ -105,7 +105,7 @@ struct GenerateRangeReportInput {
     report_type: String,
     start_date: String,
     end_date: String,
-    memories: Vec<DailyMemoryForReport>,
+    entries: Vec<ReportSourceEntry>,
     #[serde(default = "default_report_length")]
     report_length: String,
     #[serde(default = "default_report_tone")]
@@ -189,15 +189,13 @@ struct ThreadLinkSuggestion {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct DailyMemoryForReport {
-    id: String,
-    date: String,
-    raw_content: String,
-    supplements: DailyMemorySupplements,
-    generated: Option<GeneratedDailyMemory>,
-    status: String,
-    created_at: String,
-    updated_at: String,
+struct ReportSourceEntry {
+    occurred_on: String,
+    content: String,
+    #[serde(default)]
+    clarifications: Vec<String>,
+    #[serde(default)]
+    thread_title: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -241,7 +239,7 @@ impl GenerateWeeklyReportInput {
             report_type: "weekly".to_string(),
             start_date: self.start_date,
             end_date: self.end_date,
-            memories: self.memories,
+            entries: self.entries,
             report_length: self.report_length,
             report_tone: self.report_tone,
             report_focus: self.report_focus,
@@ -816,10 +814,11 @@ fn build_codex_range_report_prompt(input: &GenerateRangeReportInput) -> String {
     };
 
     format!(
-        r#"请根据输入中的 daily memories 整理一份中文{report_name}。只输出合法 JSON，不要 markdown code fence、解释、代码块或工具调用。
+        r#"请根据输入中的 entries（工作记录）整理一份中文{report_name}。只输出合法 JSON，不要 markdown code fence、解释、代码块或工具调用。
 JSON keys: title:string, summary:string, highlights:string[], completedItems:string[], problems?:string, nextWeekPlan?:string, markdown:string.
 规则：
-- 只能使用输入里已经存在的工作记忆，不要编造没有做过的事情。
+- 只能使用输入里已经存在的工作记录，不要编造没有做过的事情。
+- 按线索聚合脉络：threadTitle 相同的 entries 归为同一条线索（把跨天进展串起来讲），threadTitle 为 null 的各自独立；clarifications 是对该条记录的补充细节，可用来展开。
 - 可以做归纳、合并和润色，语气遵守 Tallya 的产品性格：温和、克制、清楚，不鸡血、不像任务监督或绩效评价。
 - {title_instruction}
 - {length_instruction}
@@ -828,7 +827,7 @@ JSON keys: title:string, summary:string, highlights:string[], completedItems:str
 - {focus_instruction}
 - {style_instruction}
 - completedItems 合并相近事项，避免把同一件事拆得过碎。
-- problems 只总结 daily memories 中提到的问题或风险；没有则返回空字符串。
+- problems 只总结 entries 中提到的问题或风险；没有则返回空字符串。
 - {plan_key_instruction}
 - markdown 是一份可直接复制的报告文本，使用中文标题和分节。
 - markdown 不要包含多余空行；section 之间最多一个空行；不要输出空 section；不要用空行撑篇幅。
@@ -932,11 +931,11 @@ fn report_length_instruction(value: &str) -> &'static str {
 }
 
 fn report_single_memory_instruction(input: &GenerateRangeReportInput) -> &'static str {
-    if input.report_length == "brief" && input.memories.len() == 1 {
+    if input.report_length == "brief" && input.entries.len() == 1 {
         return "当前只有 1 条工作记忆，整体进一步压缩：highlights 最多 2 条，completedItems 最多 2 条，problems 和 nextWeekPlan 只保留必要内容，不要把同一条记忆拆成过多项目。";
     }
 
-    "如果可用工作记忆较少，不要为了篇幅扩写或重复表达。"
+    "如果可用工作记录较少，不要为了篇幅扩写或重复表达。"
 }
 
 fn report_tone_instruction(value: &str) -> &'static str {
@@ -1167,27 +1166,11 @@ mod tests {
             report_focus: report_focus.to_string(),
             report_style_hint: String::new(),
             report_style_profile: ReportStyleProfileInput::default(),
-            memories: vec![DailyMemoryForReport {
-                id: "daily-memory-2026-06-01".to_string(),
-                date: "2026-06-01".to_string(),
-                raw_content: "完成 SQLite 迁移。".to_string(),
-                supplements: DailyMemorySupplements {
-                    project_topic: None,
-                    tomorrow_plan: Some("继续整理报告能力。".to_string()),
-                    extra_note: None,
-                },
-                generated: Some(GeneratedDailyMemory {
-                    summary: "完成 SQLite 迁移。".to_string(),
-                    completed_items: vec!["迁移本地存储".to_string()],
-                    key_outcome: None,
-                    problems: None,
-                    tomorrow_plan: Some("继续整理报告能力。".to_string()),
-                    extra_note: None,
-                    daily_report_text: None,
-                }),
-                status: "generated".to_string(),
-                created_at: "2026-06-01T01:00:00.000Z".to_string(),
-                updated_at: "2026-06-01T02:00:00.000Z".to_string(),
+            entries: vec![ReportSourceEntry {
+                occurred_on: "2026-06-01".to_string(),
+                content: "完成 SQLite 迁移。".to_string(),
+                clarifications: vec!["迁移了本地存储到 SQLite。".to_string()],
+                thread_title: None,
             }],
         }
     }

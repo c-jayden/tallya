@@ -1,9 +1,11 @@
-﻿import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type {
-  DailyMemory,
+  Clarification,
+  Entry,
   GeneratedReportContent,
   RangeReportSourceInput,
   Report,
+  Thread,
 } from '../../types';
 import {
   createReportService,
@@ -22,65 +24,66 @@ const generatedReport: GeneratedReportContent = {
 };
 
 describe('createReportService', () => {
-  it('loads current weekly context with generated and locked memories only', async () => {
+  it('builds the weekly context from entries, oldest first with clarifications and thread titles', async () => {
     const service = createService({
-      memories: [
-        createMemory('2026-06-01', 'generated'),
-        createMemory('2026-06-02', 'draft'),
-        createMemory('2026-06-03', 'locked'),
-        createMemory('2026-05-29', 'generated'),
+      // Returned newest-first like the real repository; the service re-sorts ascending.
+      entries: [
+        createEntry('e2', '2026-06-03', '继续联调订单接口', 'thread_1'),
+        createEntry('e1', '2026-06-01', '对接订单接口', 'thread_1'),
       ],
+      clarifications: [createClarification('c1', 'e1', '卡在鉴权头')],
+      threads: [createThread('thread_1', '订单接口对接')],
     });
 
     await expect(service.getCurrentWeeklyReportContext()).resolves.toEqual({
       startDate: '2026-06-01',
       endDate: '2026-06-07',
-      memories: [
-        expect.objectContaining({ date: '2026-06-01', status: 'generated' }),
-        expect.objectContaining({ date: '2026-06-03', status: 'locked' }),
+      entries: [
+        {
+          occurredOn: '2026-06-01',
+          content: '对接订单接口',
+          clarifications: ['卡在鉴权头'],
+          threadTitle: '订单接口对接',
+        },
+        {
+          occurredOn: '2026-06-03',
+          content: '继续联调订单接口',
+          clarifications: [],
+          threadTitle: '订单接口对接',
+        },
       ],
       existingReport: null,
     });
   });
 
-  it('does not generate a weekly report without formal memories', async () => {
+  it('does not generate a weekly report when the range has no entries', async () => {
     const generateRangeReport = vi.fn();
-    const service = createService({
-      memories: [createMemory('2026-06-02', 'draft')],
-      generateRangeReport,
-    });
+    const service = createService({ entries: [], generateRangeReport });
 
     await expect(service.generateCurrentWeeklyReport()).rejects.toThrow(
-      '这个时间范围内还没有可用于生成报告的工作记忆。',
+      '这个时间范围内还没有可用于生成报告的记录。',
     );
     expect(generateRangeReport).not.toHaveBeenCalled();
   });
 
-  it('generates a preview from the current weekly memories without saving it', async () => {
-    const generateRangeReport = vi.fn().mockResolvedValue(generatedReport);
+  it('generates a weekly preview from entries without saving it', async () => {
+    const generateRangeReport = vi
+      .fn<ReportAIService['generateRangeReport']>()
+      .mockResolvedValue(generatedReport);
     const saveReport = vi.fn();
-    const saveReportSources = vi.fn();
     const service = createService({
-      memories: [createMemory('2026-06-01', 'generated')],
+      entries: [createEntry('e1', '2026-06-01', '对接订单接口')],
       generateRangeReport,
-      reportRepository: {
-        getAllReports: vi.fn(),
-        getReportsByType: vi.fn(),
-        getReportByTypeAndRange: vi.fn().mockResolvedValue(null),
-        getWeeklyReportByRange: vi.fn().mockResolvedValue(null),
-        saveReport,
-        updateReport: vi.fn(),
-        deleteReportSources: vi.fn(),
-        saveReportSources,
-        getReportById: vi.fn(),
-      },
+      reportRepository: createReportRepository({ saveReport }),
     });
 
     await expect(service.generateCurrentWeeklyReport()).resolves.toEqual({
       reportType: 'weekly',
       startDate: '2026-06-01',
       endDate: '2026-06-07',
-      memories: [expect.objectContaining({ date: '2026-06-01' })],
+      entries: [
+        { occurredOn: '2026-06-01', content: '对接订单接口', clarifications: [], threadTitle: null },
+      ],
       generated: generatedReport,
       existingReport: null,
     });
@@ -88,54 +91,20 @@ describe('createReportService', () => {
       reportType: 'weekly',
       startDate: '2026-06-01',
       endDate: '2026-06-07',
-      memories: [expect.objectContaining({ date: '2026-06-01' })],
+      entries: [
+        { occurredOn: '2026-06-01', content: '对接订单接口', clarifications: [], threadTitle: null },
+      ],
     } satisfies RangeReportSourceInput);
     expect(saveReport).not.toHaveBeenCalled();
-    expect(saveReportSources).not.toHaveBeenCalled();
   });
 
-  it('loads custom report context with formal memories only', async () => {
-    const existingReport = createReport({
-      id: 'custom-report-2026-06-01-2026-06-03',
-      type: 'custom',
-      title: '阶段工作总结',
-      startDate: '2026-06-01',
-      endDate: '2026-06-03',
-    });
-    const service = createService({
-      memories: [
-        createMemory('2026-06-01', 'generated'),
-        createMemory('2026-06-02', 'draft'),
-        createMemory('2026-06-03', 'locked'),
-        createMemory('2026-06-04', 'generated'),
-      ],
-      reportRepository: createReportRepository({
-        getReportByTypeAndRange: vi.fn().mockResolvedValue(existingReport),
-      }),
-    });
-
-    await expect(service.getReportContext('custom', '2026-06-01', '2026-06-03')).resolves.toEqual({
-      reportType: 'custom',
-      startDate: '2026-06-01',
-      endDate: '2026-06-03',
-      memories: [
-        expect.objectContaining({ date: '2026-06-01', status: 'generated' }),
-        expect.objectContaining({ date: '2026-06-03', status: 'locked' }),
-      ],
-      existingReport,
-    });
-  });
-
-  it('saves a custom range report and report sources', async () => {
+  it('saves a custom range report (no source tracking)', async () => {
     const saveReport = vi.fn();
-    const saveReportSources = vi.fn();
-    const memory = createMemory('2026-06-01', 'generated');
     const service = createService({
-      memories: [memory],
+      entries: [createEntry('e1', '2026-06-01', '对接订单接口')],
       reportRepository: createReportRepository({
         getReportByTypeAndRange: vi.fn().mockResolvedValue(null),
         saveReport,
-        saveReportSources,
       }),
     });
 
@@ -143,11 +112,8 @@ describe('createReportService', () => {
       reportType: 'custom',
       startDate: '2026-06-01',
       endDate: '2026-06-03',
-      memories: [memory],
-      generated: {
-        ...generatedReport,
-        title: '2026年6月1日-6月3日工作总结',
-      },
+      entries: [],
+      generated: { ...generatedReport, title: '2026年6月1日-6月3日工作总结' },
       existingReport: null,
     });
 
@@ -161,227 +127,59 @@ describe('createReportService', () => {
       }),
     );
     expect(saveReport).toHaveBeenCalledWith(report);
-    expect(saveReportSources).toHaveBeenCalledWith(report.id, [memory]);
   });
 
-  it('overwrites the existing custom report for the same range', async () => {
+  it('reuses the existing report id when overwriting the same range', async () => {
     const existingReport = createReport({
-      id: 'existing-custom-report',
-      type: 'custom',
-      startDate: '2026-06-01',
-      endDate: '2026-06-03',
+      id: 'existing-weekly-report',
+      createdAt: '2026-06-07T01:00:00.000Z',
     });
     const saveReport = vi.fn();
-    const deleteReportSources = vi.fn();
-    const memory = createMemory('2026-06-01', 'generated');
     const service = createService({
-      memories: [memory],
+      entries: [createEntry('e1', '2026-06-01', '对接订单接口')],
       reportRepository: createReportRepository({
         getReportByTypeAndRange: vi.fn().mockResolvedValue(existingReport),
         saveReport,
-        deleteReportSources,
-        saveReportSources: vi.fn(),
       }),
-    });
-
-    const report = await service.saveReport({
-      reportType: 'custom',
-      startDate: '2026-06-01',
-      endDate: '2026-06-03',
-      memories: [memory],
-      generated: generatedReport,
-      existingReport,
-    });
-
-    expect(report.id).toBe(existingReport.id);
-    expect(report.type).toBe('custom');
-    expect(deleteReportSources).toHaveBeenCalledWith(existingReport.id);
-    expect(saveReport).toHaveBeenCalledWith(report);
-  });
-
-  it('saves a weekly report and report sources', async () => {
-    const saveReport = vi.fn();
-    const saveReportSources = vi.fn();
-    const memory = createMemory('2026-06-01', 'generated');
-    const service = createService({
-      memories: [memory],
-      reportRepository: {
-        getAllReports: vi.fn(),
-        getReportsByType: vi.fn(),
-        getReportByTypeAndRange: vi.fn().mockResolvedValue(null),
-        getWeeklyReportByRange: vi.fn().mockResolvedValue(null),
-        saveReport,
-        updateReport: vi.fn(),
-        deleteReportSources: vi.fn(),
-        saveReportSources,
-        getReportById: vi.fn(),
-      },
     });
 
     const report = await service.saveWeeklyReport({
       startDate: '2026-06-01',
       endDate: '2026-06-07',
-      memories: [memory],
-      generated: generatedReport,
-      existingReport: null,
-    });
-
-    expect(report).toEqual(
-      expect.objectContaining({
-        type: 'weekly',
-        title: '本周周报',
-        startDate: '2026-06-01',
-        endDate: '2026-06-07',
-        content: generatedReport,
-        status: 'generated',
-      }),
-    );
-    expect(saveReport).toHaveBeenCalledWith(report);
-    expect(saveReportSources).toHaveBeenCalledWith(report.id, [memory]);
-  });
-
-  it('reuses the existing weekly report id when overwriting the same week', async () => {
-    const existingReport: Report = {
-      id: 'existing-weekly-report',
-      type: 'weekly',
-      title: '旧周报',
-      startDate: '2026-06-01',
-      endDate: '2026-06-07',
-      content: {},
-      status: 'generated',
-      createdAt: '2026-06-07T01:00:00.000Z',
-      updatedAt: '2026-06-07T01:00:00.000Z',
-      generatedAt: '2026-06-07T01:00:00.000Z',
-    };
-    const saveReport = vi.fn();
-    const deleteReportSources = vi.fn();
-    const memory = createMemory('2026-06-01', 'generated');
-    const service = createService({
-      memories: [memory],
-      existingReport,
-      reportRepository: {
-        getAllReports: vi.fn(),
-        getReportsByType: vi.fn(),
-        getReportByTypeAndRange: vi.fn().mockResolvedValue(existingReport),
-        getWeeklyReportByRange: vi.fn().mockResolvedValue(existingReport),
-        saveReport,
-        updateReport: vi.fn(),
-        deleteReportSources,
-        saveReportSources: vi.fn(),
-        getReportById: vi.fn(),
-      },
-    });
-
-    const report = await service.saveWeeklyReport({
-      startDate: '2026-06-01',
-      endDate: '2026-06-07',
-      memories: [memory],
+      entries: [],
       generated: generatedReport,
       existingReport,
     });
 
     expect(report.id).toBe(existingReport.id);
     expect(report.createdAt).toBe(existingReport.createdAt);
-    expect(deleteReportSources).toHaveBeenCalledWith(existingReport.id);
     expect(saveReport).toHaveBeenCalledWith(report);
   });
 
-  it('restores a stale report to generated and rewrites sources when saving regeneration', async () => {
+  it('regenerates a weekly preview for an existing report range', async () => {
     const existingReport = createReport({
-      id: 'stale-weekly-report',
-      status: 'stale',
-      createdAt: '2026-06-07T01:00:00.000Z',
-      updatedAt: '2026-06-08T01:00:00.000Z',
-      generatedAt: '2026-06-07T01:00:00.000Z',
-    });
-    const memory = createMemory('2026-06-01', 'generated');
-    const saveReport = vi.fn();
-    const saveReportSources = vi.fn();
-    const deleteReportSources = vi.fn();
-    const service = createService({
-      memories: [memory],
-      reportRepository: createReportRepository({
-        getReportByTypeAndRange: vi.fn().mockResolvedValue(existingReport),
-        saveReport,
-        saveReportSources,
-        deleteReportSources,
-      }),
-    });
-
-    const report = await service.saveWeeklyReport({
-      startDate: '2026-06-01',
-      endDate: '2026-06-07',
-      memories: [memory],
-      generated: generatedReport,
-      existingReport,
-    });
-
-    expect(report).toEqual(
-      expect.objectContaining({
-        id: existingReport.id,
-        status: 'generated',
-        createdAt: existingReport.createdAt,
-        updatedAt: '2026-06-03T10:00:00.000Z',
-        generatedAt: '2026-06-03T10:00:00.000Z',
-      }),
-    );
-    expect(deleteReportSources).toHaveBeenCalledWith(existingReport.id);
-    expect(saveReportSources).toHaveBeenCalledWith(existingReport.id, [
-      expect.objectContaining({ id: memory.id, updatedAt: memory.updatedAt }),
-    ]);
-  });
-
-  it('returns a friendly error when AI weekly output cannot be parsed', async () => {
-    const service = createService({
-      memories: [createMemory('2026-06-01', 'generated')],
-      generateRangeReport: vi.fn().mockRejectedValue(new Error('AI 返回内容不是合法 JSON，请重试。')),
-    });
-
-    await expect(service.generateCurrentWeeklyReport()).rejects.toThrow(
-      'AI 返回内容不是合法 JSON，请重试。',
-    );
-  });
-
-  it('regenerates a weekly report preview for an existing report range', async () => {
-    const existingReport: Report = {
       id: 'existing-weekly-report',
-      type: 'weekly',
-      title: '旧周报',
       startDate: '2026-05-25',
       endDate: '2026-05-31',
-      content: {},
-      status: 'generated',
-      createdAt: '2026-06-01T01:00:00.000Z',
-      updatedAt: '2026-06-01T01:00:00.000Z',
-      generatedAt: '2026-06-01T01:00:00.000Z',
-    };
+    });
     const generateRangeReport = vi
       .fn<ReportAIService['generateRangeReport']>()
       .mockResolvedValue(generatedReport);
     const service = createService({
-      memories: [
-        createMemory('2026-05-26', 'generated'),
-        createMemory('2026-06-01', 'generated'),
-      ],
+      entries: [createEntry('e1', '2026-05-26', '梳理报告流程')],
       generateRangeReport,
-      reportRepository: {
-        getAllReports: vi.fn(),
-        getReportsByType: vi.fn(),
+      reportRepository: createReportRepository({
         getReportByTypeAndRange: vi.fn().mockResolvedValue(existingReport),
-        getWeeklyReportByRange: vi.fn().mockResolvedValue(existingReport),
-        saveReport: vi.fn(),
-        updateReport: vi.fn(),
-        deleteReportSources: vi.fn(),
-        saveReportSources: vi.fn(),
-        getReportById: vi.fn(),
-      },
+      }),
     });
 
     await expect(service.generateWeeklyReportForRange(existingReport)).resolves.toEqual({
       reportType: 'weekly',
       startDate: '2026-05-25',
       endDate: '2026-05-31',
-      memories: [expect.objectContaining({ date: '2026-05-26' })],
+      entries: [
+        { occurredOn: '2026-05-26', content: '梳理报告流程', clarifications: [], threadTitle: null },
+      ],
       generated: generatedReport,
       existingReport,
     });
@@ -389,39 +187,58 @@ describe('createReportService', () => {
       reportType: 'weekly',
       startDate: '2026-05-25',
       endDate: '2026-05-31',
-      memories: [expect.objectContaining({ date: '2026-05-26' })],
+      entries: [
+        { occurredOn: '2026-05-26', content: '梳理报告流程', clarifications: [], threadTitle: null },
+      ],
     });
+  });
+
+  it('surfaces a friendly error when AI output cannot be parsed', async () => {
+    const service = createService({
+      entries: [createEntry('e1', '2026-06-01', '对接订单接口')],
+      generateRangeReport: vi.fn().mockRejectedValue(new Error('AI 返回内容不是合法 JSON，请重试。')),
+    });
+
+    await expect(service.generateCurrentWeeklyReport()).rejects.toThrow(
+      'AI 返回内容不是合法 JSON，请重试。',
+    );
   });
 });
 
 function createService({
-  memories = [],
+  entries = [],
+  clarifications = [],
+  threads = [],
   existingReport = null,
   generateRangeReport = vi
     .fn<ReportAIService['generateRangeReport']>()
     .mockResolvedValue(generatedReport),
   reportRepository,
 }: {
-  memories?: DailyMemory[];
+  entries?: Entry[];
+  clarifications?: Clarification[];
+  threads?: Thread[];
   existingReport?: Report | null;
   generateRangeReport?: ReportAIService['generateRangeReport'];
   reportRepository?: ReportRepository;
 } = {}) {
   return createReportService({
     now: () => new Date('2026-06-03T10:00:00.000Z'),
-    dailyMemoryRepository: {
-      getGeneratedMemories: vi.fn().mockResolvedValue(memories),
+    entryRepository: {
+      listRange: vi.fn().mockResolvedValue(entries),
     },
-    aiService: {
-      generateRangeReport,
+    clarificationRepository: {
+      listByEntryIds: vi.fn().mockResolvedValue(clarifications),
     },
+    threadRepository: {
+      list: vi.fn().mockResolvedValue(threads),
+    },
+    aiService: { generateRangeReport },
     reportRepository:
       reportRepository ??
-      ({
-        ...createReportRepository({
-          getReportByTypeAndRange: vi.fn().mockResolvedValue(existingReport),
-        }),
-      } satisfies ReportRepository),
+      createReportRepository({
+        getReportByTypeAndRange: vi.fn().mockResolvedValue(existingReport),
+      }),
   });
 }
 
@@ -433,8 +250,6 @@ function createReportRepository(overrides: Partial<ReportRepository> = {}): Repo
     getWeeklyReportByRange: vi.fn().mockResolvedValue(null),
     saveReport: vi.fn(),
     updateReport: vi.fn(),
-    deleteReportSources: vi.fn(),
-    saveReportSources: vi.fn(),
     getReportById: vi.fn(),
     ...overrides,
   };
@@ -456,24 +271,42 @@ function createReport(overrides: Partial<Report> = {}): Report {
   };
 }
 
-function createMemory(date: string, status: DailyMemory['status']): DailyMemory {
+function createEntry(
+  id: string,
+  occurredOn: string,
+  content: string,
+  threadId: string | null = null,
+): Entry {
   return {
-    id: `daily-memory-${date}`,
-    date,
-    rawContent: `${date} work note`,
-    supplements: {
-      tomorrowPlan: status === 'draft' ? 'Draft plan' : 'Continue follow up',
-    },
-    generated:
-      status === 'draft'
-        ? null
-        : {
-            summary: `${date} summary`,
-            completedItems: [`${date} completed item`],
-            tomorrowPlan: 'Continue follow up',
-          },
-    status,
-    createdAt: `${date}T01:00:00.000Z`,
-    updatedAt: `${date}T02:00:00.000Z`,
+    id,
+    content,
+    occurredAt: `${occurredOn}T03:00:00.000Z`,
+    occurredOn,
+    threadId,
+    difficulty: null,
+    effort: null,
+    createdAt: `${occurredOn}T03:00:00.000Z`,
+    updatedAt: `${occurredOn}T03:00:00.000Z`,
+  };
+}
+
+function createClarification(id: string, entryId: string, answer: string): Clarification {
+  return {
+    id,
+    entryId,
+    question: null,
+    answer,
+    createdAt: '2026-06-01T04:00:00.000Z',
+    updatedAt: '2026-06-01T04:00:00.000Z',
+  };
+}
+
+function createThread(id: string, title: string): Thread {
+  return {
+    id,
+    title,
+    status: 'open',
+    createdAt: '2026-06-01T00:00:00.000Z',
+    updatedAt: '2026-06-03T00:00:00.000Z',
   };
 }

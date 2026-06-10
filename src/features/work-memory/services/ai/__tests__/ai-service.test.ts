@@ -24,19 +24,12 @@ const generated: GeneratedDailyMemory = {
 const weeklyInput: WeeklyReportSourceInput = {
   startDate: '2026-06-01',
   endDate: '2026-06-07',
-  memories: [
+  entries: [
     {
-      id: 'daily-memory-2026-06-01',
-      date: '2026-06-01',
-      rawContent: 'Finished SQLite migration.',
-      supplements: {},
-      generated: {
-        summary: 'Finished SQLite migration.',
-        completedItems: ['Migrated local storage to SQLite'],
-      },
-      status: 'generated',
-      createdAt: '2026-06-01T01:00:00.000Z',
-      updatedAt: '2026-06-01T02:00:00.000Z',
+      occurredOn: '2026-06-01',
+      content: 'Finished SQLite migration.',
+      clarifications: ['Migrated local storage to SQLite'],
+      threadTitle: null,
     },
   ],
 };
@@ -45,7 +38,7 @@ const customInput: RangeReportSourceInput = {
   reportType: 'custom',
   startDate: '2026-06-01',
   endDate: '2026-06-03',
-  memories: weeklyInput.memories,
+  entries: weeklyInput.entries,
 };
 
 const weeklyGenerated: GeneratedReportContent = {

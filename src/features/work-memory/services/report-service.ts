@@ -1,17 +1,30 @@
 import type {
-  DailyMemory,
+  Clarification,
+  Entry,
   GeneratedReportContent,
   RangeReportSourceInput,
   Report,
   ReportGenerationType,
+  ReportSourceEntry,
+  Thread,
 } from '../types';
 import { aiService as defaultAIService } from './ai/ai-service';
-import { dailyMemoryRepository as defaultDailyMemoryRepository } from './daily-memory-repository';
+import { clarificationRepository as defaultClarificationRepository } from './clarification-repository';
+import { entryRepository as defaultEntryRepository } from './entry-repository';
 import { reportRepository as defaultReportRepository } from './report-repository';
+import { threadRepository as defaultThreadRepository } from './thread-repository';
 import { getCurrentWeekRange } from './report-date';
 
-export type ReportDailyMemoryRepository = {
-  getGeneratedMemories(): Promise<DailyMemory[]>;
+export type ReportEntryRepository = {
+  listRange(startDate: string, endDate: string): Promise<Entry[]>;
+};
+
+export type ReportClarificationRepository = {
+  listByEntryIds(entryIds: string[]): Promise<Clarification[]>;
+};
+
+export type ReportThreadRepository = {
+  list(): Promise<Thread[]>;
 };
 
 export type ReportRepository = {
@@ -21,8 +34,6 @@ export type ReportRepository = {
   getWeeklyReportByRange(startDate: string, endDate: string): Promise<Report | null>;
   saveReport(report: Report): Promise<void>;
   updateReport(report: Report): Promise<void>;
-  deleteReportSources(reportId: string): Promise<void>;
-  saveReportSources(reportId: string, dailyMemories: DailyMemory[]): Promise<void>;
   getReportById(id: string): Promise<Report | null>;
 };
 
@@ -32,7 +43,9 @@ export type ReportAIService = {
 
 export type ReportServiceOptions = {
   now?: () => Date;
-  dailyMemoryRepository?: ReportDailyMemoryRepository;
+  entryRepository?: ReportEntryRepository;
+  clarificationRepository?: ReportClarificationRepository;
+  threadRepository?: ReportThreadRepository;
   reportRepository?: ReportRepository;
   aiService?: ReportAIService;
 };
@@ -41,7 +54,7 @@ export type ReportContext = {
   reportType: ReportGenerationType;
   startDate: string;
   endDate: string;
-  memories: DailyMemory[];
+  entries: ReportSourceEntry[];
   existingReport: Report | null;
 };
 
@@ -56,10 +69,14 @@ export type WeeklyReportDraft = Omit<ReportDraft, 'reportType'> & {
 
 export function createReportService({
   now = () => new Date(),
-  dailyMemoryRepository = defaultDailyMemoryRepository,
+  entryRepository = defaultEntryRepository,
+  clarificationRepository = defaultClarificationRepository,
+  threadRepository = defaultThreadRepository,
   reportRepository = defaultReportRepository,
   aiService = defaultAIService,
 }: ReportServiceOptions = {}) {
+  const sourceRepositories = { entryRepository, clarificationRepository, threadRepository };
+
   return {
     async getAllReports() {
       return reportRepository.getAllReports();
@@ -68,7 +85,7 @@ export function createReportService({
     async getCurrentWeeklyReportContext(): Promise<WeeklyReportContext> {
       const { startDate, endDate } = getCurrentWeekRange(now());
       const context = await getReportContext(
-        dailyMemoryRepository,
+        sourceRepositories,
         reportRepository,
         'weekly',
         startDate,
@@ -83,7 +100,7 @@ export function createReportService({
       startDate: string,
       endDate: string,
     ): Promise<ReportContext> {
-      return getReportContext(dailyMemoryRepository, reportRepository, reportType, startDate, endDate);
+      return getReportContext(sourceRepositories, reportRepository, reportType, startDate, endDate);
     },
 
     async generateCurrentWeeklyReport(): Promise<WeeklyReportDraft> {
@@ -111,7 +128,7 @@ export function createReportService({
     async generateReportForRange(report: Report): Promise<ReportDraft> {
       const reportType = getSupportedGenerationType(report.type);
       const context = await getReportContext(
-        dailyMemoryRepository,
+        sourceRepositories,
         reportRepository,
         reportType,
         report.startDate,
@@ -153,12 +170,9 @@ export function createReportService({
         generatedAt: timestamp,
       };
 
-      if (existingReport) {
-        await reportRepository.deleteReportSources(existingReport.id);
-      }
-
+      // Reports are regenerable from entries on demand, so we no longer track
+      // per-source staleness (the old daily_memories report_sources mechanism).
       await reportRepository.saveReport(report);
-      await reportRepository.saveReportSources(report.id, draft.memories);
 
       return report;
     },
@@ -167,33 +181,59 @@ export function createReportService({
 
 export const reportService = createReportService();
 
-async function getFormalMemoriesInRange(
-  repository: ReportDailyMemoryRepository,
+type SourceRepositories = {
+  entryRepository: ReportEntryRepository;
+  clarificationRepository: ReportClarificationRepository;
+  threadRepository: ReportThreadRepository;
+};
+
+// Builds the report's source material from the entry model: entries in range
+// (oldest first), each carrying its clarification answers and thread title so
+// the AI can aggregate cross-day storylines.
+async function buildReportEntries(
+  repositories: SourceRepositories,
   startDate: string,
   endDate: string,
-) {
-  const memories = await repository.getGeneratedMemories();
+): Promise<ReportSourceEntry[]> {
+  const entries = await repositories.entryRepository.listRange(startDate, endDate);
 
-  return memories
-    .filter(
-      (memory) =>
-        (memory.status === 'generated' || memory.status === 'locked') &&
-        memory.generated !== null &&
-        memory.date >= startDate &&
-        memory.date <= endDate,
-    )
-    .sort((first, second) => first.date.localeCompare(second.date));
+  if (entries.length === 0) {
+    return [];
+  }
+
+  const [clarifications, threads] = await Promise.all([
+    repositories.clarificationRepository.listByEntryIds(entries.map((entry) => entry.id)),
+    repositories.threadRepository.list(),
+  ]);
+
+  const answersByEntry = new Map<string, string[]>();
+  for (const clarification of clarifications) {
+    const list = answersByEntry.get(clarification.entryId) ?? [];
+    list.push(clarification.answer);
+    answersByEntry.set(clarification.entryId, list);
+  }
+
+  const titleByThread = new Map(threads.map((thread) => [thread.id, thread.title]));
+
+  return [...entries]
+    .sort((first, second) => first.occurredAt.localeCompare(second.occurredAt))
+    .map((entry) => ({
+      occurredOn: entry.occurredOn,
+      content: entry.content,
+      clarifications: answersByEntry.get(entry.id) ?? [],
+      threadTitle: entry.threadId ? titleByThread.get(entry.threadId) ?? null : null,
+    }));
 }
 
 async function getReportContext(
-  dailyMemoryRepository: ReportDailyMemoryRepository,
+  repositories: SourceRepositories,
   reportRepository: ReportRepository,
   reportType: ReportGenerationType,
   startDate: string,
   endDate: string,
 ): Promise<ReportContext> {
-  const [memories, existingReport] = await Promise.all([
-    getFormalMemoriesInRange(dailyMemoryRepository, startDate, endDate),
+  const [entries, existingReport] = await Promise.all([
+    buildReportEntries(repositories, startDate, endDate),
     reportRepository.getReportByTypeAndRange(reportType, startDate, endDate),
   ]);
 
@@ -201,7 +241,7 @@ async function getReportContext(
     reportType,
     startDate,
     endDate,
-    memories,
+    entries,
     existingReport,
   };
 }
@@ -210,15 +250,15 @@ async function generateReportDraft(
   aiService: ReportAIService,
   context: ReportContext,
 ): Promise<ReportDraft> {
-  if (context.memories.length === 0) {
-    throw new Error('这个时间范围内还没有可用于生成报告的工作记忆。');
+  if (context.entries.length === 0) {
+    throw new Error('这个时间范围内还没有可用于生成报告的记录。');
   }
 
   const generated = await aiService.generateRangeReport({
     reportType: context.reportType,
     startDate: context.startDate,
     endDate: context.endDate,
-    memories: context.memories,
+    entries: context.entries,
   });
 
   return {
@@ -231,7 +271,7 @@ function toWeeklyContext(context: ReportContext): WeeklyReportContext {
   return {
     startDate: context.startDate,
     endDate: context.endDate,
-    memories: context.memories,
+    entries: context.entries,
     existingReport: context.existingReport,
   };
 }

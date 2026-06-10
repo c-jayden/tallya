@@ -19,10 +19,11 @@ describe('WorkMemoryHome selected date wiring', () => {
     expect(source).not.toContain('aiService');
   });
 
-  it('keeps report entry points out of the home surface during the entry-model transition', () => {
+  it('mounts the report flow now that reports run on the entry model', () => {
     const source = readFileSync(new URL('../work-memory-home.tsx', import.meta.url), 'utf8');
 
-    expect(source).not.toContain('ReportGenerateDialog');
-    expect(source).not.toContain('useWeeklyReportFlow');
+    expect(source).toContain('useWeeklyReportFlow');
+    expect(source).toContain('<ReportGenerateDialog');
+    expect(source).toContain('onReportsClick');
   });
 });

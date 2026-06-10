@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { mockProvider } from '../mock-provider';
-import type { DailyMemory } from '../../../types';
+import type { ReportSourceEntry } from '../../../types';
 
 describe('mockProvider', () => {
   it('generates a valid daily memory shape for development tests', async () => {
@@ -20,7 +20,7 @@ describe('mockProvider', () => {
   });
 
   it('generates weekly and custom report content without exposing it to the UI', async () => {
-    const memory = createMemory('2026-06-08');
+    const entry = createEntry('2026-06-08');
 
     await expect(
       mockProvider.generateWeeklyReport(
@@ -37,7 +37,7 @@ describe('mockProvider', () => {
             promptHint: '',
             updatedAt: '',
           },
-          memories: [memory],
+          entries: [entry],
         },
         { codexCommand: 'codex', codexModel: 'gpt-5.4-mini' },
       ),
@@ -65,7 +65,7 @@ describe('mockProvider', () => {
             promptHint: '',
             updatedAt: '',
           },
-          memories: [memory],
+          entries: [entry],
         },
         { codexCommand: 'codex', codexModel: 'gpt-5.4-mini' },
       ),
@@ -88,20 +88,11 @@ describe('mockProvider', () => {
   });
 });
 
-function createMemory(date: string): DailyMemory {
+function createEntry(date: string): ReportSourceEntry {
   return {
-    id: `daily-memory-${date}`,
-    date,
-    rawContent: `${date} work memory`,
-    supplements: {
-      tomorrowPlan: '继续整理报告能力。',
-    },
-    generated: {
-      summary: '整理报告能力。',
-      completedItems: ['补齐报告流程'],
-    },
-    status: 'generated',
-    createdAt: `${date}T01:00:00.000Z`,
-    updatedAt: `${date}T02:00:00.000Z`,
+    occurredOn: date,
+    content: '整理报告能力。',
+    clarifications: ['补齐报告流程'],
+    threadTitle: null,
   };
 }

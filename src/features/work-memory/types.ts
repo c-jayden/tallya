@@ -92,10 +92,19 @@ export type AnalyzedReportStyle = {
 
 export type ReportGenerationType = 'weekly' | 'custom';
 
+// One entry as seen by report generation: the note, its clarification answers,
+// and the thread it belongs to (so the AI can aggregate a cross-day storyline).
+export type ReportSourceEntry = {
+  occurredOn: string;
+  content: string;
+  clarifications: string[];
+  threadTitle: string | null;
+};
+
 export type WeeklyReportSourceInput = {
   startDate: string;
   endDate: string;
-  memories: DailyMemory[];
+  entries: ReportSourceEntry[];
 };
 
 export type GenerateWeeklyReportInput = WeeklyReportSourceInput & ReportPreferences;
