@@ -39,7 +39,6 @@ jobs:
             tauriArgs: "--target x86_64-pc-windows-msvc"
             artifactName: tallya-windows-x64-release-assets
           # TODO: Add aarch64-pc-windows-msvc after Windows ARM64 NSIS packaging is verified.
-          # TODO: Add macos-latest and ubuntu-latest jobs after platform-specific packaging is verified.
 
     steps:
       - name: Checkout
@@ -220,12 +219,12 @@ jobs:
           $body = @(
             "Tallya $env:TAG_NAME",
             "",
-            "- Windows 安装包。",
-            "- portable zip 免安装版。",
+            "- Windows 安装包（NSIS setup / MSI）与 portable zip 免安装版。",
+            "- macOS 通用版 .dmg（Intel + Apple Silicon）。",
             "- 当前 AI 生成支持 Codex CLI 和 OpenAI Compatible。",
             "- 数据默认保存在本机应用数据目录。",
             "- 覆盖安装不应清空本地数据。",
-            "- 当前安装包未配置代码签名，Windows 可能提示未知发布者。"
+            "- 当前安装包未配置代码签名：Windows 可能提示未知发布者；macOS 首次打开需在「系统设置 > 隐私与安全性」放行，或右键打开。"
           )
           $bodyPath = "dist/release-body.md"
           $body | Set-Content -Path $bodyPath -Encoding UTF8
@@ -248,5 +247,113 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifactName }}
+          path: dist/release-assets/*
+          if-no-files-found: error
+
+  macos:
+    name: macOS universal
+    runs-on: macos-latest
+    # The Windows job validates versions and creates the (draft) Release + tag;
+    # macOS only builds and uploads its assets onto that same release.
+    needs: windows
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.32.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Read and validate versions
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+
+          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          const tauri = JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json', 'utf8'));
+          const cargo = fs.readFileSync('src-tauri/Cargo.toml', 'utf8');
+          const cargoVersion = cargo.match(/^version\s*=\s*"([^"]+)"/m)?.[1];
+
+          if (!pkg.version) {
+            throw new Error('package.json version is missing');
+          }
+
+          if (tauri.version !== pkg.version) {
+            throw new Error(`Version mismatch: package.json=${pkg.version}, tauri.conf.json=${tauri.version}`);
+          }
+
+          if (cargoVersion !== pkg.version) {
+            throw new Error(`Version mismatch: package.json=${pkg.version}, Cargo.toml=${cargoVersion}`);
+          }
+
+          fs.appendFileSync(process.env.GITHUB_ENV, `APP_VERSION=${pkg.version}\n`);
+          fs.appendFileSync(process.env.GITHUB_ENV, `TAG_NAME=v${pkg.version}\n`);
+          NODE
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build frontend
+        run: pnpm build
+
+      - name: Build macOS universal bundle
+        uses: tauri-apps/tauri-action@v0
+        with:
+          args: "--target universal-apple-darwin"
+
+      - name: Collect release assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          assetsDir="dist/release-assets"
+          mkdir -p "$assetsDir"
+          prefix="Tallya_${APP_VERSION}_macos_universal"
+
+          dmg="$(find src-tauri/target -path '*/bundle/dmg/*.dmg' | head -n1)"
+          if [ -z "$dmg" ]; then
+            echo "::error::macOS DMG was not found."
+            exit 1
+          fi
+          cp "$dmg" "$assetsDir/${prefix}.dmg"
+
+          app="$(find src-tauri/target -path '*/bundle/macos/*.app' -type d | head -n1)"
+          if [ -n "$app" ]; then
+            ( cd "$(dirname "$app")" && zip -ry "$GITHUB_WORKSPACE/$assetsDir/${prefix}_app.zip" "$(basename "$app")" )
+          fi
+
+          ls -1 "$assetsDir" | sed 's/^/- /' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload assets to GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "$TAG_NAME" dist/release-assets/* --clobber
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tallya-macos-universal-release-assets
           path: dist/release-assets/*
           if-no-files-found: error
