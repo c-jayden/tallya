@@ -63,6 +63,9 @@ export function ReportGenerateDialog({
 }: ReportGenerateDialogProps) {
   const [isOverwriteConfirmOpen, setIsOverwriteConfirmOpen] = useState(false);
   const availableMemoryCount = context?.entries.length ?? 0;
+  const availableDayCount = context
+    ? new Set(context.entries.map((entry) => entry.occurredOn)).size
+    : 0;
   const hasAvailableMemories = availableMemoryCount > 0;
   const hasExistingReport = Boolean(context?.existingReport);
   const isRangeValid =
@@ -81,8 +84,8 @@ export function ReportGenerateDialog({
       : '本周周报已存在，重新生成会覆盖原报告。';
   const countCopy =
     reportType === 'custom'
-      ? `该范围内可用 ${availableMemoryCount} 条记录`
-      : `本周可用 ${availableMemoryCount} 条记录`;
+      ? `该范围内 ${availableDayCount} 天 · ${availableMemoryCount} 条记录`
+      : `本周 ${availableDayCount} 天 · ${availableMemoryCount} 条记录`;
 
   function handleOpenChange(nextOpen: boolean) {
     if (shouldAllowReportDialogOpenChange(nextOpen, !dialogState.canClose)) {

@@ -101,7 +101,7 @@ export function WorkMemoryHome() {
     if (isAnyOverlayOpen) {
       void ensureHomeWindowHeightForOverlay();
     } else {
-      void resizeHomeWindowToContent(contentRef.current);
+      void resizeHomeWindowToContent(contentRef.current, { animate: true });
     }
   }, [isAnyOverlayOpen, contentRef]);
 

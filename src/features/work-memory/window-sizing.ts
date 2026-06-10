@@ -9,10 +9,68 @@ const HOME_MAX_HEIGHT = 700;
 // Dialogs/popovers (settings, report generate, date picker) need vertical room
 // the content-hugging home height doesn't provide, so overlays temporarily grow
 // the window to this height.
-const HOME_OVERLAY_HEIGHT = 660;
+const HOME_OVERLAY_HEIGHT = 600;
 const MANUAL_RESIZE_TOLERANCE = 16;
+const RESIZE_ANIMATION_MS = 160;
 
 let lastAutoHeight: number | null = null;
+// Bumped whenever a new sizing op starts so an in-flight tween cancels itself.
+let resizeToken = 0;
+
+function clampHeight(height: number) {
+  return Math.min(Math.max(height, HOME_MIN_HEIGHT), HOME_MAX_HEIGHT);
+}
+
+function easeInOutQuad(t: number) {
+  return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+}
+
+type AppWindow = ReturnType<typeof getCurrentWindow>;
+
+// Tween the window height over a few frames so overlay open/close reads as a
+// smooth grow/shrink rather than a jump. A newer sizing op supersedes this one.
+function tweenWindowHeight(appWindow: AppWindow, fromHeight: number, toHeight: number) {
+  resizeToken += 1;
+  const token = resizeToken;
+  const start = performance.now();
+
+  return new Promise<void>((resolve) => {
+    const step = (now: number) => {
+      if (token !== resizeToken) {
+        resolve();
+        return;
+      }
+
+      const progress = Math.min(1, (now - start) / RESIZE_ANIMATION_MS);
+      const height = Math.round(fromHeight + (toHeight - fromHeight) * easeInOutQuad(progress));
+      void appWindow.setSize(new LogicalSize(HOME_WINDOW_WIDTH, height));
+
+      if (progress < 1) {
+        requestAnimationFrame(step);
+      } else {
+        resolve();
+      }
+    };
+
+    requestAnimationFrame(step);
+  });
+}
+
+async function applyHeight(
+  appWindow: AppWindow,
+  fromHeight: number,
+  toHeight: number,
+  animate: boolean,
+) {
+  if (animate && Math.abs(toHeight - fromHeight) > 2) {
+    await tweenWindowHeight(appWindow, fromHeight, toHeight);
+    return;
+  }
+
+  // Instant path also bumps the token so it cancels any running tween.
+  resizeToken += 1;
+  await appWindow.setSize(new LogicalSize(HOME_WINDOW_WIDTH, toHeight));
+}
 
 // Grow the window so an open overlay (and any popover inside it) isn't clipped
 // by the short, content-hugging home window. No-op if already tall enough.
@@ -29,18 +87,23 @@ export async function ensureHomeWindowHeightForOverlay() {
       return;
     }
 
-    await appWindow.setSize(new LogicalSize(HOME_WINDOW_WIDTH, HOME_OVERLAY_HEIGHT));
+    await applyHeight(appWindow, currentHeight, HOME_OVERLAY_HEIGHT, true);
     lastAutoHeight = HOME_OVERLAY_HEIGHT;
   } catch (error) {
     console.warn('Failed to expand home window for overlay', error);
   }
 }
 
-function clampHeight(height: number) {
-  return Math.min(Math.max(height, HOME_MIN_HEIGHT), HOME_MAX_HEIGHT);
-}
+type ResizeOptions = {
+  // Overlay-close refits animate; the content observer resizes instantly so
+  // typing/feed growth stays snappy.
+  animate?: boolean;
+};
 
-export async function resizeHomeWindowToContent(contentElement: HTMLElement | null) {
+export async function resizeHomeWindowToContent(
+  contentElement: HTMLElement | null,
+  { animate = false }: ResizeOptions = {},
+) {
   if (!contentElement) {
     return;
   }
@@ -84,7 +147,7 @@ export async function resizeHomeWindowToContent(contentElement: HTMLElement | nu
       return;
     }
 
-    await appWindow.setSize(new LogicalSize(HOME_WINDOW_WIDTH, targetHeight));
+    await applyHeight(appWindow, currentSize.height, targetHeight, animate);
     lastAutoHeight = targetHeight;
   } catch (error) {
     console.warn('Failed to resize home window from content', error);

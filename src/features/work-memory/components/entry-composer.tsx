@@ -1,5 +1,5 @@
 import { useState, type KeyboardEvent as ReactKeyboardEvent, type Ref } from 'react';
-import { Loader2, Plus } from 'lucide-react';
+import { CornerDownLeft, Loader2, Plus } from 'lucide-react';
 import { TallyaScrollArea } from '@/components/tallya-scroll-area';
 import { Button } from '@/components/ui/button';
 import { Kbd, KbdGroup } from '@/components/ui/kbd';
@@ -50,14 +50,16 @@ export function EntryComposer({ placeholder, isSaving, inputRef, onSubmit }: Ent
       </TallyaScrollArea>
       <div className="flex items-center justify-between pt-2.5">
         <span className="flex items-center gap-1.5 text-[13px] leading-[1.45] text-app-ink-subtle">
-          <KbdGroup>
-            <Kbd>↵</Kbd>
-          </KbdGroup>
+          <Kbd>
+            <CornerDownLeft aria-hidden="true" />
+          </Kbd>
           记录
           <span className="px-0.5 text-app-ink-subtle/60">·</span>
           <KbdGroup>
             <Kbd>Shift</Kbd>
-            <Kbd>↵</Kbd>
+            <Kbd>
+              <CornerDownLeft aria-hidden="true" />
+            </Kbd>
           </KbdGroup>
           换行
         </span>
