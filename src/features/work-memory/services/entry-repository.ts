@@ -1,0 +1,402 @@
+import type { CreateEntryInput, Entry, UpdateEntryInput } from '../types';
+import type { DatabaseClient } from './database/database';
+import { getDatabase } from './database/database';
+import { logger } from './logger/logger';
+import { createFriendlyError } from './service-error';
+
+const STORAGE_KEY = 'tallya.entries.v1';
+
+type Clock = () => Date;
+
+type RepositoryOptions = {
+  now?: Clock;
+};
+
+export type EntryRepository = {
+  create(input: CreateEntryInput): Promise<Entry>;
+  update(id: string, input: UpdateEntryInput): Promise<Entry | null>;
+  remove(id: string): Promise<void>;
+  getById(id: string): Promise<Entry | null>;
+  listByDate(date: string): Promise<Entry[]>;
+  listRange(startDate: string, endDate: string): Promise<Entry[]>;
+  search(keyword: string): Promise<Entry[]>;
+  clearLocalData(): Promise<void>;
+};
+
+export function getEntryDate(date = new Date()) {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, '0');
+  const day = `${date.getDate()}`.padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
+}
+
+function buildEntryId(): string {
+  return `entry_${crypto.randomUUID()}`;
+}
+
+function getBrowserStorage() {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  return window.localStorage;
+}
+
+function compareByOccurredAtDesc(first: Entry, second: Entry) {
+  return (
+    second.occurredAt.localeCompare(first.occurredAt) || second.id.localeCompare(first.id)
+  );
+}
+
+// Capture is structureless: only content + timestamps are set here. thread_id /
+// difficulty / effort are reserved for later milestones and stay null.
+function buildEntry(input: CreateEntryInput, now: Clock): Entry {
+  const occurredAt = input.occurredAt ?? now().toISOString();
+  const timestamp = now().toISOString();
+
+  return {
+    id: buildEntryId(),
+    content: input.content.trim(),
+    occurredAt,
+    occurredOn: getEntryDate(new Date(occurredAt)),
+    threadId: null,
+    difficulty: null,
+    effort: null,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+}
+
+export class LocalStorageEntryRepository implements EntryRepository {
+  private now: Clock;
+
+  constructor(
+    private readonly storage: Storage | null = getBrowserStorage(),
+    options: RepositoryOptions = {},
+  ) {
+    this.now = options.now ?? (() => new Date());
+  }
+
+  setClock(now: Clock) {
+    this.now = now;
+  }
+
+  async create(input: CreateEntryInput) {
+    const entry = buildEntry(input, this.now);
+    const entries = this.readAll();
+
+    entries.push(entry);
+    this.writeAll(entries);
+
+    return entry;
+  }
+
+  async update(id: string, input: UpdateEntryInput) {
+    const entries = this.readAll();
+    const index = entries.findIndex((entry) => entry.id === id);
+
+    if (index === -1) {
+      return null;
+    }
+
+    const updated: Entry = {
+      ...entries[index],
+      content: input.content.trim(),
+      updatedAt: this.now().toISOString(),
+    };
+
+    entries[index] = updated;
+    this.writeAll(entries);
+
+    return updated;
+  }
+
+  async remove(id: string) {
+    this.writeAll(this.readAll().filter((entry) => entry.id !== id));
+  }
+
+  async getById(id: string) {
+    return this.readAll().find((entry) => entry.id === id) ?? null;
+  }
+
+  async listByDate(date: string) {
+    return this.readAll()
+      .filter((entry) => entry.occurredOn === date)
+      .sort(compareByOccurredAtDesc);
+  }
+
+  async listRange(startDate: string, endDate: string) {
+    return this.readAll()
+      .filter((entry) => entry.occurredOn >= startDate && entry.occurredOn <= endDate)
+      .sort(compareByOccurredAtDesc);
+  }
+
+  async search(keyword: string) {
+    const normalized = keyword.trim().toLowerCase();
+
+    if (!normalized) {
+      return [];
+    }
+
+    return this.readAll()
+      .filter((entry) => entry.content.toLowerCase().includes(normalized))
+      .sort(compareByOccurredAtDesc);
+  }
+
+  async clearLocalData() {
+    this.writeAll([]);
+  }
+
+  private readAll(): Entry[] {
+    if (!this.storage) {
+      return [];
+    }
+
+    const raw = this.storage.getItem(STORAGE_KEY);
+
+    if (!raw) {
+      return [];
+    }
+
+    try {
+      const parsed = JSON.parse(raw) as unknown;
+
+      return Array.isArray(parsed)
+        ? parsed.filter((entry): entry is Entry => isEntryLike(entry))
+        : [];
+    } catch {
+      return [];
+    }
+  }
+
+  private writeAll(entries: Entry[]) {
+    this.storage?.setItem(STORAGE_KEY, JSON.stringify(entries));
+  }
+}
+
+type EntryRow = {
+  id: string;
+  content: string;
+  occurred_at: string;
+  occurred_on: string;
+  thread_id: string | null;
+  difficulty: number | null;
+  effort: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+function mapRowToEntry(row: EntryRow): Entry {
+  return {
+    id: row.id,
+    content: row.content,
+    occurredAt: row.occurred_at,
+    occurredOn: row.occurred_on,
+    threadId: row.thread_id,
+    difficulty: row.difficulty,
+    effort: row.effort,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function escapeLikePattern(keyword: string) {
+  return keyword.replace(/[\\%_]/g, (match) => `\\${match}`);
+}
+
+export class SQLiteEntryRepository implements EntryRepository {
+  private now: Clock;
+  private databasePromise: Promise<DatabaseClient> | null;
+
+  constructor(database?: Promise<DatabaseClient>, options: RepositoryOptions = {}) {
+    this.databasePromise = database ?? null;
+    this.now = options.now ?? (() => new Date());
+  }
+
+  setClock(now: Clock) {
+    this.now = now;
+  }
+
+  async create(input: CreateEntryInput) {
+    const entry = buildEntry(input, this.now);
+
+    await this.write((database) => insertEntryRow(database, entry));
+
+    return entry;
+  }
+
+  async update(id: string, input: UpdateEntryInput) {
+    const existing = await this.getById(id);
+
+    if (!existing) {
+      return null;
+    }
+
+    const updated: Entry = {
+      ...existing,
+      content: input.content.trim(),
+      updatedAt: this.now().toISOString(),
+    };
+
+    await this.write((database) =>
+      database.execute('UPDATE entries SET content = $1, updated_at = $2 WHERE id = $3', [
+        updated.content,
+        updated.updatedAt,
+        updated.id,
+      ]),
+    );
+
+    return updated;
+  }
+
+  async remove(id: string) {
+    await this.write((database) =>
+      database.execute('DELETE FROM entries WHERE id = $1', [id]),
+    );
+  }
+
+  async getById(id: string) {
+    return this.safeRead(async (database) => {
+      const rows = await database.select<EntryRow[]>(
+        'SELECT * FROM entries WHERE id = $1 LIMIT 1',
+        [id],
+      );
+
+      return rows[0] ? mapRowToEntry(rows[0]) : null;
+    }, null);
+  }
+
+  async listByDate(date: string) {
+    return this.safeRead(async (database) => {
+      const rows = await database.select<EntryRow[]>(
+        'SELECT * FROM entries WHERE occurred_on = $1 ORDER BY occurred_at DESC',
+        [date],
+      );
+
+      return rows.map(mapRowToEntry);
+    }, []);
+  }
+
+  async listRange(startDate: string, endDate: string) {
+    return this.safeRead(async (database) => {
+      const rows = await database.select<EntryRow[]>(
+        'SELECT * FROM entries WHERE occurred_on >= $1 AND occurred_on <= $2 ORDER BY occurred_at DESC',
+        [startDate, endDate],
+      );
+
+      return rows.map(mapRowToEntry);
+    }, []);
+  }
+
+  async search(keyword: string) {
+    const normalized = keyword.trim();
+
+    if (!normalized) {
+      return [];
+    }
+
+    return this.safeRead(async (database) => {
+      try {
+        const ftsQuery = `"${normalized.replace(/"/g, '""')}"`;
+        const rows = await database.select<EntryRow[]>(
+          `SELECT e.* FROM entries e JOIN entries_fts f ON f.rowid = e.rowid
+           WHERE entries_fts MATCH $1 ORDER BY e.occurred_at DESC`,
+          [ftsQuery],
+        );
+
+        return rows.map(mapRowToEntry);
+      } catch (error) {
+        // FTS may be unavailable (no trigram tokenizer) or reject short/odd
+        // queries; LIKE keeps search correct, just slower.
+        logger.warn('sqlite', 'entry.search_fts_fallback', 'Entry FTS search failed; falling back to LIKE', {
+          table: 'entries_fts',
+          error,
+        });
+
+        const rows = await database.select<EntryRow[]>(
+          `SELECT * FROM entries WHERE content LIKE $1 ESCAPE '\\' ORDER BY occurred_at DESC`,
+          [`%${escapeLikePattern(normalized)}%`],
+        );
+
+        return rows.map(mapRowToEntry);
+      }
+    }, []);
+  }
+
+  async clearLocalData() {
+    await this.write((database) => database.execute('DELETE FROM entries'));
+  }
+
+  private async safeRead<T>(operation: (database: DatabaseClient) => Promise<T>, fallback: T) {
+    try {
+      const database = await this.getReadyDatabase();
+
+      return await operation(database);
+    } catch (error) {
+      logger.error('sqlite', 'entry.read_failed', 'Failed to read entries from SQLite', {
+        operation: 'select',
+        table: 'entries',
+        error,
+      });
+
+      return fallback;
+    }
+  }
+
+  private async write(operation: (database: DatabaseClient) => Promise<unknown>) {
+    try {
+      const database = await this.getReadyDatabase();
+
+      await operation(database);
+    } catch (error) {
+      logger.error('sqlite', 'entry.write_failed', 'Failed to write entry to SQLite', {
+        operation: 'write',
+        table: 'entries',
+        error,
+      });
+      throw createFriendlyError('记录保存失败，请稍后重试。', error);
+    }
+  }
+
+  private async getReadyDatabase() {
+    this.databasePromise ??= getDatabase();
+
+    return this.databasePromise;
+  }
+}
+
+async function insertEntryRow(database: DatabaseClient, entry: Entry) {
+  await database.execute(
+    `INSERT INTO entries (id, content, occurred_at, occurred_on, thread_id, difficulty, effort, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+    [
+      entry.id,
+      entry.content,
+      entry.occurredAt,
+      entry.occurredOn,
+      entry.threadId,
+      entry.difficulty,
+      entry.effort,
+      entry.createdAt,
+      entry.updatedAt,
+    ],
+  );
+}
+
+function isEntryLike(value: unknown): value is Entry {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  const candidate = value as Record<string, unknown>;
+
+  return (
+    typeof candidate.id === 'string' &&
+    typeof candidate.content === 'string' &&
+    typeof candidate.occurredAt === 'string' &&
+    typeof candidate.occurredOn === 'string'
+  );
+}
+
+export const entryRepository: EntryRepository = new SQLiteEntryRepository();

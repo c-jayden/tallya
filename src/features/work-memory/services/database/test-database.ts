@@ -38,7 +38,19 @@ type ReportSourceRow = {
   daily_memory_updated_at_snapshot: string;
 };
 
-type TableName = 'daily_memories' | 'reports' | 'report_sources' | 'app_settings';
+type EntryRow = {
+  id: string;
+  content: string;
+  occurred_at: string;
+  occurred_on: string;
+  thread_id: string | null;
+  difficulty: number | null;
+  effort: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type TableName = 'daily_memories' | 'reports' | 'report_sources' | 'app_settings' | 'entries';
 
 export class TestDatabaseClient implements DatabaseClient {
   readonly createdTables = new Set<TableName>();
@@ -46,6 +58,7 @@ export class TestDatabaseClient implements DatabaseClient {
   appSettings = new Map<string, AppSettingsRow>();
   reports = new Map<string, ReportRow>();
   reportSources = new Map<string, ReportSourceRow>();
+  entries = new Map<string, EntryRow>();
   clearedReports = false;
   clearedReportSources = false;
 
@@ -71,6 +84,48 @@ export class TestDatabaseClient implements DatabaseClient {
       };
 
       this.dailyMemories.set(row.date, row);
+      return;
+    }
+
+    if (normalizedQuery.startsWith('insert into entries')) {
+      const row: EntryRow = {
+        id: String(bindValues[0]),
+        content: String(bindValues[1]),
+        occurred_at: String(bindValues[2]),
+        occurred_on: String(bindValues[3]),
+        thread_id: toNullableString(bindValues[4]),
+        difficulty: typeof bindValues[5] === 'number' ? bindValues[5] : null,
+        effort: toNullableString(bindValues[6]),
+        created_at: String(bindValues[7]),
+        updated_at: String(bindValues[8]),
+      };
+
+      this.entries.set(row.id, row);
+      return;
+    }
+
+    if (normalizedQuery.startsWith('update entries set content =')) {
+      const id = String(bindValues[2]);
+      const existing = this.entries.get(id);
+
+      if (existing) {
+        this.entries.set(id, {
+          ...existing,
+          content: String(bindValues[0]),
+          updated_at: String(bindValues[1]),
+        });
+      }
+
+      return;
+    }
+
+    if (normalizedQuery.startsWith('delete from entries where id =')) {
+      this.entries.delete(String(bindValues[0]));
+      return;
+    }
+
+    if (normalizedQuery.startsWith('delete from entries')) {
+      this.entries.clear();
       return;
     }
 
@@ -205,6 +260,57 @@ export class TestDatabaseClient implements DatabaseClient {
         : []) as T;
     }
 
+    if (normalizedQuery.startsWith('select count(*) as count from entries')) {
+      return [{ count: this.entries.size }] as T;
+    }
+
+    if (normalizedQuery.startsWith('select id, date, raw_content')) {
+      return Array.from(this.dailyMemories.values())
+        .sort((first, second) => first.date.localeCompare(second.date))
+        .map((row) => ({
+          id: row.id,
+          date: row.date,
+          raw_content: row.raw_content,
+          created_at: row.created_at,
+          updated_at: row.updated_at,
+        })) as T;
+    }
+
+    if (normalizedQuery.startsWith('select * from entries where id =')) {
+      const row = this.entries.get(String(bindValues[0]));
+      return (row ? [row] : []) as T;
+    }
+
+    if (normalizedQuery.startsWith('select * from entries where occurred_on >=')) {
+      const start = String(bindValues[0]);
+      const end = String(bindValues[1]);
+      return Array.from(this.entries.values())
+        .filter((row) => row.occurred_on >= start && row.occurred_on <= end)
+        .sort(compareEntriesByOccurredAtDesc) as T;
+    }
+
+    if (normalizedQuery.startsWith('select * from entries where occurred_on =')) {
+      return Array.from(this.entries.values())
+        .filter((row) => row.occurred_on === String(bindValues[0]))
+        .sort(compareEntriesByOccurredAtDesc) as T;
+    }
+
+    // FTS search path: the mock has no real FTS index, so it approximates the
+    // MATCH query with a case-insensitive substring scan over content.
+    if (normalizedQuery.startsWith('select e.* from entries e join entries_fts')) {
+      const keyword = stripFtsQuotes(String(bindValues[0])).toLowerCase();
+      return Array.from(this.entries.values())
+        .filter((row) => row.content.toLowerCase().includes(keyword))
+        .sort(compareEntriesByOccurredAtDesc) as T;
+    }
+
+    if (normalizedQuery.startsWith('select * from entries where content like')) {
+      const pattern = String(bindValues[0]).replace(/^%/, '').replace(/%$/, '').toLowerCase();
+      return Array.from(this.entries.values())
+        .filter((row) => row.content.toLowerCase().includes(pattern))
+        .sort(compareEntriesByOccurredAtDesc) as T;
+    }
+
     if (normalizedQuery.startsWith('select * from daily_memories where date =')) {
       const row = this.dailyMemories.get(String(bindValues[0]));
       return (row ? [row] : []) as T;
@@ -303,6 +409,10 @@ export class TestDatabaseClient implements DatabaseClient {
     if (query.includes('app_settings')) {
       this.createdTables.add('app_settings');
     }
+
+    if (/create table if not exists entries\b/.test(query)) {
+      this.createdTables.add('entries');
+    }
   }
 
   private getTableRows(tableName: TableName) {
@@ -312,6 +422,17 @@ export class TestDatabaseClient implements DatabaseClient {
 
 function normalizeQuery(query: string) {
   return query.replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
+function compareEntriesByOccurredAtDesc(first: EntryRow, second: EntryRow) {
+  return (
+    second.occurred_at.localeCompare(first.occurred_at) ||
+    second.id.localeCompare(first.id)
+  );
+}
+
+function stripFtsQuotes(value: string) {
+  return value.replace(/^"+|"+$/g, '').replace(/""/g, '"');
 }
 
 function toNullableString(value: unknown) {

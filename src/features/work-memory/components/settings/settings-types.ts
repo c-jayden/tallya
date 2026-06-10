@@ -15,10 +15,12 @@ export type { ProviderHealth };
 
 export const defaultSettingsSection: SettingsSection = 'app';
 
+// 报告偏好 is hidden during the entry-model transition: reports are degraded
+// until they are rebuilt on top of entries (see docs/PLAN.md M5). The section
+// type and option constants are kept so it can be re-enabled without rework.
 export const menuItems: { id: SettingsSection; label: string }[] = [
   { id: 'app', label: '应用设置' },
   { id: 'ai', label: 'AI 配置' },
-  { id: 'reports', label: '报告偏好' },
   { id: 'notifications', label: '通知提醒' },
   { id: 'shortcuts', label: '快捷键' },
   { id: 'data', label: '数据管理' },

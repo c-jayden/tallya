@@ -128,6 +128,30 @@ export type DailyMemory = {
   updatedAt: string;
 };
 
+// A single low-friction work-memory entry. Capture stays structureless: just
+// text plus a timestamp. thread_id / difficulty / effort are reserved for later
+// milestones (thread linking, light metadata) and stay null until then.
+export type Entry = {
+  id: string;
+  content: string;
+  occurredAt: string; // ISO timestamp of when the work happened/was logged
+  occurredOn: string; // YYYY-MM-DD derived from occurredAt, used for day grouping
+  threadId: string | null;
+  difficulty: number | null;
+  effort: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CreateEntryInput = {
+  content: string;
+  occurredAt?: string;
+};
+
+export type UpdateEntryInput = {
+  content: string;
+};
+
 export type ReportType = 'weekly' | 'monthly' | 'yearly' | 'custom' | 'performance' | 'handoff';
 
 export type ReportStatus = 'generated' | 'stale' | 'locked';

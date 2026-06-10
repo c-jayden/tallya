@@ -14,20 +14,20 @@ export function getDailyMemoryHeroCopy(selectedDate: string, todayDate: string) 
   if (dayDiff === 0) {
     return {
       title: '今天做了什么？',
-      description: '随便写几句，Tallya 会帮你整理和沉淀。',
+      description: '随手记一条，之后随时能搜回来。',
     };
   }
 
   if (dayDiff === 1) {
     return {
       title: '昨天做了什么？',
-      description: '写下这一天记得的工作内容，Tallya 会帮你整理。',
+      description: '补记这天做过的事，之后随时能搜回来。',
     };
   }
 
   return {
     title: '这一天做了什么？',
-    description: '写下这一天记得的工作内容，Tallya 会帮你整理。',
+    description: '补记这天做过的事，之后随时能搜回来。',
   };
 }
 

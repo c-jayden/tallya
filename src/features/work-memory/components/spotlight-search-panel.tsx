@@ -2,18 +2,13 @@ import { Search, X } from 'lucide-react';
 import type { KeyboardEvent as ReactKeyboardEvent, RefObject } from 'react';
 import { TallyaScrollArea } from '@/components/tallya-scroll-area';
 import { cn } from '@/lib/utils';
-import {
-  formatMemoryDate,
-  getMemorySnippet,
-  getMemorySummary,
-  getRelativeMemoryDate,
-} from '../memory-view-model';
-import type { DailyMemory } from '../types';
+import { formatMemoryDate, getRelativeMemoryDate } from '../memory-view-model';
+import type { Entry } from '../types';
 
 type SpotlightSearchPanelProps = {
   open: boolean;
   keyword: string;
-  results: DailyMemory[];
+  results: Entry[];
   activeIndex: number;
   currentDate: string;
   inputRef: RefObject<HTMLInputElement | null>;
@@ -25,7 +20,7 @@ type SpotlightSearchPanelProps = {
   onKeyDown: (event: ReactKeyboardEvent<HTMLInputElement>) => void;
   onClear: () => void;
   onActiveIndexChange: (index: number) => void;
-  onOpenMemory: (memory: DailyMemory) => void;
+  onOpenMemory: (entry: Entry) => void;
 };
 
 type HighlightedTextProps = {
@@ -141,37 +136,30 @@ export function SpotlightSearchPanel({
             <TallyaScrollArea className="min-h-0 flex-1 p-2">
               {results.length > 0 ? (
                 <div className="grid gap-1">
-                  {results.map((memory, index) => {
-                    const snippet = getMemorySnippet(memory, keyword);
-                    const relativeDate = getRelativeMemoryDate(memory.date, currentDate);
-                    const dateLabel = `${formatMemoryDate(memory.date)}${
+                  {results.map((entry, index) => {
+                    const relativeDate = getRelativeMemoryDate(entry.occurredOn, currentDate);
+                    const dateLabel = `${formatMemoryDate(entry.occurredOn)}${
                       relativeDate ? ` · ${relativeDate}` : ''
                     }`;
                     const isActive = index === activeIndex;
 
                     return (
                       <button
-                        key={memory.id}
+                        key={entry.id}
                         type="button"
                         className={cn(
                           'block w-full cursor-pointer rounded-[10px] bg-transparent px-3.5 py-3 text-left transition-colors duration-150 hover:bg-app-surface-muted focus-visible:bg-app-surface-muted focus-visible:outline-none',
                           isActive && 'bg-app-surface-muted',
                         )}
                         onMouseEnter={() => onActiveIndexChange(index)}
-                        onClick={() => onOpenMemory(memory)}
+                        onClick={() => onOpenMemory(entry)}
                       >
                         <p className="text-xs leading-4 text-app-ink-subtle">
                           <HighlightedText text={dateLabel} keyword={keyword} />
                         </p>
-                        <p className="mt-1 line-clamp-2 text-[14.5px] leading-[1.55] text-app-ink">
-                          <HighlightedText text={getMemorySummary(memory)} keyword={keyword} />
+                        <p className="mt-1 line-clamp-3 text-[14.5px] leading-[1.55] whitespace-pre-wrap text-app-ink">
+                          <HighlightedText text={entry.content} keyword={keyword} />
                         </p>
-                        {snippet ? (
-                          <p className="mt-1 line-clamp-1 text-[13px] leading-[1.45] text-app-ink-muted">
-                            匹配：
-                            <HighlightedText text={snippet} keyword={keyword} />
-                          </p>
-                        ) : null}
                       </button>
                     );
                   })}

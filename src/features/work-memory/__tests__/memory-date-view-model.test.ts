@@ -21,11 +21,11 @@ describe('memory date view model', () => {
   it('uses date-aware home title and description copy', () => {
     expect(getDailyMemoryHeroCopy('2026-06-08', '2026-06-08')).toEqual({
       title: '今天做了什么？',
-      description: '随便写几句，Tallya 会帮你整理和沉淀。',
+      description: '随手记一条，之后随时能搜回来。',
     });
     expect(getDailyMemoryHeroCopy('2026-06-07', '2026-06-08')).toMatchObject({
       title: '昨天做了什么？',
-      description: '写下这一天记得的工作内容，Tallya 会帮你整理。',
+      description: '补记这天做过的事，之后随时能搜回来。',
     });
     expect(getDailyMemoryHeroCopy('2026-06-06', '2026-06-08')).toMatchObject({
       title: '这一天做了什么？',

@@ -5,18 +5,18 @@ import {
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
 } from 'react';
-import { dailyMemoryRepository } from '../services/daily-memory-repository';
-import type { DailyMemory } from '../types';
+import { entryRepository } from '../services/entry-repository';
+import type { Entry } from '../types';
 
 type UseMemorySearchOptions = {
-  onOpenMemory: (memory: DailyMemory) => void;
+  onOpenMemory: (entry: Entry) => void;
 };
 
 export function useMemorySearch({ onOpenMemory }: UseMemorySearchOptions) {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchKeyword, setSearchKeyword] = useState('');
   const [isSearchComposing, setIsSearchComposing] = useState(false);
-  const [searchResults, setSearchResults] = useState<DailyMemory[]>([]);
+  const [searchResults, setSearchResults] = useState<Entry[]>([]);
   const [activeSearchIndex, setActiveSearchIndex] = useState(-1);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const searchButtonRef = useRef<HTMLButtonElement>(null);
@@ -44,9 +44,9 @@ export function useMemorySearch({ onOpenMemory }: UseMemorySearchOptions) {
       return;
     }
 
-    // Search follows a Spotlight-style command palette and intentionally reads
-    // only generated memories; drafts stay out of global search.
-    void dailyMemoryRepository.searchMemories(keyword).then((results) => {
+    // Search follows a Spotlight-style command palette over all captured
+    // entries, backed by FTS5 with a LIKE fallback in the repository.
+    void entryRepository.search(keyword).then((results) => {
       if (isMounted) {
         setSearchResults(results);
         setActiveSearchIndex(results.length > 0 ? 0 : -1);
@@ -139,9 +139,9 @@ export function useMemorySearch({ onOpenMemory }: UseMemorySearchOptions) {
     }
   }
 
-  function openSearchMemory(memory: DailyMemory) {
+  function openSearchMemory(entry: Entry) {
     closeSearchPanel();
-    onOpenMemory(memory);
+    onOpenMemory(entry);
   }
 
   return {

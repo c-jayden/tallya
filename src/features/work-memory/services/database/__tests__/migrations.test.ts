@@ -10,7 +10,7 @@ describe('database migrations', () => {
     await runMigrations(database);
 
     expect(database.createdTables).toEqual(
-      new Set(['daily_memories', 'reports', 'report_sources', 'app_settings']),
+      new Set(['daily_memories', 'reports', 'report_sources', 'app_settings', 'entries']),
     );
   });
 

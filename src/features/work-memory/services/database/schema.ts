@@ -1,5 +1,5 @@
 export const DATABASE_PATH = 'sqlite:tallya.db';
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 export const createDailyMemoriesTableSql = `
   CREATE TABLE IF NOT EXISTS daily_memories (
@@ -14,6 +14,52 @@ export const createDailyMemoriesTableSql = `
     locked_at TEXT
   )
 `;
+
+// The entry is the core unit of the work-memory model: one low-friction note
+// with a timestamp. thread_id / difficulty / effort are created up front but
+// stay null until later milestones so we never have to migrate columns again.
+export const createEntriesTableSql = `
+  CREATE TABLE IF NOT EXISTS entries (
+    id TEXT PRIMARY KEY,
+    content TEXT NOT NULL,
+    occurred_at TEXT NOT NULL,
+    occurred_on TEXT NOT NULL,
+    thread_id TEXT,
+    difficulty INTEGER,
+    effort TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  )
+`;
+
+export const createEntriesIndexSql = `
+  CREATE INDEX IF NOT EXISTS idx_entries_occurred_on ON entries(occurred_on)
+`;
+
+// External-content FTS5 over entries.content. trigram tokenizer gives CJK
+// substring matching without an external segmenter. If trigram is unavailable
+// on the bundled SQLite, FTS creation is skipped and search falls back to LIKE.
+export const createEntriesFtsSql = `
+  CREATE VIRTUAL TABLE IF NOT EXISTS entries_fts USING fts5(
+    content,
+    content='entries',
+    content_rowid='rowid',
+    tokenize='trigram'
+  )
+`;
+
+export const createEntriesFtsTriggersSql = [
+  `CREATE TRIGGER IF NOT EXISTS entries_ai AFTER INSERT ON entries BEGIN
+    INSERT INTO entries_fts(rowid, content) VALUES (new.rowid, new.content);
+  END`,
+  `CREATE TRIGGER IF NOT EXISTS entries_ad AFTER DELETE ON entries BEGIN
+    INSERT INTO entries_fts(entries_fts, rowid, content) VALUES ('delete', old.rowid, old.content);
+  END`,
+  `CREATE TRIGGER IF NOT EXISTS entries_au AFTER UPDATE ON entries BEGIN
+    INSERT INTO entries_fts(entries_fts, rowid, content) VALUES ('delete', old.rowid, old.content);
+    INSERT INTO entries_fts(rowid, content) VALUES (new.rowid, new.content);
+  END`,
+];
 
 export const createReportsTableSql = `
   CREATE TABLE IF NOT EXISTS reports (
