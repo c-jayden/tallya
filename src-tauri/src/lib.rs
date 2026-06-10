@@ -680,6 +680,21 @@ fn run_codex_prompt_generation<T>(
     Err("生成超时，请稍后重试。".to_string())
 }
 
+// On Windows, spawning a console subprocess (the Codex CLI) flashes a terminal
+// window. CREATE_NO_WINDOW keeps it hidden; no-op on other platforms.
+fn suppress_console_window(command: &mut Command) {
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = command;
+    }
+}
+
 fn spawn_codex_cli(
     command: &str,
     model: &str,
@@ -689,7 +704,8 @@ fn spawn_codex_cli(
     let codex_model = normalize_codex_model(model);
 
     for command in get_command_candidates(command)? {
-        match Command::new(&command)
+        let mut child_command = Command::new(&command);
+        child_command
             .args([
                 "exec",
                 "--ephemeral",
@@ -710,9 +726,10 @@ fn spawn_codex_cli(
             ])
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-        {
+            .stderr(Stdio::piped());
+        suppress_console_window(&mut child_command);
+
+        match child_command.spawn() {
             Ok(child) => {
                 return Ok(child);
             }
@@ -744,12 +761,14 @@ fn run_codex_cli_check(command: String) -> Result<String, String> {
     let mut last_error = None;
 
     for command in get_command_candidates(&command)? {
-        match Command::new(&command)
+        let mut child_command = Command::new(&command);
+        child_command
             .arg("--version")
             .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-        {
+            .stderr(Stdio::piped());
+        suppress_console_window(&mut child_command);
+
+        match child_command.spawn() {
             Ok(mut child) => {
                 let started_at = Instant::now();
 
