@@ -29,6 +29,7 @@ import {
 } from './memory-date-view-model';
 import { getEntryDate } from './services/entry-repository';
 import { dailyMemoryRepository } from './services/daily-memory-repository';
+import { ensureHomeWindowHeightForOverlay, resizeHomeWindowToContent } from './window-sizing';
 import type { Entry } from './types';
 
 export function WorkMemoryHome() {
@@ -82,6 +83,27 @@ export function WorkMemoryHome() {
     setIsSettingsOpen(false);
     weeklyReport.closeReportDialogs();
   }
+
+  // The home window hugs its content and can be quite short; dialogs and the
+  // date-picker popover need more vertical room. Grow the window while any
+  // overlay is open, then refit to content when they all close.
+  const isAnyOverlayOpen =
+    search.isSearchOpen ||
+    threads.isThreadsOpen ||
+    isSettingsOpen ||
+    weeklyReport.isGenerateDialogOpen ||
+    weeklyReport.isPreviewDialogOpen ||
+    weeklyReport.isReportListOpen ||
+    weeklyReport.isReportDetailOpen ||
+    weeklyReport.isGapDialogOpen;
+
+  useEffect(() => {
+    if (isAnyOverlayOpen) {
+      void ensureHomeWindowHeightForOverlay();
+    } else {
+      void resizeHomeWindowToContent(contentRef.current);
+    }
+  }, [isAnyOverlayOpen, contentRef]);
 
   const toolbarDate = formatToolbarDate(selectedDate);
   const heroCopy = getDailyMemoryHeroCopy(selectedDate, todayDate);

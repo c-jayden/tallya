@@ -53,9 +53,10 @@ export function ClearDataConfirmDialog({
           </label>
           <Input
             id="clear-data-confirm-input"
+            className="placeholder:text-[var(--app-placeholder)]"
             value={confirmText}
             onChange={(event) => setConfirmText(event.target.value)}
-            placeholder={CLEAR_DATA_CONFIRM_TEXT}
+            placeholder="在此输入上面的文字以确认"
             disabled={isClearingData}
             autoComplete="off"
           />

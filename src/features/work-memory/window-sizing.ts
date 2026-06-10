@@ -6,9 +6,35 @@ const HOME_WINDOW_WIDTH = 720;
 // a blank band; the window still grows with the feed up to the max.
 const HOME_MIN_HEIGHT = 360;
 const HOME_MAX_HEIGHT = 700;
+// Dialogs/popovers (settings, report generate, date picker) need vertical room
+// the content-hugging home height doesn't provide, so overlays temporarily grow
+// the window to this height.
+const HOME_OVERLAY_HEIGHT = 660;
 const MANUAL_RESIZE_TOLERANCE = 16;
 
 let lastAutoHeight: number | null = null;
+
+// Grow the window so an open overlay (and any popover inside it) isn't clipped
+// by the short, content-hugging home window. No-op if already tall enough.
+export async function ensureHomeWindowHeightForOverlay() {
+  try {
+    const appWindow = getCurrentWindow();
+    const [innerSize, scaleFactor] = await Promise.all([
+      appWindow.innerSize(),
+      appWindow.scaleFactor(),
+    ]);
+    const currentHeight = innerSize.toLogical(scaleFactor).height;
+
+    if (currentHeight >= HOME_OVERLAY_HEIGHT - 1) {
+      return;
+    }
+
+    await appWindow.setSize(new LogicalSize(HOME_WINDOW_WIDTH, HOME_OVERLAY_HEIGHT));
+    lastAutoHeight = HOME_OVERLAY_HEIGHT;
+  } catch (error) {
+    console.warn('Failed to expand home window for overlay', error);
+  }
+}
 
 function clampHeight(height: number) {
   return Math.min(Math.max(height, HOME_MIN_HEIGHT), HOME_MAX_HEIGHT);

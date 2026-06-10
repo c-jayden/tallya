@@ -56,7 +56,7 @@ export function HomeToolbar({
           aria-hidden="true"
         />
       </DatePickerPopover>
-      <div className="flex min-w-0 items-center gap-3">
+      <div className="flex min-w-0 items-center gap-1">
         <Button
           ref={searchButtonRef}
           variant="ghost"

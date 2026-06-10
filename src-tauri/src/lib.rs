@@ -695,6 +695,47 @@ fn suppress_console_window(command: &mut Command) {
     }
 }
 
+// Open the app's data ("data") or logs ("logs") directory in the OS file
+// manager. Done in Rust to avoid the JS fs/opener plugin scope pitfalls that
+// made the previous implementation fail on macOS.
+#[tauri::command]
+fn open_app_directory(app: tauri::AppHandle, kind: String) -> Result<(), String> {
+    use tauri::Manager;
+
+    let base = app.path().app_data_dir().map_err(|error| {
+        eprintln!("Failed to resolve app data dir: {error}");
+        "无法定位应用数据目录。".to_string()
+    })?;
+    let dir = if kind == "logs" { base.join("logs") } else { base };
+
+    std::fs::create_dir_all(&dir).map_err(|error| {
+        eprintln!("Failed to create directory {dir:?}: {error}");
+        "无法创建目录。".to_string()
+    })?;
+
+    reveal_directory(&dir)
+}
+
+fn reveal_directory(dir: &std::path::Path) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    let program = "open";
+    #[cfg(target_os = "windows")]
+    let program = "explorer";
+    #[cfg(all(not(target_os = "macos"), not(target_os = "windows")))]
+    let program = "xdg-open";
+
+    let mut command = Command::new(program);
+    command.arg(dir);
+    suppress_console_window(&mut command);
+
+    command.spawn().map_err(|error| {
+        eprintln!("Failed to open directory {dir:?}: {error}");
+        "打开目录失败。".to_string()
+    })?;
+
+    Ok(())
+}
+
 fn spawn_codex_cli(
     command: &str,
     model: &str,
@@ -1819,6 +1860,7 @@ pub fn run() {
             generate_range_report_with_codex,
             generate_weekly_report_with_codex,
             hide_main_window,
+            open_app_directory,
             quit_app,
             send_tallya_notification,
             set_window_behavior,

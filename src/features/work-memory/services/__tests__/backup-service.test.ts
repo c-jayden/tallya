@@ -149,7 +149,7 @@ describe('backup-service', () => {
     expect(tauriMocks.writeTextFile).not.toHaveBeenCalled();
   });
 
-  it('opens the Tauri app data directory instead of a hard-coded platform path', async () => {
+  it('opens the data directory through the Rust command', async () => {
     const service = createBackupService({
       appVersion: '0.1.0',
       now: () => new Date('2026-06-08T10:00:00.000Z'),
@@ -157,17 +157,10 @@ describe('backup-service', () => {
       reportRepository: createReportRepository(),
       appSettingsRepository: createAppSettingsRepository(),
     });
-    tauriMocks.appDataDir.mockResolvedValueOnce('/mock/app-data/tallya');
 
     await service.openDataDirectory();
 
-    expect(tauriMocks.mkdir).toHaveBeenCalledWith('/mock/app-data/tallya', {
-      recursive: true,
-    });
-    expect(tauriMocks.openPath).toHaveBeenCalledWith('/mock/app-data/tallya');
-    expect(tauriMocks.mkdir.mock.invocationCallOrder[0]).toBeLessThan(
-      tauriMocks.openPath.mock.invocationCallOrder[0],
-    );
+    expect(tauriMocks.invoke).toHaveBeenCalledWith('open_app_directory', { kind: 'data' });
   });
 
   it('returns null without reading a file when backup import selection is cancelled', async () => {

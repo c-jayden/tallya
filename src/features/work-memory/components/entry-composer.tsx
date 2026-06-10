@@ -2,6 +2,7 @@ import { useState, type KeyboardEvent as ReactKeyboardEvent, type Ref } from 're
 import { Loader2, Plus } from 'lucide-react';
 import { TallyaScrollArea } from '@/components/tallya-scroll-area';
 import { Button } from '@/components/ui/button';
+import { Kbd, KbdGroup } from '@/components/ui/kbd';
 import { Textarea } from '@/components/ui/textarea';
 
 type EntryComposerProps = {
@@ -48,8 +49,17 @@ export function EntryComposer({ placeholder, isSaving, inputRef, onSubmit }: Ent
         />
       </TallyaScrollArea>
       <div className="flex items-center justify-between pt-2.5">
-        <span className="text-[13px] leading-[1.45] text-app-ink-subtle">
-          回车记录，Shift + 回车换行
+        <span className="flex items-center gap-1.5 text-[13px] leading-[1.45] text-app-ink-subtle">
+          <KbdGroup>
+            <Kbd>↵</Kbd>
+          </KbdGroup>
+          记录
+          <span className="px-0.5 text-app-ink-subtle/60">·</span>
+          <KbdGroup>
+            <Kbd>Shift</Kbd>
+            <Kbd>↵</Kbd>
+          </KbdGroup>
+          换行
         </span>
         <Button
           type="button"

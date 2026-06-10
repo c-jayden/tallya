@@ -321,7 +321,8 @@ export function useSettingsDialogState({
     setIsOpeningLogDirectory(true);
 
     try {
-      await logger.openLogsDirectory();
+      const { invoke } = await import('@tauri-apps/api/core');
+      await invoke('open_app_directory', { kind: 'logs' });
     } catch (error) {
       logger.error('settings', 'diagnostic_log.open_directory_failed', 'Failed to open log directory', {
         error,

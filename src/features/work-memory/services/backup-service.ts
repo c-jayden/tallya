@@ -1,4 +1,3 @@
-import { appDataDir } from '@tauri-apps/api/path';
 import { appVersion as currentAppVersion } from '@/lib/app-version';
 import { appSettingsRepository, type AppSettings } from './app-settings-repository';
 import { dailyMemoryRepository } from './daily-memory-repository';
@@ -112,12 +111,11 @@ export function createBackupService(dependencies: BackupServiceDependencies) {
     },
 
     async openDataDirectory() {
-      const { mkdir } = await import('@tauri-apps/plugin-fs');
-      const { openPath } = await import('@tauri-apps/plugin-opener');
-      const dataDirectory = await appDataDir();
+      // Resolve + create + reveal happens in Rust to dodge JS plugin scope
+      // issues that broke this on macOS.
+      const { invoke } = await import('@tauri-apps/api/core');
 
-      await mkdir(dataDirectory, { recursive: true });
-      await openPath(dataDirectory);
+      await invoke('open_app_directory', { kind: 'data' });
     },
   };
 }
