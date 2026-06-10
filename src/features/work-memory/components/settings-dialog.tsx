@@ -55,7 +55,7 @@ export function SettingsDialog({
             </DialogDescription>
           </DialogHeader>
 
-          <div className="grid min-h-0 flex-1 grid-cols-[9rem_minmax(0,1fr)]">
+          <div className="grid min-h-0 flex-1 grid-cols-[9rem_minmax(0,1fr)] grid-rows-[minmax(0,1fr)]">
             <SettingsMenu
               activeSection={settingsState.activeSection}
               onSelect={settingsState.setActiveSection}

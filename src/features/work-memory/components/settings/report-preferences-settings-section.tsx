@@ -122,12 +122,12 @@ function ReportPreferenceItem<T extends ReportLength | ReportTone | ReportFocus>
   onChange: (value: T) => void;
 }) {
   return (
-    <div className="flex flex-col gap-3 rounded-lg bg-slate-50/70 px-4 py-3 sm:flex-row sm:items-start sm:justify-between">
-      <div className="space-y-1">
+    <div className="space-y-2.5 rounded-lg bg-slate-50/70 px-4 py-3">
+      <div className="space-y-0.5">
         <div className="text-sm font-semibold text-app-ink">{label}</div>
         <p className="text-[13px] leading-5 text-app-ink-subtle">{description}</p>
       </div>
-      <div className="inline-flex w-fit shrink-0 gap-1 rounded-xl bg-gray-100 p-1 dark:bg-app-surface-muted">
+      <div className="inline-flex w-fit max-w-full flex-wrap gap-1 rounded-xl bg-gray-100 p-1 dark:bg-app-surface-muted">
         {options.map((option) => {
           const isActive = value === option.value;
 

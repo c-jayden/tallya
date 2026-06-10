@@ -9,7 +9,7 @@ type SettingsMenuProps = {
 export function SettingsMenu({ activeSection, onSelect }: SettingsMenuProps) {
   return (
     <nav
-      className="min-h-0 overflow-y-auto border-r border-app-border bg-transparent p-3 scrollbar-none [&::-webkit-scrollbar]:hidden"
+      className="h-full min-h-0 overflow-y-auto border-r border-app-border bg-transparent p-3 scrollbar-none [&::-webkit-scrollbar]:hidden"
       aria-label="设置分组"
     >
       <div className="flex flex-col gap-1">
