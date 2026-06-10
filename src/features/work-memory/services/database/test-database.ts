@@ -50,7 +50,22 @@ type EntryRow = {
   updated_at: string;
 };
 
-type TableName = 'daily_memories' | 'reports' | 'report_sources' | 'app_settings' | 'entries';
+type EntryClarificationRow = {
+  id: string;
+  entry_id: string;
+  question: string | null;
+  answer: string;
+  created_at: string;
+  updated_at: string;
+};
+
+type TableName =
+  | 'daily_memories'
+  | 'reports'
+  | 'report_sources'
+  | 'app_settings'
+  | 'entries'
+  | 'entry_clarifications';
 
 export class TestDatabaseClient implements DatabaseClient {
   readonly createdTables = new Set<TableName>();
@@ -59,6 +74,7 @@ export class TestDatabaseClient implements DatabaseClient {
   reports = new Map<string, ReportRow>();
   reportSources = new Map<string, ReportSourceRow>();
   entries = new Map<string, EntryRow>();
+  clarifications = new Map<string, EntryClarificationRow>();
   clearedReports = false;
   clearedReportSources = false;
 
@@ -126,6 +142,57 @@ export class TestDatabaseClient implements DatabaseClient {
 
     if (normalizedQuery.startsWith('delete from entries')) {
       this.entries.clear();
+      return;
+    }
+
+    if (normalizedQuery.startsWith('insert into entry_clarifications')) {
+      const row: EntryClarificationRow = {
+        id: String(bindValues[0]),
+        entry_id: String(bindValues[1]),
+        question: toNullableString(bindValues[2]),
+        answer: String(bindValues[3]),
+        created_at: String(bindValues[4]),
+        updated_at: String(bindValues[5]),
+      };
+
+      this.clarifications.set(row.id, row);
+      return;
+    }
+
+    if (normalizedQuery.startsWith('update entry_clarifications set answer =')) {
+      const id = String(bindValues[2]);
+      const existing = this.clarifications.get(id);
+
+      if (existing) {
+        this.clarifications.set(id, {
+          ...existing,
+          answer: String(bindValues[0]),
+          updated_at: String(bindValues[1]),
+        });
+      }
+
+      return;
+    }
+
+    if (normalizedQuery.startsWith('delete from entry_clarifications where id =')) {
+      this.clarifications.delete(String(bindValues[0]));
+      return;
+    }
+
+    if (normalizedQuery.startsWith('delete from entry_clarifications where entry_id =')) {
+      const entryId = String(bindValues[0]);
+
+      for (const [id, row] of this.clarifications) {
+        if (row.entry_id === entryId) {
+          this.clarifications.delete(id);
+        }
+      }
+
+      return;
+    }
+
+    if (normalizedQuery.startsWith('delete from entry_clarifications')) {
+      this.clarifications.clear();
       return;
     }
 
@@ -311,6 +378,31 @@ export class TestDatabaseClient implements DatabaseClient {
         .sort(compareEntriesByOccurredAtDesc) as T;
     }
 
+    if (normalizedQuery.startsWith('select * from entry_clarifications where entry_id in')) {
+      const ids = new Set(bindValues.map((value) => String(value)));
+      return Array.from(this.clarifications.values())
+        .filter((row) => ids.has(row.entry_id))
+        .sort(compareClarificationsByCreatedAtAsc) as T;
+    }
+
+    if (normalizedQuery.startsWith('select * from entry_clarifications where entry_id =')) {
+      return Array.from(this.clarifications.values())
+        .filter((row) => row.entry_id === String(bindValues[0]))
+        .sort(compareClarificationsByCreatedAtAsc) as T;
+    }
+
+    if (normalizedQuery.startsWith('select * from entry_clarifications where')) {
+      // search path: answer LIKE $1 OR question LIKE $1
+      const pattern = String(bindValues[0]).replace(/^%/, '').replace(/%$/, '').toLowerCase();
+      return Array.from(this.clarifications.values())
+        .filter(
+          (row) =>
+            row.answer.toLowerCase().includes(pattern) ||
+            (row.question?.toLowerCase().includes(pattern) ?? false),
+        )
+        .sort((first, second) => second.created_at.localeCompare(first.created_at)) as T;
+    }
+
     if (normalizedQuery.startsWith('select * from daily_memories where date =')) {
       const row = this.dailyMemories.get(String(bindValues[0]));
       return (row ? [row] : []) as T;
@@ -413,6 +505,10 @@ export class TestDatabaseClient implements DatabaseClient {
     if (/create table if not exists entries\b/.test(query)) {
       this.createdTables.add('entries');
     }
+
+    if (query.includes('entry_clarifications')) {
+      this.createdTables.add('entry_clarifications');
+    }
   }
 
   private getTableRows(tableName: TableName) {
@@ -433,6 +529,15 @@ function compareEntriesByOccurredAtDesc(first: EntryRow, second: EntryRow) {
 
 function stripFtsQuotes(value: string) {
   return value.replace(/^"+|"+$/g, '').replace(/""/g, '"');
+}
+
+function compareClarificationsByCreatedAtAsc(
+  first: EntryClarificationRow,
+  second: EntryClarificationRow,
+) {
+  // No id tiebreaker: ids are random, so equal timestamps must keep insertion
+  // (Map) order via the stable sort, mirroring SQL `ORDER BY created_at, rowid`.
+  return first.created_at.localeCompare(second.created_at);
 }
 
 function toNullableString(value: unknown) {

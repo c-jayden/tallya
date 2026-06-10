@@ -17,6 +17,17 @@ The home screen's core task is always:
 
 > 今天做了什么？
 
+## Entry Model (current architecture)
+
+Tallya records work as **entries**, not one record per day. See `docs/PLAN.md` for the full plan.
+
+- An entry is one low-friction note: text + timestamp. Capture has no required fields and no AI gate — typing and pressing Enter saves it.
+- The home body is the day's entry stream (composer on top, entries newest-first below), not a single textarea.
+- **Clarifications** attach detail to an entry without rewriting it (AI-asked or manual). They show as quiet sub-items under the entry.
+- AI is an optional enhancement: it suggests follow-up questions ("追问"), it never blocks capture and never invents content. Without AI configured, "补充" degrades to a manual input.
+- Search (Spotlight) spans entries and their clarifications, backed by SQLite FTS5.
+- Reports (weekly/range) are temporarily degraded during the entry-model transition and will be rebuilt on top of entries.
+
 ## Product Personality
 
 Tallya is a quiet, restrained, and reliable local work memory assistant.
@@ -43,7 +54,7 @@ It does not rush users, create pressure, use exaggerated language, or turn work 
 - Do not adjust the home UI while working on unrelated surfaces such as settings, reports, or data tools.
 - Keep toolbar actions small, quiet, and icon-led where appropriate.
 - All clickable elements must include `cursor-pointer`; disabled states use `cursor-not-allowed`.
-- The home screen is only the daily note entry point. History and reports are secondary entry points.
+- The home screen is the day's entry stream: a composer plus the current day's entries. History (other days) is reached via the toolbar date switch; search is a secondary entry point.
 - Search should use a Spotlight / Command Palette pattern.
 - Do not use disabled buttons as placeholders for future features.
 

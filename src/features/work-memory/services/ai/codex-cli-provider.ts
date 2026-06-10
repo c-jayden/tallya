@@ -1,5 +1,10 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { AnalyzedReportStyle, GeneratedDailyMemory, GeneratedReportContent } from '../../types';
+import type {
+  AnalyzedReportStyle,
+  GeneratedDailyMemory,
+  GeneratedReportContent,
+  SuggestClarificationsInput,
+} from '../../types';
 import { logger } from '../logger/logger';
 import { AIProviderError, type AIProvider } from './ai-provider';
 
@@ -70,6 +75,23 @@ export function createCodexCliProvider(invokeCommand: TauriInvoke = invoke): AIP
           commandConfigured: Boolean(options.codexCommand),
           model: options.codexModel,
           sampleTextLength: input.sampleText.trim().length,
+          errorMessage: getFriendlyCodexError(error),
+        });
+        throw new AIProviderError(getFriendlyCodexError(error), CODEX_PROVIDER_ID, error);
+      }
+    },
+    async suggestClarifications(input: SuggestClarificationsInput, options) {
+      try {
+        return await invokeCommand<string[]>('suggest_clarifications_with_codex', {
+          input,
+          codexCommand: options.codexCommand,
+          codexModel: options.codexModel,
+        });
+      } catch (error) {
+        logger.error('ai', 'codex-cli.suggest_clarifications_failed', 'Codex CLI clarification suggestion failed', {
+          commandConfigured: Boolean(options.codexCommand),
+          model: options.codexModel,
+          contentLength: input.content.trim().length,
           errorMessage: getFriendlyCodexError(error),
         });
         throw new AIProviderError(getFriendlyCodexError(error), CODEX_PROVIDER_ID, error);

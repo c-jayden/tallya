@@ -148,6 +148,18 @@ struct AnalyzedReportStyle {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+struct SuggestClarificationsInput {
+    content: String,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+struct SuggestedClarifications {
+    #[serde(default)]
+    questions: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct DailyMemoryForReport {
     id: String,
     date: String,
@@ -285,6 +297,22 @@ async fn analyze_report_style_with_codex(
     .map_err(|error| {
         eprintln!("Codex style analysis task join failed: {error}");
         "Codex 风格分析失败，请检查 Codex CLI 是否可用。".to_string()
+    })?
+}
+
+#[tauri::command]
+async fn suggest_clarifications_with_codex(
+    input: SuggestClarificationsInput,
+    codex_command: String,
+    codex_model: String,
+) -> Result<Vec<String>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        run_codex_clarifications(input, codex_command, codex_model)
+    })
+    .await
+    .map_err(|error| {
+        eprintln!("Codex clarifications task join failed: {error}");
+        "Codex 追问失败，请检查 Codex CLI 是否可用。".to_string()
     })?
 }
 
@@ -448,6 +476,21 @@ fn run_codex_report_style_analysis(
         codex_model,
         "report-style",
         parse_analyzed_report_style,
+    )
+}
+
+fn run_codex_clarifications(
+    input: SuggestClarificationsInput,
+    codex_command: String,
+    codex_model: String,
+) -> Result<Vec<String>, String> {
+    let prompt = build_codex_clarifications_prompt(&input);
+    run_codex_prompt_generation(
+        prompt,
+        codex_command,
+        codex_model,
+        "clarifications",
+        parse_suggested_clarifications,
     )
 }
 
@@ -765,6 +808,16 @@ promptHint 要求：
     )
 }
 
+fn build_codex_clarifications_prompt(input: &SuggestClarificationsInput) -> String {
+    format!(
+        r#"用户记下了一条很简短的工作记录，你要追问 1-2 个问题，帮他之后写周报时能把这件事展开。只输出合法 JSON，不要 markdown、解释、代码块或工具调用。
+JSON keys: questions:string[].
+要求：最多 2 个问题，每个一句话、口语化、容易回答；问题围绕难点、原因、卡了多久、和谁协作、产出或结果；只追问这条记录本身，不要扩展到无关的事，也不要替用户编造答案；如果记录已经足够清楚、没什么可追问的，questions 返回空数组；用中文，避免重复用户已经写过的信息。
+工作记录：{}"#,
+        input.content
+    )
+}
+
 fn report_style_instruction(input: &GenerateRangeReportInput) -> String {
     let mut instructions = vec![
         "风格提示只影响表达方式，不允许改变事实内容，也不允许加入样本里的具体业务信息。"
@@ -938,6 +991,29 @@ mod tests {
     }
 
     #[test]
+    fn parse_suggested_clarifications_trims_caps_and_tolerates_empty() {
+        assert_eq!(parse_suggested_clarifications("").expect("empty"), Vec::<String>::new());
+        assert!(parse_suggested_clarifications("not json").is_err());
+        assert_eq!(
+            parse_suggested_clarifications(
+                r#"{"questions":[" 难点在哪？ ","","卡了多久？","多余的问题"]}"#
+            )
+            .expect("questions"),
+            vec!["难点在哪？".to_string(), "卡了多久？".to_string()],
+        );
+    }
+
+    #[test]
+    fn build_clarifications_prompt_includes_record_and_json_keys() {
+        let prompt = build_codex_clarifications_prompt(&SuggestClarificationsInput {
+            content: "对接订单接口".to_string(),
+        });
+
+        assert!(prompt.contains("questions:string[]"));
+        assert!(prompt.contains("对接订单接口"));
+    }
+
+    #[test]
     fn normalize_report_text_collapses_extra_blank_lines() {
         let normalized = normalize_report_text("# Title\n\n\n## Summary\n\nText\n\n\n- A");
 
@@ -1105,6 +1181,29 @@ fn parse_analyzed_report_style(raw_output: &str) -> Result<AnalyzedReportStyle, 
         summary,
         prompt_hint,
     })
+}
+
+fn parse_suggested_clarifications(raw_output: &str) -> Result<Vec<String>, String> {
+    let raw_output = raw_output.trim();
+
+    // No output means the model had nothing to ask; treat as zero questions
+    // rather than an error so the UI can fall back to manual input.
+    if raw_output.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let parsed = serde_json::from_str::<SuggestedClarifications>(raw_output).map_err(|error| {
+        eprintln!("Codex clarifications output is not valid JSON: {error}");
+        "AI 返回内容不是合法 JSON，请重试。".to_string()
+    })?;
+
+    Ok(parsed
+        .questions
+        .into_iter()
+        .map(|question| question.trim().to_string())
+        .filter(|question| !question.is_empty())
+        .take(2)
+        .collect())
 }
 
 fn normalize_generated_range_report(
@@ -1367,6 +1466,7 @@ pub fn run() {
             send_tallya_notification,
             set_window_behavior,
             show_main_window,
+            suggest_clarifications_with_codex,
             toggle_main_window
         ])
         .run(tauri::generate_context!())

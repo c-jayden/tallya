@@ -1,5 +1,5 @@
 export const DATABASE_PATH = 'sqlite:tallya.db';
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 export const createDailyMemoriesTableSql = `
   CREATE TABLE IF NOT EXISTS daily_memories (
@@ -34,6 +34,23 @@ export const createEntriesTableSql = `
 
 export const createEntriesIndexSql = `
   CREATE INDEX IF NOT EXISTS idx_entries_occurred_on ON entries(occurred_on)
+`;
+
+// Clarifications add detail to an entry (AI-asked or manual). They are short and
+// low-volume, so search uses LIKE rather than a dedicated FTS table.
+export const createEntryClarificationsTableSql = `
+  CREATE TABLE IF NOT EXISTS entry_clarifications (
+    id TEXT PRIMARY KEY,
+    entry_id TEXT NOT NULL,
+    question TEXT,
+    answer TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  )
+`;
+
+export const createEntryClarificationsIndexSql = `
+  CREATE INDEX IF NOT EXISTS idx_entry_clarifications_entry_id ON entry_clarifications(entry_id)
 `;
 
 // External-content FTS5 over entries.content. trigram tokenizer gives CJK

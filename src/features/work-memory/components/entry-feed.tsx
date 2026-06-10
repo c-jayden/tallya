@@ -10,22 +10,36 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { EntryFeedItem } from './entry-feed-item';
-import type { Entry } from '../types';
+import type { Clarification, Entry } from '../types';
 
 type EntryFeedProps = {
   entries: Entry[];
+  clarificationsByEntry: Record<string, Clarification[]>;
+  focusedEntryId: string | null;
   isLoading: boolean;
   emptyHint: string;
   onUpdateEntry: (id: string, content: string) => Promise<boolean> | boolean;
   onRemoveEntry: (id: string) => void;
+  onAddClarification: (
+    entryId: string,
+    question: string | null,
+    answer: string,
+  ) => Promise<boolean> | boolean;
+  onRemoveClarification: (id: string) => void;
+  onSuggestQuestions: (content: string) => Promise<string[]>;
 };
 
 export function EntryFeed({
   entries,
+  clarificationsByEntry,
+  focusedEntryId,
   isLoading,
   emptyHint,
   onUpdateEntry,
   onRemoveEntry,
+  onAddClarification,
+  onRemoveClarification,
+  onSuggestQuestions,
 }: EntryFeedProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
@@ -62,11 +76,18 @@ export function EntryFeed({
             <EntryFeedItem
               key={entry.id}
               entry={entry}
+              clarifications={clarificationsByEntry[entry.id] ?? []}
               isEditing={editingId === entry.id}
+              isFocused={focusedEntryId === entry.id}
               onStartEdit={() => setEditingId(entry.id)}
               onCancelEdit={() => setEditingId(null)}
               onSubmitEdit={(content) => void handleSubmitEdit(entry.id, content)}
               onRequestDelete={() => setPendingDeleteId(entry.id)}
+              onAddClarification={(question, answer) =>
+                onAddClarification(entry.id, question, answer)
+              }
+              onRemoveClarification={onRemoveClarification}
+              onSuggestQuestions={onSuggestQuestions}
             />
           ))}
         </ul>

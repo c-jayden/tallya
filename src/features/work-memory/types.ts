@@ -81,6 +81,10 @@ export type AnalyzeReportStyleInput = {
   sampleText: string;
 };
 
+export type SuggestClarificationsInput = {
+  content: string;
+};
+
 export type AnalyzedReportStyle = {
   summary: string;
   promptHint: string;
@@ -150,6 +154,23 @@ export type CreateEntryInput = {
 
 export type UpdateEntryInput = {
   content: string;
+};
+
+// A follow-up that adds real detail to an entry without rewriting it. question
+// is null for manual additions (no AI prompt), set when AI asked something.
+export type Clarification = {
+  id: string;
+  entryId: string;
+  question: string | null;
+  answer: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CreateClarificationInput = {
+  entryId: string;
+  question?: string | null;
+  answer: string;
 };
 
 export type ReportType = 'weekly' | 'monthly' | 'yearly' | 'custom' | 'performance' | 'handoff';

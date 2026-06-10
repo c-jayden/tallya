@@ -6,6 +6,7 @@ import type {
   GenerateDailyMemoryInput,
   GenerateRangeReportInput,
   GenerateWeeklyReportInput,
+  SuggestClarificationsInput,
 } from '../../types';
 
 export type AIProviderId = 'ai-codex-cli' | 'openai-compatible' | 'ollama';
@@ -51,6 +52,10 @@ export type AIProvider = {
     input: AnalyzeReportStyleInput,
     options: AIProviderOptions,
   ): Promise<AnalyzedReportStyle>;
+  suggestClarifications?(
+    input: SuggestClarificationsInput,
+    options: AIProviderOptions,
+  ): Promise<string[]>;
   checkHealth?(options: AIProviderOptions): Promise<ProviderHealth>;
 };
 

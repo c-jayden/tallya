@@ -1,5 +1,5 @@
 import { today } from './constants';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { EntryComposer } from './components/entry-composer';
 import { EntryFeed } from './components/entry-feed';
 import { HomeToolbar } from './components/home-toolbar';
@@ -30,11 +30,31 @@ export function WorkMemoryHome() {
   const contentRef = useHomeWindowSizing();
   const entries = useEntriesController({ currentDate: selectedDate, todayDate });
   const isSelectedDateToday = isTodayDate(selectedDate, todayDate);
+  const [focusedEntryId, setFocusedEntryId] = useState<string | null>(null);
+  const focusTimeoutRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (focusTimeoutRef.current) {
+        window.clearTimeout(focusTimeoutRef.current);
+      }
+    };
+  }, []);
 
   function openEntry(entry: Entry) {
+    // Opening a search hit jumps to its day and briefly highlights the row, so
+    // the action reads as "found it" even when the entry is already on screen.
     if (!isFutureMemoryDate(entry.occurredOn, todayDate)) {
       setSelectedDate(entry.occurredOn);
     }
+
+    setFocusedEntryId(entry.id);
+
+    if (focusTimeoutRef.current) {
+      window.clearTimeout(focusTimeoutRef.current);
+    }
+
+    focusTimeoutRef.current = window.setTimeout(() => setFocusedEntryId(null), 2200);
   }
 
   const search = useMemorySearch({ onOpenMemory: openEntry });
@@ -124,10 +144,15 @@ export function WorkMemoryHome() {
 
           <EntryFeed
             entries={entries.entries}
+            clarificationsByEntry={entries.clarificationsByEntry}
+            focusedEntryId={focusedEntryId}
             isLoading={entries.isLoading}
             emptyHint={emptyHint}
             onUpdateEntry={entries.updateEntry}
             onRemoveEntry={entries.removeEntry}
+            onAddClarification={entries.addClarification}
+            onRemoveClarification={entries.removeClarification}
+            onSuggestQuestions={entries.suggestQuestions}
           />
         </div>
       </section>

@@ -5,7 +5,7 @@ import {
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
 } from 'react';
-import { entryRepository } from '../services/entry-repository';
+import { memorySearch } from '../services/memory-search-service';
 import type { Entry } from '../types';
 
 type UseMemorySearchOptions = {
@@ -45,8 +45,8 @@ export function useMemorySearch({ onOpenMemory }: UseMemorySearchOptions) {
     }
 
     // Search follows a Spotlight-style command palette over all captured
-    // entries, backed by FTS5 with a LIKE fallback in the repository.
-    void entryRepository.search(keyword).then((results) => {
+    // entries and their clarifications (FTS5 + LIKE under the hood).
+    void memorySearch.searchEntries(keyword).then((results) => {
       if (isMounted) {
         setSearchResults(results);
         setActiveSearchIndex(results.length > 0 ? 0 : -1);

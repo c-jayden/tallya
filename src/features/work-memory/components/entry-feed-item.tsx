@@ -1,17 +1,23 @@
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
-import { Check, Pencil, Trash2, X } from 'lucide-react';
+import { Check, MessageSquarePlus, Pencil, Trash2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
-import type { Entry } from '../types';
+import { EntrySupplementPanel } from './entry-supplement-panel';
+import type { Clarification, Entry } from '../types';
 
 type EntryFeedItemProps = {
   entry: Entry;
+  clarifications: Clarification[];
   isEditing: boolean;
+  isFocused: boolean;
   onStartEdit: () => void;
   onCancelEdit: () => void;
   onSubmitEdit: (content: string) => void;
   onRequestDelete: () => void;
+  onAddClarification: (question: string | null, answer: string) => Promise<boolean> | boolean;
+  onRemoveClarification: (id: string) => void;
+  onSuggestQuestions: (content: string) => Promise<string[]>;
 };
 
 const timeFormatter = new Intl.DateTimeFormat('zh-CN', {
@@ -70,7 +76,7 @@ function EntryInlineEditor({ initialValue, onSubmit, onCancel }: EntryInlineEdit
         onChange={(event) => setDraft(event.currentTarget.value)}
         onKeyDown={handleKeyDown}
       />
-      <div className="flex items-center justify-end gap-1.5 pt-2">
+      <div className="flex items-center justify-end gap-1.5 pt-1 pb-1.5">
         <Button
           type="button"
           variant="ghost"
@@ -98,12 +104,26 @@ function EntryInlineEditor({ initialValue, onSubmit, onCancel }: EntryInlineEdit
 
 export function EntryFeedItem({
   entry,
+  clarifications,
   isEditing,
+  isFocused,
   onStartEdit,
   onCancelEdit,
   onSubmitEdit,
   onRequestDelete,
+  onAddClarification,
+  onRemoveClarification,
+  onSuggestQuestions,
 }: EntryFeedItemProps) {
+  const [isSupplementOpen, setIsSupplementOpen] = useState(false);
+  const itemRef = useRef<HTMLLIElement>(null);
+
+  useEffect(() => {
+    if (isFocused) {
+      itemRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
+  }, [isFocused]);
+
   if (isEditing) {
     return (
       <EntryInlineEditor
@@ -117,38 +137,94 @@ export function EntryFeedItem({
   const time = formatEntryTime(entry.occurredAt);
 
   return (
-    <li className="group flex items-start gap-3 rounded-lg px-2.5 py-1.5 transition-colors duration-150 hover:bg-app-surface-muted">
-      {time ? (
-        <span className="h-6 shrink-0 font-mono text-xs leading-6 tabular-nums text-app-ink-subtle">
-          {time}
-        </span>
-      ) : null}
-      <p className="min-w-0 flex-1 text-sm leading-6 whitespace-pre-wrap break-words text-app-ink">
-        {entry.content}
-      </p>
-      <div
-        className={cn(
-          'flex shrink-0 items-start gap-0.5 opacity-0 transition-opacity duration-150',
-          'group-hover:opacity-100 focus-within:opacity-100',
-        )}
-      >
-        <button
-          type="button"
-          className="grid size-6 cursor-pointer place-items-center rounded-md text-app-ink-subtle transition-colors duration-150 hover:bg-app-surface hover:text-app-ink focus-visible:bg-app-surface focus-visible:text-app-ink focus-visible:outline-none"
-          onClick={onStartEdit}
-          aria-label="编辑这条记录"
+    <li
+      ref={itemRef}
+      className={cn(
+        'group rounded-lg px-2.5 py-1.5 transition-colors duration-300 hover:bg-app-surface-muted',
+        isFocused && 'bg-[color-mix(in_srgb,#f59e0b_14%,transparent)]',
+      )}
+    >
+      <div className="flex items-start gap-3">
+        {time ? (
+          <span className="h-6 shrink-0 font-mono text-xs leading-6 tabular-nums text-app-ink-subtle">
+            {time}
+          </span>
+        ) : null}
+        <p className="min-w-0 flex-1 text-sm leading-6 whitespace-pre-wrap break-words text-app-ink">
+          {entry.content}
+        </p>
+        <div
+          className={cn(
+            'flex shrink-0 items-start gap-0.5 opacity-0 transition-opacity duration-150',
+            'group-hover:opacity-100 focus-within:opacity-100',
+            isSupplementOpen && 'opacity-100',
+          )}
         >
-          <Pencil className="size-3.5" aria-hidden="true" />
-        </button>
-        <button
-          type="button"
-          className="grid size-6 cursor-pointer place-items-center rounded-md text-app-ink-subtle transition-colors duration-150 hover:bg-app-surface hover:text-[var(--app-danger,#dc2626)] focus-visible:bg-app-surface focus-visible:outline-none"
-          onClick={onRequestDelete}
-          aria-label="删除这条记录"
-        >
-          <Trash2 className="size-3.5" aria-hidden="true" />
-        </button>
+          <button
+            type="button"
+            className="grid size-6 cursor-pointer place-items-center rounded-md text-app-ink-subtle transition-colors duration-150 hover:bg-app-surface hover:text-app-ink focus-visible:bg-app-surface focus-visible:text-app-ink focus-visible:outline-none"
+            onClick={() => setIsSupplementOpen((open) => !open)}
+            aria-label="补充细节"
+            aria-pressed={isSupplementOpen}
+          >
+            <MessageSquarePlus className="size-3.5" aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            className="grid size-6 cursor-pointer place-items-center rounded-md text-app-ink-subtle transition-colors duration-150 hover:bg-app-surface hover:text-app-ink focus-visible:bg-app-surface focus-visible:text-app-ink focus-visible:outline-none"
+            onClick={onStartEdit}
+            aria-label="编辑这条记录"
+          >
+            <Pencil className="size-3.5" aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            className="grid size-6 cursor-pointer place-items-center rounded-md text-app-ink-subtle transition-colors duration-150 hover:bg-app-surface hover:text-[var(--app-danger,#dc2626)] focus-visible:bg-app-surface focus-visible:outline-none"
+            onClick={onRequestDelete}
+            aria-label="删除这条记录"
+          >
+            <Trash2 className="size-3.5" aria-hidden="true" />
+          </button>
+        </div>
       </div>
+
+      {clarifications.length > 0 ? (
+        <ul className="mt-1.5 ml-9 grid gap-1.5 border-l border-app-border pl-3">
+          {clarifications.map((clarification) => (
+            <li key={clarification.id} className="group/clar flex items-start gap-2">
+              <div className="min-w-0 flex-1">
+                {clarification.question ? (
+                  <p className="text-[12px] leading-[1.5] text-app-ink-subtle">
+                    {clarification.question}
+                  </p>
+                ) : null}
+                <p className="text-[13px] leading-[1.5] whitespace-pre-wrap break-words text-app-ink-muted">
+                  {clarification.answer}
+                </p>
+              </div>
+              <button
+                type="button"
+                className="mt-0.5 grid size-5 shrink-0 cursor-pointer place-items-center rounded text-app-ink-subtle opacity-0 transition-opacity duration-150 group-hover/clar:opacity-100 hover:text-[var(--app-danger,#dc2626)] focus-visible:opacity-100 focus-visible:outline-none"
+                onClick={() => onRemoveClarification(clarification.id)}
+                aria-label="删除这条补充"
+              >
+                <X className="size-3" aria-hidden="true" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
+      {isSupplementOpen ? (
+        <div className="mt-1.5 ml-9">
+          <EntrySupplementPanel
+            entryContent={entry.content}
+            onAdd={onAddClarification}
+            onSuggest={onSuggestQuestions}
+            onClose={() => setIsSupplementOpen(false)}
+          />
+        </div>
+      ) : null}
     </li>
   );
 }

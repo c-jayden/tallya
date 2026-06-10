@@ -16,7 +16,9 @@
 
 产品方向：
 
-- Tallya / 职迹 是本地优先的 AI 工作记忆工具。
+- Tallya / 职迹 是本地优先的工作记忆工具，核心是"低摩擦记录 + 强检索"（见 `docs/PLAN.md`）。
+- 记录是最高频动作，**不得**给它加 AI 网关或必填项；AI 是可选增强。
+- 首页是"当天条目流"：顶部 composer 即记，下面按时间倒序展示当天 entry。
 - 不要把它做成后台管理系统、SaaS 官网、普通日报生成器或项目管理系统。
 - 首页必须保持聚焦：今天做了什么？
 
@@ -52,7 +54,9 @@ UI 约束：
 - 业务组件放到 `src/features/work-memory/components`。
 - AI 逻辑放到 `src/features/work-memory/services/ai`。
 - 设置存储逻辑放到 `app-settings-repository`。
-- 记忆存储逻辑放到 `daily-memory-repository`。
+- 工作记录存储走 `entry-repository`（条目）和 `clarification-repository`（补充）。
+- 旧的 `daily-memory-repository` 已被 entry 模型取代，仅作迁移/归档保留，不要在新功能里使用。
+- 检索走 `memory-search-service`（合并 entry 与 clarification 命中），不要在 UI 里直接拼检索逻辑。
 
 测试组织规则：
 

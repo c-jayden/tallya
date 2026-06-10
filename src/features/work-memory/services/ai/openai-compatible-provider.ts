@@ -5,6 +5,7 @@ import type {
   AnalyzedReportStyle,
   GenerateDailyMemoryInput,
   GenerateRangeReportInput,
+  SuggestClarificationsInput,
 } from '../../types';
 import { logger } from '../logger/logger';
 import { normalizeReportText } from '../report-text';
@@ -22,6 +23,7 @@ const CHAT_COMPLETIONS_PATH = '/chat/completions';
 const RESPONSES_PATH = '/responses';
 const RESPONSE_BODY_PREVIEW_LIMIT = 500;
 const SERVER_MESSAGE_LIMIT = 160;
+const MAX_CLARIFICATION_QUESTIONS = 2;
 const STRICT_JSON_SYSTEM_PROMPT =
   '你是 Tallya 的工作记忆整理助手。只输出合法 JSON，不要输出 markdown code fence、解释或额外文字。';
 
@@ -477,6 +479,9 @@ export function createOpenAICompatibleProvider(fetchImpl: FetchLike = fetch): AI
 
         throw error;
       }
+    },
+    async suggestClarifications(input, options) {
+      return requestJSON(options, buildClarificationsPrompt(input), parseSuggestedClarifications);
     },
     async checkHealth(options) {
       try {
@@ -999,6 +1004,27 @@ function buildReportStyleAnalysisPrompt(input: AnalyzeReportStyleInput) {
     '- 使用克制、清晰、可执行的中文表达。',
     `样本文本：${input.sampleText}`,
   ].join('\n');
+}
+
+function buildClarificationsPrompt(input: SuggestClarificationsInput) {
+  return [
+    '用户记下了一条很简短的工作记录，你要追问 1-2 个问题，帮他之后写周报时能把这件事展开。',
+    '只输出合法 JSON，不要解释或 markdown。',
+    'JSON keys: questions:string[]。',
+    '要求：',
+    '- 最多 2 个问题，每个一句话、口语化、容易回答。',
+    '- 问题围绕：难点、原因、卡了多久、和谁协作、产出或结果。',
+    '- 只追问这条记录本身，不要扩展到无关的事，也不要替用户编造答案。',
+    '- 如果记录已经足够清楚、没什么可追问的，questions 返回空数组。',
+    '- 用中文，避免重复用户已经写过的信息。',
+    `工作记录：${input.content}`,
+  ].join('\n');
+}
+
+function parseSuggestedClarifications(rawOutput: string): string[] {
+  const parsed = parseStrictJSON<{ questions?: unknown }>(rawOutput);
+
+  return normalizeStringList(parsed.questions).slice(0, MAX_CLARIFICATION_QUESTIONS);
 }
 
 function reportStyleInstruction(input: GenerateRangeReportInput) {
