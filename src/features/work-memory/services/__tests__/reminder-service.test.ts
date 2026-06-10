@@ -37,7 +37,7 @@ describe('reminder time calculation', () => {
 });
 
 describe('ReminderService', () => {
-  it('schedules and sends a daily reminder when there is no generated memory today', async () => {
+  it('schedules and sends a daily reminder when no entry was recorded today', async () => {
     const now = new Date('2026-06-03T12:00:00');
     const sendNotification = vi.fn<() => Promise<void>>(() => Promise.resolve());
     const scheduledTimers: Array<{ callback: () => void; delay: number }> = [];
@@ -51,8 +51,8 @@ describe('ReminderService', () => {
             dailyReminderMessage: '可以花一分钟沉淀一下今天的工作。',
           }),
       },
-      memoryRepository: {
-        getMemoryByDate: () => Promise.resolve(null),
+      entryRepository: {
+        listByDate: () => Promise.resolve([]),
       },
       sendNotification,
       setTimeout: (callback, delay) => {
@@ -75,7 +75,7 @@ describe('ReminderService', () => {
     });
   });
 
-  it('skips the daily reminder when a generated memory already exists today', async () => {
+  it('skips the daily reminder when an entry was already recorded today', async () => {
     const now = new Date('2026-06-03T12:00:00');
     const sendNotification = vi.fn<() => Promise<void>>(() => Promise.resolve());
     const scheduledTimers: Array<{ callback: () => void; delay: number }> = [];
@@ -88,21 +88,21 @@ describe('ReminderService', () => {
             dailyReminderTime: '12:01',
           }),
       },
-      memoryRepository: {
-        getMemoryByDate: () =>
-          Promise.resolve({
-            id: 'daily-memory-2026-06-03',
-            date: '2026-06-03',
-            rawContent: '已生成',
-            supplements: {},
-            generated: {
-              summary: '已生成',
-              completedItems: ['完成记录'],
+      entryRepository: {
+        listByDate: () =>
+          Promise.resolve([
+            {
+              id: 'entry_1',
+              content: '今天记了一条',
+              occurredAt: now.toISOString(),
+              occurredOn: '2026-06-03',
+              threadId: null,
+              difficulty: null,
+              effort: null,
+              createdAt: now.toISOString(),
+              updatedAt: now.toISOString(),
             },
-            status: 'generated',
-            createdAt: now.toISOString(),
-            updatedAt: now.toISOString(),
-          }),
+          ]),
       },
       sendNotification,
       setTimeout: (callback, delay) => {

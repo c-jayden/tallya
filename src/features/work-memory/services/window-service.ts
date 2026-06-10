@@ -40,9 +40,27 @@ export async function syncWindowBehaviorSettings(settings: AppSettings) {
     closeToTray: settings.closeToTray,
   });
 
-  // TODO: Connect launchAtStartup through the Tauri autostart plugin when the
-  // plugin is added. For now this setting is persisted but not applied.
-  void settings.launchAtStartup;
+  await syncLaunchAtStartup(settings.launchAtStartup);
+}
+
+async function syncLaunchAtStartup(launchAtStartup: boolean) {
+  // The autostart plugin only exists in the real Tauri app; in the browser dev
+  // server the import/calls fail, so this is best-effort and never surfaced.
+  try {
+    const { enable, disable, isEnabled } = await import('@tauri-apps/plugin-autostart');
+    const alreadyEnabled = await isEnabled();
+
+    if (launchAtStartup && !alreadyEnabled) {
+      await enable();
+    } else if (!launchAtStartup && alreadyEnabled) {
+      await disable();
+    }
+  } catch (error) {
+    logger.warn('tray', 'window.autostart_sync_failed', 'Failed to sync launch-at-startup', {
+      launchAtStartup,
+      error,
+    });
+  }
 }
 
 export async function applyStartupWindowBehavior(settings: AppSettings) {

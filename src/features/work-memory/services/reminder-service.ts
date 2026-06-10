@@ -1,6 +1,6 @@
 import type { AppSettings } from './app-settings-repository';
 import { appSettingsRepository } from './app-settings-repository';
-import { dailyMemoryRepository, getDailyMemoryDate } from './daily-memory-repository';
+import { entryRepository, getEntryDate } from './entry-repository';
 import { logger } from './logger/logger';
 
 type Weekday =
@@ -16,7 +16,7 @@ type TimeoutId = number;
 
 type ReminderDependencies = {
   settingsRepository: Pick<typeof appSettingsRepository, 'getSettings'>;
-  memoryRepository: Pick<typeof dailyMemoryRepository, 'getMemoryByDate'>;
+  entryRepository: Pick<typeof entryRepository, 'listByDate'>;
   sendNotification: (body: string) => Promise<void>;
   setTimeout: (callback: () => void, delay: number) => TimeoutId;
   clearTimeout: (timeoutId: TimeoutId) => void;
@@ -72,7 +72,7 @@ export class ReminderService {
   constructor(
     private readonly dependencies: ReminderDependencies = {
       settingsRepository: appSettingsRepository,
-      memoryRepository: dailyMemoryRepository,
+      entryRepository,
       sendNotification: sendTauriNotification,
       setTimeout: (callback, delay) => window.setTimeout(callback, delay),
       clearTimeout: (timeoutId) => window.clearTimeout(timeoutId),
@@ -152,12 +152,11 @@ export class ReminderService {
   private async handleDailyReminder() {
     try {
       const now = this.dependencies.now();
-      const todayMemory = await this.dependencies.memoryRepository.getMemoryByDate(
-        getDailyMemoryDate(now),
-      );
+      const todayEntries = await this.dependencies.entryRepository.listByDate(getEntryDate(now));
 
-      // Drafts still need a reminder; only a formal generated memory completes the day.
-      if (!todayMemory) {
+      // In the entry model "recorded today" means at least one entry exists;
+      // only remind when the day is still empty.
+      if (todayEntries.length === 0) {
         const settings = await this.dependencies.settingsRepository.getSettings();
         await this.sendSystemNotification(settings.dailyReminderMessage);
       }
