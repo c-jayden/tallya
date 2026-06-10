@@ -24,7 +24,7 @@
 | M3 | 跨天线索关联：threads + AI 建议归并 + 线索视图 | ✅ 已完成并提交（commit `bcfa92e`） |
 | M4 | 提醒可靠性：开机自启 + 重排逻辑 + 修每日提醒数据源 | ✅ 代码完成，待真机验证/提交 |
 | M5a | 报告重接 entry：数据源/AI 输入切到 entries + 重放入口与偏好 | ✅ 代码完成，待真机验证/提交 |
-| M5b | 周报缺口补全：按线索聚合 + 标信息不足 + 集中追问再生成 | ⏳ 未开始 |
+| M5b | 周报缺口补全：标信息不足的线索 + 集中追问再生成 | ✅ 代码完成，待真机验证/提交 |
 | — | 清理：删除旧 daily_memories 读路径 / drop 旧表 | ⏳ 留到验证稳定后 |
 
 ---
@@ -39,15 +39,17 @@
 - **线索（M3）**：[thread-service.ts](../src/features/work-memory/services/thread-service.ts) = 线索摘要/故事线/归并。记一条 entry 后后台静默调 `suggestThreadLink` 比对最近 ~20 条；命中就在该条下方弹建议卡（归并/忽略，见 [entry-feed-item.tsx](../src/features/work-memory/components/entry-feed-item.tsx)）。线索视图是**独立面板** [threads-panel.tsx](../src/features/work-memory/components/threads-panel.tsx)（工具栏 ListTree 按钮入口，见 [use-threads-panel.ts](../src/features/work-memory/hooks/use-threads-panel.ts)）：线索列表 → 点开看跨天故事线 → 点 entry 跳到对应天。搜索面板保持纯记录搜索。建议为会话内临时态，忽略不持久化。
 - **AI**：`suggestClarifications` + `suggestThreadLink` 贯通 ai-provider / codex(lib.rs) / openai-compatible / ai-service。AI 未配置时补充退化为纯手动、归并建议后台静默跳过。
 - **报告（M5a）**：数据源从 daily_memories 切到 entries——[report-service.ts](../src/features/work-memory/services/report-service.ts) 的 `buildReportEntries` 从 entryRepository.listRange + clarifications + threads 组装 `ReportSourceEntry[]`（按天升序、带补充与线索名）。AI 报告输入 `memories`→`entries` 贯通 types/ai-service/openai/codex/lib.rs，prompt 要求按线索聚合脉络。入口重新放出：工具栏 FileText「报告」按钮 → 生成/预览/保存/历史（4 个对话框 + [use-weekly-report-flow.ts](../src/features/work-memory/hooks/use-weekly-report-flow.ts) 重新挂载于主屏，与搜索/线索/设置互斥）。设置"报告偏好"分组重新可见。简化：不再写 report_sources（报告随时可重新生成）。缺口补全留 M5b。
+- **周报缺口补全（M5b）**：点"生成"先静默调 `suggestReportGaps`（[report-service.ts](../src/features/work-memory/services/report-service.ts) `getReportGaps`，fail-open）让 AI 挑 ≤3 条"重点但信息不足"的线索并各给一句追问；命中则弹 [report-gap-dialog.tsx](../src/features/work-memory/components/report-gap-dialog.tsx)（可逐条答、可整体跳过）；答案经 `saveGapAnswers` 存为对应 entry 的 clarification，再 `runGenerate` 生成（buildReportEntries 自动带上）。无 AI/无缺口/失败都直接生成。AI 能力贯通 ai-provider/ai-service/openai/codex/lib.rs。
 - **提醒（M4）**：每日提醒判定改用 entries——[reminder-service.ts](../src/features/work-memory/services/reminder-service.ts) `handleDailyReminder` 查当天 `entryRepository.listByDate`，"今天一条都没记"才提醒（修了 entry 模型下恒弹的 bug）。开机自启经 `tauri-plugin-autostart` 真正接上（[window-service.ts](../src/features/work-memory/services/window-service.ts) `syncLaunchAtStartup`，按 `launchAtStartup` enable/disable）。重排时机：启动 + 设置变更 + **窗口重新可见**（[reminder-bootstrap.tsx](../src/features/work-memory/components/settings/reminder-bootstrap.tsx) 监听 visibilitychange/focus），兜住休眠/隐藏导致的 setTimeout 漂移。
 
 ---
 
-## 下一步（M5b，回来从这里继续）
+## 下一步（核心里程碑 M1–M5b 已全部完成）
 
-### M5b：周报缺口补全
-- 按 thread 聚合本周 → 标出"重点但信息不足"的线索 → 集中追问几句 → 再生成。
-- 可选：report_sources 重新启用为 entry 维度的 staleness。
+剩余可选清理 / 增强：
+- 删除旧 `daily_memories` 读路径与相关死代码（见下方"清理"行），drop 旧表。
+- 可选：report_sources 重新启用为 entry 维度的 staleness（当前不写、报告随时可重新生成）。
+- 可选：把缺口检测/归并建议改走 HTTP 网关以提速（Codex 冷启动慢）。
 
 ---
 

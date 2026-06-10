@@ -1,9 +1,12 @@
 import type {
   Clarification,
+  CreateClarificationInput,
   Entry,
   GeneratedReportContent,
   RangeReportSourceInput,
   Report,
+  ReportGap,
+  ReportGapEntry,
   ReportGenerationType,
   ReportSourceEntry,
   Thread,
@@ -21,6 +24,7 @@ export type ReportEntryRepository = {
 
 export type ReportClarificationRepository = {
   listByEntryIds(entryIds: string[]): Promise<Clarification[]>;
+  create(input: CreateClarificationInput): Promise<Clarification>;
 };
 
 export type ReportThreadRepository = {
@@ -39,6 +43,13 @@ export type ReportRepository = {
 
 export type ReportAIService = {
   generateRangeReport(input: RangeReportSourceInput): Promise<GeneratedReportContent>;
+  suggestReportGaps(input: { entries: ReportGapEntry[] }): Promise<ReportGap[]>;
+};
+
+export type GapAnswer = {
+  entryId: string;
+  question: string;
+  answer: string;
 };
 
 export type ReportServiceOptions = {
@@ -176,6 +187,34 @@ export function createReportService({
 
       return report;
     },
+
+    // Fail-open: any failure (no AI, network/parse error) yields no gaps so
+    // report generation is never blocked or shown an error by gap detection.
+    async getReportGaps(startDate: string, endDate: string): Promise<ReportGap[]> {
+      try {
+        const gapEntries = await buildGapEntries(sourceRepositories, startDate, endDate);
+
+        if (gapEntries.length === 0) {
+          return [];
+        }
+
+        return await aiService.suggestReportGaps({ entries: gapEntries });
+      } catch {
+        return [];
+      }
+    },
+
+    async saveGapAnswers(answers: GapAnswer[]): Promise<void> {
+      for (const { entryId, question, answer } of answers) {
+        const trimmed = answer.trim();
+
+        if (!trimmed) {
+          continue;
+        }
+
+        await clarificationRepository.create({ entryId, question, answer: trimmed });
+      }
+    },
   };
 }
 
@@ -221,6 +260,43 @@ async function buildReportEntries(
       occurredOn: entry.occurredOn,
       content: entry.content,
       clarifications: answersByEntry.get(entry.id) ?? [],
+      threadTitle: entry.threadId ? titleByThread.get(entry.threadId) ?? null : null,
+    }));
+}
+
+// Like buildReportEntries but keeps entry ids and clarification counts so the
+// AI can flag a thin thread and we can attach the answer back to a real entry.
+async function buildGapEntries(
+  repositories: SourceRepositories,
+  startDate: string,
+  endDate: string,
+): Promise<ReportGapEntry[]> {
+  const entries = await repositories.entryRepository.listRange(startDate, endDate);
+
+  if (entries.length === 0) {
+    return [];
+  }
+
+  const [clarifications, threads] = await Promise.all([
+    repositories.clarificationRepository.listByEntryIds(entries.map((entry) => entry.id)),
+    repositories.threadRepository.list(),
+  ]);
+
+  const countByEntry = new Map<string, number>();
+  for (const clarification of clarifications) {
+    countByEntry.set(clarification.entryId, (countByEntry.get(clarification.entryId) ?? 0) + 1);
+  }
+
+  const titleByThread = new Map(threads.map((thread) => [thread.id, thread.title]));
+
+  return [...entries]
+    .sort((first, second) => first.occurredAt.localeCompare(second.occurredAt))
+    .map((entry) => ({
+      id: entry.id,
+      occurredOn: entry.occurredOn,
+      content: entry.content,
+      clarificationCount: countByEntry.get(entry.id) ?? 0,
+      threadId: entry.threadId,
       threadTitle: entry.threadId ? titleByThread.get(entry.threadId) ?? null : null,
     }));
 }

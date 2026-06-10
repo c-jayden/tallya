@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type {
   Clarification,
+  CreateClarificationInput,
   Entry,
   GeneratedReportContent,
   RangeReportSourceInput,
@@ -203,6 +204,61 @@ describe('createReportService', () => {
       'AI 返回内容不是合法 JSON，请重试。',
     );
   });
+
+  it('detects report gaps from entries with clarification counts and thread titles', async () => {
+    const suggestReportGaps = vi
+      .fn<ReportAIService['suggestReportGaps']>()
+      .mockResolvedValue([{ entryId: 'e1', threadTitle: '订单接口对接', question: '卡在哪了？' }]);
+    const service = createService({
+      entries: [createEntry('e1', '2026-06-01', '对接订单接口', 'thread_1')],
+      clarifications: [createClarification('c1', 'e1', '卡在鉴权头')],
+      threads: [createThread('thread_1', '订单接口对接')],
+      suggestReportGaps,
+    });
+
+    await expect(service.getReportGaps('2026-06-01', '2026-06-07')).resolves.toEqual([
+      { entryId: 'e1', threadTitle: '订单接口对接', question: '卡在哪了？' },
+    ]);
+    expect(suggestReportGaps).toHaveBeenCalledWith({
+      entries: [
+        {
+          id: 'e1',
+          occurredOn: '2026-06-01',
+          content: '对接订单接口',
+          clarificationCount: 1,
+          threadId: 'thread_1',
+          threadTitle: '订单接口对接',
+        },
+      ],
+    });
+  });
+
+  it('fails open to no gaps when detection throws', async () => {
+    const service = createService({
+      entries: [createEntry('e1', '2026-06-01', '对接订单接口')],
+      suggestReportGaps: vi.fn().mockRejectedValue(new Error('codex unavailable')),
+    });
+
+    await expect(service.getReportGaps('2026-06-01', '2026-06-07')).resolves.toEqual([]);
+  });
+
+  it('saves non-empty gap answers as clarifications', async () => {
+    const createClarificationMock =
+      vi.fn<(input: CreateClarificationInput) => Promise<Clarification>>();
+    const service = createService({ createClarificationMock });
+
+    await service.saveGapAnswers([
+      { entryId: 'e1', question: '卡在哪了？', answer: '  鉴权头格式不对  ' },
+      { entryId: 'e2', question: '产出是什么？', answer: '   ' },
+    ]);
+
+    expect(createClarificationMock).toHaveBeenCalledTimes(1);
+    expect(createClarificationMock).toHaveBeenCalledWith({
+      entryId: 'e1',
+      question: '卡在哪了？',
+      answer: '鉴权头格式不对',
+    });
+  });
 });
 
 function createService({
@@ -213,6 +269,8 @@ function createService({
   generateRangeReport = vi
     .fn<ReportAIService['generateRangeReport']>()
     .mockResolvedValue(generatedReport),
+  suggestReportGaps = vi.fn<ReportAIService['suggestReportGaps']>().mockResolvedValue([]),
+  createClarificationMock = vi.fn<(input: CreateClarificationInput) => Promise<Clarification>>(),
   reportRepository,
 }: {
   entries?: Entry[];
@@ -220,6 +278,8 @@ function createService({
   threads?: Thread[];
   existingReport?: Report | null;
   generateRangeReport?: ReportAIService['generateRangeReport'];
+  suggestReportGaps?: ReportAIService['suggestReportGaps'];
+  createClarificationMock?: ReturnType<typeof vi.fn<(input: CreateClarificationInput) => Promise<Clarification>>>;
   reportRepository?: ReportRepository;
 } = {}) {
   return createReportService({
@@ -229,11 +289,12 @@ function createService({
     },
     clarificationRepository: {
       listByEntryIds: vi.fn().mockResolvedValue(clarifications),
+      create: createClarificationMock,
     },
     threadRepository: {
       list: vi.fn().mockResolvedValue(threads),
     },
-    aiService: { generateRangeReport },
+    aiService: { generateRangeReport, suggestReportGaps },
     reportRepository:
       reportRepository ??
       createReportRepository({

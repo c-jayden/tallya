@@ -6,7 +6,9 @@ import type {
   GenerateDailyMemoryInput,
   GenerateRangeReportInput,
   GenerateWeeklyReportInput,
+  ReportGap,
   SuggestClarificationsInput,
+  SuggestReportGapsInput,
   SuggestThreadLinkInput,
   ThreadLinkSuggestion,
 } from '../../types';
@@ -62,6 +64,10 @@ export type AIProvider = {
     input: SuggestThreadLinkInput,
     options: AIProviderOptions,
   ): Promise<ThreadLinkSuggestion>;
+  suggestReportGaps?(
+    input: SuggestReportGapsInput,
+    options: AIProviderOptions,
+  ): Promise<ReportGap[]>;
   checkHealth?(options: AIProviderOptions): Promise<ProviderHealth>;
 };
 

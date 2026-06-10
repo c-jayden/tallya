@@ -3,7 +3,9 @@ import type {
   AnalyzedReportStyle,
   GeneratedDailyMemory,
   GeneratedReportContent,
+  ReportGap,
   SuggestClarificationsInput,
+  SuggestReportGapsInput,
   SuggestThreadLinkInput,
   ThreadLinkSuggestion,
 } from '../../types';
@@ -111,6 +113,23 @@ export function createCodexCliProvider(invokeCommand: TauriInvoke = invoke): AIP
           commandConfigured: Boolean(options.codexCommand),
           model: options.codexModel,
           candidateCount: input.candidates.length,
+          errorMessage: getFriendlyCodexError(error),
+        });
+        throw new AIProviderError(getFriendlyCodexError(error), CODEX_PROVIDER_ID, error);
+      }
+    },
+    async suggestReportGaps(input: SuggestReportGapsInput, options) {
+      try {
+        return await invokeCommand<ReportGap[]>('suggest_report_gaps_with_codex', {
+          input,
+          codexCommand: options.codexCommand,
+          codexModel: options.codexModel,
+        });
+      } catch (error) {
+        logger.error('ai', 'codex-cli.suggest_report_gaps_failed', 'Codex CLI report gap detection failed', {
+          commandConfigured: Boolean(options.codexCommand),
+          model: options.codexModel,
+          entryCount: input.entries.length,
           errorMessage: getFriendlyCodexError(error),
         });
         throw new AIProviderError(getFriendlyCodexError(error), CODEX_PROVIDER_ID, error);

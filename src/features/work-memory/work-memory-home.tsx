@@ -5,6 +5,7 @@ import { EntryFeed } from './components/entry-feed';
 import { HomeToolbar } from './components/home-toolbar';
 import { MemoryHero } from './components/memory-hero';
 import { ReportDetailDialog } from './components/report-detail-dialog';
+import { ReportGapDialog } from './components/report-gap-dialog';
 import { ReportGenerateDialog } from './components/report-generate-dialog';
 import { ReportListDialog } from './components/report-list-dialog';
 import { ReportPreviewDialog } from './components/report-preview-dialog';
@@ -238,13 +239,22 @@ export function WorkMemoryHome() {
         customStartDate={weeklyReport.customStartDate}
         customEndDate={weeklyReport.customEndDate}
         isLoading={weeklyReport.isLoadingContext}
-        isGenerating={weeklyReport.isGeneratingReport}
+        isGenerating={weeklyReport.isGeneratingReport || weeklyReport.isDetectingGaps}
         onOpenChange={weeklyReport.setIsGenerateDialogOpen}
         onReportTypeChange={weeklyReport.setReportType}
         onCustomStartDateChange={weeklyReport.updateCustomStartDate}
         onCustomEndDateChange={weeklyReport.updateCustomEndDate}
         onGenerate={weeklyReport.generateReport}
         onViewReports={weeklyReport.openReportList}
+      />
+
+      <ReportGapDialog
+        open={weeklyReport.isGapDialogOpen}
+        gaps={weeklyReport.reportGaps}
+        isGenerating={weeklyReport.isGeneratingReport}
+        onOpenChange={weeklyReport.setIsGapDialogOpen}
+        onSubmit={weeklyReport.submitGapAnswers}
+        onSkip={weeklyReport.skipGaps}
       />
 
       <ReportPreviewDialog

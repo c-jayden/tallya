@@ -189,6 +189,43 @@ struct ThreadLinkSuggestion {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+struct ReportGapEntry {
+    id: String,
+    occurred_on: String,
+    content: String,
+    #[serde(default)]
+    clarification_count: u32,
+    #[serde(default)]
+    thread_id: Option<String>,
+    #[serde(default)]
+    thread_title: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SuggestReportGapsInput {
+    #[serde(default)]
+    entries: Vec<ReportGapEntry>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+struct SuggestedReportGaps {
+    #[serde(default)]
+    gaps: Vec<ReportGap>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ReportGap {
+    entry_id: String,
+    #[serde(default)]
+    thread_title: String,
+    #[serde(default)]
+    question: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct ReportSourceEntry {
     occurred_on: String,
     content: String,
@@ -356,6 +393,22 @@ async fn suggest_thread_link_with_codex(
     .map_err(|error| {
         eprintln!("Codex thread link task join failed: {error}");
         "Codex 线索归并建议失败，请检查 Codex CLI 是否可用。".to_string()
+    })?
+}
+
+#[tauri::command]
+async fn suggest_report_gaps_with_codex(
+    input: SuggestReportGapsInput,
+    codex_command: String,
+    codex_model: String,
+) -> Result<Vec<ReportGap>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        run_codex_report_gaps(input, codex_command, codex_model)
+    })
+    .await
+    .map_err(|error| {
+        eprintln!("Codex report gaps task join failed: {error}");
+        "Codex 报告缺口检测失败，请检查 Codex CLI 是否可用。".to_string()
     })?
 }
 
@@ -549,6 +602,21 @@ fn run_codex_thread_link(
         codex_model,
         "thread-link",
         |raw_output| parse_thread_link_suggestion(raw_output, &input),
+    )
+}
+
+fn run_codex_report_gaps(
+    input: SuggestReportGapsInput,
+    codex_command: String,
+    codex_model: String,
+) -> Result<Vec<ReportGap>, String> {
+    let prompt = build_codex_report_gaps_prompt(&input);
+    run_codex_prompt_generation(
+        prompt,
+        codex_command,
+        codex_model,
+        "report-gaps",
+        |raw_output| parse_report_gaps(raw_output, &input),
     )
 }
 
@@ -902,6 +970,30 @@ JSON keys: relatedEntryId:string|null, threadTitle:string.
     )
 }
 
+fn build_codex_report_gaps_prompt(input: &SuggestReportGapsInput) -> String {
+    let entries = input
+        .entries
+        .iter()
+        .map(|entry| {
+            serde_json::json!({
+                "id": entry.id,
+                "occurredOn": entry.occurred_on,
+                "content": entry.content,
+                "clarificationCount": entry.clarification_count,
+                "threadTitle": entry.thread_title,
+            })
+        })
+        .collect::<Vec<_>>();
+    let entries_json = serde_json::to_string(&entries).unwrap_or_else(|_| "[]".to_string());
+
+    format!(
+        r#"下面是用户本周的工作记录（含所属线索 threadTitle 和已有补充数 clarificationCount）。在写周报前，挑出“重点但信息不足”的线索：跨多条/跨天反复出现、但内容简略、补充很少的那种。只输出合法 JSON，不要 markdown、解释、代码块或工具调用。
+JSON keys: gaps: {{ entryId:string, threadTitle:string, question:string }}[].
+要求：最多 3 条，挑最值得补的；entryId 必须是输入里某条的 id（原样返回）；question 一句话、口语化、容易回答，围绕难点、原因、产出或结果、和谁协作、卡了多久；信息已经足够或本周记录很少时 gaps 返回空数组，不要为了凑数而追问；不要编造，不要重复记录里已经写过的信息。
+工作记录：{entries_json}"#
+    )
+}
+
 fn report_style_instruction(input: &GenerateRangeReportInput) -> String {
     let mut instructions = vec![
         "风格提示只影响表达方式，不允许改变事实内容，也不允许加入样本里的具体业务信息。"
@@ -1146,6 +1238,50 @@ mod tests {
         assert!(prompt.contains("entry_1"));
     }
 
+    fn report_gaps_input() -> SuggestReportGapsInput {
+        SuggestReportGapsInput {
+            entries: vec![ReportGapEntry {
+                id: "entry_1".to_string(),
+                occurred_on: "2026-06-08".to_string(),
+                content: "对接订单接口".to_string(),
+                clarification_count: 0,
+                thread_id: Some("thread_1".to_string()),
+                thread_title: Some("订单接口对接".to_string()),
+            }],
+        }
+    }
+
+    #[test]
+    fn parse_report_gaps_keeps_only_candidate_ids_caps_and_tolerates_empty() {
+        let input = report_gaps_input();
+
+        assert_eq!(parse_report_gaps("", &input).expect("empty"), Vec::<ReportGap>::new());
+        assert!(parse_report_gaps("not json", &input).is_err());
+
+        let gaps = parse_report_gaps(
+            r#"{"gaps":[
+                {"entryId":"entry_1","threadTitle":"订单接口对接","question":" 卡在哪了？ "},
+                {"entryId":"entry_1","threadTitle":"x","question":"重复应被去重"},
+                {"entryId":"entry_999","threadTitle":"y","question":"幻觉 id 应丢弃"}
+            ]}"#,
+            &input,
+        )
+        .expect("gaps");
+
+        assert_eq!(gaps.len(), 1);
+        assert_eq!(gaps[0].entry_id, "entry_1");
+        assert_eq!(gaps[0].question, "卡在哪了？");
+    }
+
+    #[test]
+    fn build_report_gaps_prompt_includes_records_and_json_keys() {
+        let prompt = build_codex_report_gaps_prompt(&report_gaps_input());
+
+        assert!(prompt.contains("entryId"));
+        assert!(prompt.contains("对接订单接口"));
+        assert!(prompt.contains("entry_1"));
+    }
+
     #[test]
     fn normalize_report_text_collapses_extra_blank_lines() {
         let normalized = normalize_report_text("# Title\n\n\n## Summary\n\nText\n\n\n- A");
@@ -1352,6 +1488,56 @@ fn parse_thread_link_suggestion(
         related_entry_id,
         thread_title: parsed.thread_title.trim().to_string(),
     })
+}
+
+fn parse_report_gaps(
+    raw_output: &str,
+    input: &SuggestReportGapsInput,
+) -> Result<Vec<ReportGap>, String> {
+    let raw_output = raw_output.trim();
+
+    // No output means the model found nothing worth asking; treat as "no gaps"
+    // so report generation stays fail-open.
+    if raw_output.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let parsed = serde_json::from_str::<SuggestedReportGaps>(raw_output).map_err(|error| {
+        eprintln!("Codex report gaps output is not valid JSON: {error}");
+        "AI 返回内容不是合法 JSON，请重试。".to_string()
+    })?;
+
+    let valid_ids: std::collections::HashSet<&str> =
+        input.entries.iter().map(|entry| entry.id.as_str()).collect();
+    let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut gaps = Vec::new();
+
+    for gap in parsed.gaps {
+        let entry_id = gap.entry_id.trim().to_string();
+        let question = gap.question.trim().to_string();
+
+        // Drop hallucinated ids, empty questions, and duplicates; cap at 3.
+        if entry_id.is_empty()
+            || question.is_empty()
+            || !valid_ids.contains(entry_id.as_str())
+            || seen.contains(&entry_id)
+        {
+            continue;
+        }
+
+        seen.insert(entry_id.clone());
+        gaps.push(ReportGap {
+            entry_id,
+            thread_title: gap.thread_title.trim().to_string(),
+            question,
+        });
+
+        if gaps.len() >= 3 {
+            break;
+        }
+    }
+
+    Ok(gaps)
 }
 
 fn normalize_generated_range_report(
@@ -1620,6 +1806,7 @@ pub fn run() {
             show_main_window,
             suggest_clarifications_with_codex,
             suggest_thread_link_with_codex,
+            suggest_report_gaps_with_codex,
             toggle_main_window
         ])
         .run(tauri::generate_context!())

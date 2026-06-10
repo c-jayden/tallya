@@ -5,7 +5,9 @@ import type {
   AnalyzedReportStyle,
   GenerateDailyMemoryInput,
   RangeReportSourceInput,
+  ReportGap,
   SuggestClarificationsInput,
+  SuggestReportGapsInput,
   SuggestThreadLinkInput,
   ThreadLinkSuggestion,
   WeeklyReportSourceInput,
@@ -142,6 +144,20 @@ export function createAIService({
       }
 
       return provider.suggestThreadLink(input, getProviderOptions(settings));
+    },
+
+    async suggestReportGaps(input: SuggestReportGapsInput): Promise<ReportGap[]> {
+      const settings = await settingsRepository.getSettings();
+      const provider = getProviderForSettings(settings, {
+        codexProvider,
+        openAICompatibleProvider: configuredOpenAICompatibleProvider,
+      });
+
+      if (!provider.suggestReportGaps) {
+        throw new Error('当前 AI 服务暂不支持报告缺口检测。');
+      }
+
+      return provider.suggestReportGaps(input, getProviderOptions(settings));
     },
 
     async checkHealth(): Promise<ProviderHealth> {

@@ -8,9 +8,9 @@ import {
   isValidReportDateRange,
 } from '../services/report-date';
 import { reportService } from '../services/report-service';
-import type { ReportContext, ReportDraft } from '../services/report-service';
+import type { GapAnswer, ReportContext, ReportDraft } from '../services/report-service';
 import { normalizeReportContent } from '../report-view-model';
-import type { Report, ReportGenerationType } from '../types';
+import type { Report, ReportGap, ReportGenerationType } from '../types';
 
 export function useWeeklyReportFlow() {
   const defaultCustomRange = getDefaultCustomReportRange();
@@ -28,6 +28,9 @@ export function useWeeklyReportFlow() {
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
   const [isReportListOpen, setIsReportListOpen] = useState(false);
   const [isReportDetailOpen, setIsReportDetailOpen] = useState(false);
+  const [reportGaps, setReportGaps] = useState<ReportGap[]>([]);
+  const [isGapDialogOpen, setIsGapDialogOpen] = useState(false);
+  const [isDetectingGaps, setIsDetectingGaps] = useState(false);
   const currentWeekRange = getCurrentWeekRange();
   const hasCurrentWeekReport = reportListItems.some(
     (report) =>
@@ -141,7 +144,7 @@ export function useWeeklyReportFlow() {
   }
 
   function closeReportDialogs() {
-    if (isGeneratingReport || isSavingReport) {
+    if (isGeneratingReport || isSavingReport || isDetectingGaps) {
       return;
     }
 
@@ -149,17 +152,17 @@ export function useWeeklyReportFlow() {
     setIsPreviewDialogOpen(false);
     setIsReportListOpen(false);
     setIsReportDetailOpen(false);
+    setIsGapDialogOpen(false);
   }
 
-  async function generateReport() {
-    if (isGeneratingReport) {
-      return;
-    }
+  function getActiveRange() {
+    return reportType === 'custom'
+      ? { startDate: customStartDate, endDate: customEndDate }
+      : currentWeekRange;
+  }
 
-    if (reportType === 'custom' && !isValidReportDateRange(customStartDate, customEndDate)) {
-      return;
-    }
-
+  // Run the actual AI report generation (the gap-fill step happens before this).
+  async function runGenerate() {
     setIsGeneratingReport(true);
 
     try {
@@ -169,6 +172,7 @@ export function useWeeklyReportFlow() {
           : await reportService.generateCurrentWeeklyReport();
 
       setReportDraft(draft as ReportDraft);
+      setIsGapDialogOpen(false);
       setIsGenerateDialogOpen(false);
       setIsPreviewDialogOpen(true);
     } catch (error) {
@@ -179,6 +183,62 @@ export function useWeeklyReportFlow() {
     } finally {
       setIsGeneratingReport(false);
     }
+  }
+
+  async function generateReport() {
+    if (isGeneratingReport || isDetectingGaps) {
+      return;
+    }
+
+    if (reportType === 'custom' && !isValidReportDateRange(customStartDate, customEndDate)) {
+      return;
+    }
+
+    // First ask the AI whether any important-but-thin thread is worth fleshing
+    // out; if so, surface the gap dialog instead of generating right away.
+    setIsDetectingGaps(true);
+
+    let gaps: ReportGap[];
+
+    try {
+      const { startDate, endDate } = getActiveRange();
+      gaps = await reportService.getReportGaps(startDate, endDate);
+    } finally {
+      setIsDetectingGaps(false);
+    }
+
+    if (gaps.length > 0) {
+      setReportGaps(gaps);
+      setIsGapDialogOpen(true);
+      return;
+    }
+
+    await runGenerate();
+  }
+
+  async function submitGapAnswers(answers: GapAnswer[]) {
+    if (isGeneratingReport) {
+      return;
+    }
+
+    try {
+      await reportService.saveGapAnswers(answers);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '补充保存失败，请稍后重试。';
+
+      toast.error(message);
+      return;
+    }
+
+    await runGenerate();
+  }
+
+  async function skipGaps() {
+    if (isGeneratingReport) {
+      return;
+    }
+
+    await runGenerate();
   }
 
   async function copyMarkdown() {
@@ -309,7 +369,13 @@ export function useWeeklyReportFlow() {
     isReportDetailOpen,
     isReportListOpen,
     isSavingReport,
-    isReportBusy: isGeneratingReport || isSavingReport,
+    isDetectingGaps,
+    isReportBusy: isGeneratingReport || isSavingReport || isDetectingGaps,
+    reportGaps,
+    isGapDialogOpen,
+    setIsGapDialogOpen,
+    submitGapAnswers,
+    skipGaps,
     hasSavedReports: reportListItems.length > 0,
     hasCurrentWeekReport,
     openGenerateDialog,

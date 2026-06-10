@@ -5,7 +5,9 @@ import type {
   AnalyzedReportStyle,
   GenerateDailyMemoryInput,
   GenerateRangeReportInput,
+  ReportGap,
   SuggestClarificationsInput,
+  SuggestReportGapsInput,
   SuggestThreadLinkInput,
   ThreadLinkSuggestion,
 } from '../../types';
@@ -488,6 +490,11 @@ export function createOpenAICompatibleProvider(fetchImpl: FetchLike = fetch): AI
     async suggestThreadLink(input, options) {
       return requestJSON(options, buildThreadLinkPrompt(input), (rawOutput) =>
         parseThreadLinkSuggestion(rawOutput, input),
+      );
+    },
+    async suggestReportGaps(input, options) {
+      return requestJSON(options, buildReportGapsPrompt(input), (rawOutput) =>
+        parseReportGaps(rawOutput, input),
       );
     },
     async checkHealth(options) {
@@ -1056,6 +1063,66 @@ function buildThreadLinkPrompt(input: SuggestThreadLinkInput) {
     `新记录：${input.content}`,
     `候选记录：${JSON.stringify(candidates)}`,
   ].join('\n');
+}
+
+const MAX_REPORT_GAPS = 3;
+
+function buildReportGapsPrompt(input: SuggestReportGapsInput) {
+  const entries = input.entries.map((entry) => ({
+    id: entry.id,
+    occurredOn: entry.occurredOn,
+    content: entry.content,
+    clarificationCount: entry.clarificationCount,
+    threadTitle: entry.threadTitle,
+  }));
+
+  return [
+    '下面是用户本周的工作记录（含所属线索 threadTitle 和已有补充数 clarificationCount）。',
+    '在写周报前，挑出"重点但信息不足"的线索：跨多条/跨天反复出现、但内容简略、补充很少的那种。',
+    '对每条这样的线索给一个候选 entryId（从输入里选一条代表记录）和一句口语化的追问，帮用户补全后写进周报。',
+    '只输出合法 JSON，不要解释或 markdown。',
+    'JSON keys: gaps: { entryId: string, threadTitle: string, question: string }[]。',
+    '要求：',
+    `- 最多 ${MAX_REPORT_GAPS} 条，挑最值得补的；entryId 必须是输入里某条的 id（原样返回）。`,
+    '- question 一句话、容易回答，围绕：难点、原因、产出/结果、和谁协作、卡了多久。',
+    '- 信息已经足够、或本周记录很少时，gaps 返回空数组；不要为了凑数而追问。',
+    '- 不要编造，不要重复记录里已经写过的信息。',
+    `工作记录：${JSON.stringify(entries)}`,
+  ].join('\n');
+}
+
+function parseReportGaps(rawOutput: string, input: SuggestReportGapsInput): ReportGap[] {
+  const parsed = parseStrictJSON<{ gaps?: unknown }>(rawOutput);
+  const validIds = new Set(input.entries.map((entry) => entry.id));
+  const seen = new Set<string>();
+  const gaps: ReportGap[] = [];
+
+  if (!Array.isArray(parsed.gaps)) {
+    return gaps;
+  }
+
+  for (const item of parsed.gaps) {
+    if (!isRecord(item)) {
+      continue;
+    }
+
+    const entryId = typeof item.entryId === 'string' ? item.entryId : '';
+    const question = typeof item.question === 'string' ? item.question.trim() : '';
+    const threadTitle = typeof item.threadTitle === 'string' ? item.threadTitle.trim() : '';
+
+    if (!entryId || !question || !validIds.has(entryId) || seen.has(entryId)) {
+      continue;
+    }
+
+    seen.add(entryId);
+    gaps.push({ entryId, threadTitle, question });
+
+    if (gaps.length >= MAX_REPORT_GAPS) {
+      break;
+    }
+  }
+
+  return gaps;
 }
 
 function parseThreadLinkSuggestion(

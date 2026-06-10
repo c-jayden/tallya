@@ -236,6 +236,29 @@ export type ThreadLinkSuggestion = {
   threadTitle: string;
 };
 
+// One entry offered to report gap-detection, carrying its id (so an answer can
+// be saved back), thread, and how many clarifications it already has.
+export type ReportGapEntry = {
+  id: string;
+  occurredOn: string;
+  content: string;
+  clarificationCount: number;
+  threadId: string | null;
+  threadTitle: string | null;
+};
+
+export type SuggestReportGapsInput = {
+  entries: ReportGapEntry[];
+};
+
+// An "important but thin" thread the AI flags before a report: a representative
+// entryId to attach the answer to, the thread title, and one short question.
+export type ReportGap = {
+  entryId: string;
+  threadTitle: string;
+  question: string;
+};
+
 export type ReportType = 'weekly' | 'monthly' | 'yearly' | 'custom' | 'performance' | 'handoff';
 
 export type ReportStatus = 'generated' | 'stale' | 'locked';
