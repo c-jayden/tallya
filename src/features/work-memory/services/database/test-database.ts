@@ -59,13 +59,22 @@ type EntryClarificationRow = {
   updated_at: string;
 };
 
+type ThreadRow = {
+  id: string;
+  title: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+};
+
 type TableName =
   | 'daily_memories'
   | 'reports'
   | 'report_sources'
   | 'app_settings'
   | 'entries'
-  | 'entry_clarifications';
+  | 'entry_clarifications'
+  | 'threads';
 
 export class TestDatabaseClient implements DatabaseClient {
   readonly createdTables = new Set<TableName>();
@@ -75,6 +84,7 @@ export class TestDatabaseClient implements DatabaseClient {
   reportSources = new Map<string, ReportSourceRow>();
   entries = new Map<string, EntryRow>();
   clarifications = new Map<string, EntryClarificationRow>();
+  threads = new Map<string, ThreadRow>();
   clearedReports = false;
   clearedReportSources = false;
 
@@ -135,6 +145,21 @@ export class TestDatabaseClient implements DatabaseClient {
       return;
     }
 
+    if (normalizedQuery.startsWith('update entries set thread_id =')) {
+      const id = String(bindValues[2]);
+      const existing = this.entries.get(id);
+
+      if (existing) {
+        this.entries.set(id, {
+          ...existing,
+          thread_id: toNullableString(bindValues[0]),
+          updated_at: String(bindValues[1]),
+        });
+      }
+
+      return;
+    }
+
     if (normalizedQuery.startsWith('delete from entries where id =')) {
       this.entries.delete(String(bindValues[0]));
       return;
@@ -142,6 +167,45 @@ export class TestDatabaseClient implements DatabaseClient {
 
     if (normalizedQuery.startsWith('delete from entries')) {
       this.entries.clear();
+      return;
+    }
+
+    if (normalizedQuery.startsWith('insert into threads')) {
+      const row: ThreadRow = {
+        id: String(bindValues[0]),
+        title: String(bindValues[1]),
+        status: String(bindValues[2]),
+        created_at: String(bindValues[3]),
+        updated_at: String(bindValues[4]),
+      };
+
+      this.threads.set(row.id, row);
+      return;
+    }
+
+    if (normalizedQuery.startsWith('update threads set title =')) {
+      const id = String(bindValues[3]);
+      const existing = this.threads.get(id);
+
+      if (existing) {
+        this.threads.set(id, {
+          ...existing,
+          title: String(bindValues[0]),
+          status: String(bindValues[1]),
+          updated_at: String(bindValues[2]),
+        });
+      }
+
+      return;
+    }
+
+    if (normalizedQuery.startsWith('delete from threads where id =')) {
+      this.threads.delete(String(bindValues[0]));
+      return;
+    }
+
+    if (normalizedQuery.startsWith('delete from threads')) {
+      this.threads.clear();
       return;
     }
 
@@ -362,6 +426,19 @@ export class TestDatabaseClient implements DatabaseClient {
         .sort(compareEntriesByOccurredAtDesc) as T;
     }
 
+    if (normalizedQuery.startsWith('select * from entries where thread_id =')) {
+      return Array.from(this.entries.values())
+        .filter((row) => row.thread_id === String(bindValues[0]))
+        .sort(compareEntriesByOccurredAtAsc) as T;
+    }
+
+    if (normalizedQuery.startsWith('select * from entries order by occurred_at desc limit')) {
+      const limit = Number(bindValues[0]);
+      return Array.from(this.entries.values())
+        .sort(compareEntriesByOccurredAtDesc)
+        .slice(0, Number.isFinite(limit) ? limit : undefined) as T;
+    }
+
     // FTS search path: the mock has no real FTS index, so it approximates the
     // MATCH query with a case-insensitive substring scan over content.
     if (normalizedQuery.startsWith('select e.* from entries e join entries_fts')) {
@@ -376,6 +453,19 @@ export class TestDatabaseClient implements DatabaseClient {
       return Array.from(this.entries.values())
         .filter((row) => row.content.toLowerCase().includes(pattern))
         .sort(compareEntriesByOccurredAtDesc) as T;
+    }
+
+    if (normalizedQuery.startsWith('select * from threads where id =')) {
+      const row = this.threads.get(String(bindValues[0]));
+      return (row ? [row] : []) as T;
+    }
+
+    if (normalizedQuery.startsWith('select * from threads order by updated_at desc')) {
+      return Array.from(this.threads.values()).sort(
+        (first, second) =>
+          second.updated_at.localeCompare(first.updated_at) ||
+          second.id.localeCompare(first.id),
+      ) as T;
     }
 
     if (normalizedQuery.startsWith('select * from entry_clarifications where entry_id in')) {
@@ -509,6 +599,10 @@ export class TestDatabaseClient implements DatabaseClient {
     if (query.includes('entry_clarifications')) {
       this.createdTables.add('entry_clarifications');
     }
+
+    if (/create table if not exists threads\b/.test(query)) {
+      this.createdTables.add('threads');
+    }
   }
 
   private getTableRows(tableName: TableName) {
@@ -524,6 +618,13 @@ function compareEntriesByOccurredAtDesc(first: EntryRow, second: EntryRow) {
   return (
     second.occurred_at.localeCompare(first.occurred_at) ||
     second.id.localeCompare(first.id)
+  );
+}
+
+function compareEntriesByOccurredAtAsc(first: EntryRow, second: EntryRow) {
+  return (
+    first.occurred_at.localeCompare(second.occurred_at) ||
+    first.id.localeCompare(second.id)
   );
 }
 

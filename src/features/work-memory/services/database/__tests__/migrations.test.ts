@@ -17,6 +17,7 @@ describe('database migrations', () => {
         'app_settings',
         'entries',
         'entry_clarifications',
+        'threads',
       ]),
     );
   });

@@ -4,6 +4,8 @@ import type {
   GeneratedDailyMemory,
   GeneratedReportContent,
   SuggestClarificationsInput,
+  SuggestThreadLinkInput,
+  ThreadLinkSuggestion,
 } from '../../types';
 import { logger } from '../logger/logger';
 import { AIProviderError, type AIProvider } from './ai-provider';
@@ -92,6 +94,23 @@ export function createCodexCliProvider(invokeCommand: TauriInvoke = invoke): AIP
           commandConfigured: Boolean(options.codexCommand),
           model: options.codexModel,
           contentLength: input.content.trim().length,
+          errorMessage: getFriendlyCodexError(error),
+        });
+        throw new AIProviderError(getFriendlyCodexError(error), CODEX_PROVIDER_ID, error);
+      }
+    },
+    async suggestThreadLink(input: SuggestThreadLinkInput, options) {
+      try {
+        return await invokeCommand<ThreadLinkSuggestion>('suggest_thread_link_with_codex', {
+          input,
+          codexCommand: options.codexCommand,
+          codexModel: options.codexModel,
+        });
+      } catch (error) {
+        logger.error('ai', 'codex-cli.suggest_thread_link_failed', 'Codex CLI thread link suggestion failed', {
+          commandConfigured: Boolean(options.codexCommand),
+          model: options.codexModel,
+          candidateCount: input.candidates.length,
           errorMessage: getFriendlyCodexError(error),
         });
         throw new AIProviderError(getFriendlyCodexError(error), CODEX_PROVIDER_ID, error);

@@ -3,7 +3,23 @@ import { toast } from 'sonner';
 import { aiService } from '../services/ai/ai-service';
 import { clarificationRepository } from '../services/clarification-repository';
 import { entryRepository } from '../services/entry-repository';
-import type { Clarification, Entry } from '../types';
+import { threadRepository } from '../services/thread-repository';
+import { threadService } from '../services/thread-service';
+import type { Clarification, Entry, ThreadLinkCandidate } from '../types';
+
+// How many recent entries are offered to the AI as merge candidates. Capped to
+// keep the prompt small and the background call cheap.
+const THREAD_LINK_CANDIDATE_LIMIT = 20;
+
+// A pending merge suggestion for one freshly-created entry. existingThreadId is
+// set when the matched entry already belongs to a thread (join it); otherwise a
+// new thread is created from both entries on confirm.
+export type ThreadSuggestionView = {
+  relatedEntry: Entry;
+  threadTitle: string;
+  existingThreadId: string | null;
+  existingThreadTitle: string | null;
+};
 
 type UseEntriesControllerOptions = {
   currentDate: string;
@@ -50,6 +66,9 @@ export function useEntriesController({ currentDate, todayDate }: UseEntriesContr
   const [clarificationsByEntry, setClarificationsByEntry] = useState<
     Record<string, Clarification[]>
   >({});
+  const [threadSuggestionByEntry, setThreadSuggestionByEntry] = useState<
+    Record<string, ThreadSuggestionView>
+  >({});
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const composerRef = useRef<HTMLTextAreaElement>(null);
@@ -80,6 +99,59 @@ export function useEntriesController({ currentDate, todayDate }: UseEntriesContr
     };
   }, [applyDayData, currentDate]);
 
+  // Background, best-effort: after a new entry lands, ask the AI whether it
+  // continues an existing entry/thread. Every failure path (no candidates, AI
+  // not configured, network/parse errors) is swallowed so capture stays
+  // zero-friction and never shows an error.
+  const requestThreadSuggestion = useCallback(async (newEntry: Entry) => {
+    try {
+      const recent = await entryRepository.listRecent(THREAD_LINK_CANDIDATE_LIMIT + 1);
+      const candidates = recent.filter((entry) => entry.id !== newEntry.id);
+
+      if (candidates.length === 0) {
+        return;
+      }
+
+      const threads = await threadRepository.list();
+      const threadTitleById = new Map(threads.map((thread) => [thread.id, thread.title]));
+
+      const candidateInputs: ThreadLinkCandidate[] = candidates.map((entry) => ({
+        id: entry.id,
+        content: entry.content,
+        occurredOn: entry.occurredOn,
+        threadId: entry.threadId,
+        threadTitle: entry.threadId ? threadTitleById.get(entry.threadId) ?? null : null,
+      }));
+
+      const suggestion = await aiService.suggestThreadLink({
+        content: newEntry.content,
+        candidates: candidateInputs,
+      });
+
+      const relatedEntry = suggestion.relatedEntryId
+        ? candidates.find((entry) => entry.id === suggestion.relatedEntryId)
+        : undefined;
+
+      if (!relatedEntry) {
+        return;
+      }
+
+      const existingThreadId = relatedEntry.threadId;
+      const existingThreadTitle = existingThreadId
+        ? threadTitleById.get(existingThreadId) ?? null
+        : null;
+      const threadTitle =
+        suggestion.threadTitle.trim() || existingThreadTitle || newEntry.content.slice(0, 14);
+
+      setThreadSuggestionByEntry((current) => ({
+        ...current,
+        [newEntry.id]: { relatedEntry, threadTitle, existingThreadId, existingThreadTitle },
+      }));
+    } catch {
+      // Silent by design: a missing/failed merge hint must not interrupt logging.
+    }
+  }, []);
+
   const createEntry = useCallback(
     async (content: string) => {
       const trimmed = content.trim();
@@ -91,11 +163,13 @@ export function useEntriesController({ currentDate, todayDate }: UseEntriesContr
       setIsSaving(true);
 
       try {
-        await entryRepository.create({
+        const newEntry = await entryRepository.create({
           content: trimmed,
           occurredAt: computeOccurredAt(currentDate, todayDate),
         });
         await reload();
+        // Fire-and-forget: don't block the composer on the AI round-trip.
+        void requestThreadSuggestion(newEntry);
 
         return true;
       } catch (error) {
@@ -106,7 +180,7 @@ export function useEntriesController({ currentDate, todayDate }: UseEntriesContr
         setIsSaving(false);
       }
     },
-    [currentDate, isSaving, reload, todayDate],
+    [currentDate, isSaving, reload, requestThreadSuggestion, todayDate],
   );
 
   const updateEntry = useCallback(
@@ -131,6 +205,19 @@ export function useEntriesController({ currentDate, todayDate }: UseEntriesContr
     [reload],
   );
 
+  const dropThreadSuggestion = useCallback((entryId: string) => {
+    setThreadSuggestionByEntry((current) => {
+      if (!(entryId in current)) {
+        return current;
+      }
+
+      const next = { ...current };
+      delete next[entryId];
+
+      return next;
+    });
+  }, []);
+
   const removeEntry = useCallback(
     async (id: string) => {
       try {
@@ -138,13 +225,49 @@ export function useEntriesController({ currentDate, todayDate }: UseEntriesContr
         // Clarifications are children of the entry; remove them so deleting an
         // entry never leaves orphaned detail behind.
         await clarificationRepository.removeByEntry(id);
+        dropThreadSuggestion(id);
         await reload();
         toast.success('已删除这条记录');
       } catch (error) {
         toast.error(error instanceof Error ? error.message : '删除失败，请稍后重试。');
       }
     },
-    [reload],
+    [dropThreadSuggestion, reload],
+  );
+
+  const confirmThreadSuggestion = useCallback(
+    async (entryId: string) => {
+      const suggestion = threadSuggestionByEntry[entryId];
+
+      if (!suggestion) {
+        return;
+      }
+
+      try {
+        if (suggestion.existingThreadId) {
+          await threadService.addEntryToThread(suggestion.existingThreadId, entryId);
+        } else {
+          await threadService.createThreadFromEntries(suggestion.threadTitle, [
+            suggestion.relatedEntry.id,
+            entryId,
+          ]);
+        }
+
+        dropThreadSuggestion(entryId);
+        await reload();
+        toast.success('已归并到线索');
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : '归并失败，请稍后重试。');
+      }
+    },
+    [dropThreadSuggestion, reload, threadSuggestionByEntry],
+  );
+
+  const dismissThreadSuggestion = useCallback(
+    (entryId: string) => {
+      dropThreadSuggestion(entryId);
+    },
+    [dropThreadSuggestion],
   );
 
   const addClarification = useCallback(
@@ -188,13 +311,16 @@ export function useEntriesController({ currentDate, todayDate }: UseEntriesContr
   const clearLocalData = useCallback(async () => {
     await entryRepository.clearLocalData();
     await clarificationRepository.clearLocalData();
+    await threadRepository.clearLocalData();
     setEntries([]);
     setClarificationsByEntry({});
+    setThreadSuggestionByEntry({});
   }, []);
 
   return {
     entries,
     clarificationsByEntry,
+    threadSuggestionByEntry,
     isLoading,
     isSaving,
     composerRef,
@@ -203,6 +329,8 @@ export function useEntriesController({ currentDate, todayDate }: UseEntriesContr
     removeEntry,
     addClarification,
     removeClarification,
+    confirmThreadSuggestion,
+    dismissThreadSuggestion,
     suggestQuestions,
     reload,
     clearLocalData,

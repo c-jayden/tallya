@@ -6,6 +6,8 @@ import type {
   GenerateDailyMemoryInput,
   RangeReportSourceInput,
   SuggestClarificationsInput,
+  SuggestThreadLinkInput,
+  ThreadLinkSuggestion,
   WeeklyReportSourceInput,
 } from '../../types';
 import {
@@ -126,6 +128,20 @@ export function createAIService({
       }
 
       return provider.suggestClarifications(input, getProviderOptions(settings));
+    },
+
+    async suggestThreadLink(input: SuggestThreadLinkInput): Promise<ThreadLinkSuggestion> {
+      const settings = await settingsRepository.getSettings();
+      const provider = getProviderForSettings(settings, {
+        codexProvider,
+        openAICompatibleProvider: configuredOpenAICompatibleProvider,
+      });
+
+      if (!provider.suggestThreadLink) {
+        throw new Error('当前 AI 服务暂不支持线索归并建议。');
+      }
+
+      return provider.suggestThreadLink(input, getProviderOptions(settings));
     },
 
     async checkHealth(): Promise<ProviderHealth> {

@@ -6,6 +6,8 @@ import type {
   GenerateDailyMemoryInput,
   GenerateRangeReportInput,
   SuggestClarificationsInput,
+  SuggestThreadLinkInput,
+  ThreadLinkSuggestion,
 } from '../../types';
 import { logger } from '../logger/logger';
 import { normalizeReportText } from '../report-text';
@@ -482,6 +484,11 @@ export function createOpenAICompatibleProvider(fetchImpl: FetchLike = fetch): AI
     },
     async suggestClarifications(input, options) {
       return requestJSON(options, buildClarificationsPrompt(input), parseSuggestedClarifications);
+    },
+    async suggestThreadLink(input, options) {
+      return requestJSON(options, buildThreadLinkPrompt(input), (rawOutput) =>
+        parseThreadLinkSuggestion(rawOutput, input),
+      );
     },
     async checkHealth(options) {
       try {
@@ -1025,6 +1032,44 @@ function parseSuggestedClarifications(rawOutput: string): string[] {
   const parsed = parseStrictJSON<{ questions?: unknown }>(rawOutput);
 
   return normalizeStringList(parsed.questions).slice(0, MAX_CLARIFICATION_QUESTIONS);
+}
+
+function buildThreadLinkPrompt(input: SuggestThreadLinkInput) {
+  const candidates = input.candidates.map((candidate) => ({
+    id: candidate.id,
+    content: candidate.content,
+    occurredOn: candidate.occurredOn,
+    threadTitle: candidate.threadTitle,
+  }));
+
+  return [
+    '用户刚记下一条新的工作记录。下面给出最近的若干历史记录作为候选。',
+    '判断这条新记录是不是在延续候选里的某一件事（同一个任务/问题/项目的后续进展）。',
+    '只输出合法 JSON，不要解释或 markdown。',
+    'JSON keys: relatedEntryId:string|null, threadTitle:string。',
+    '要求：',
+    '- 命中时 relatedEntryId 必须是候选里某条的 id（原样返回），threadTitle 给一个简短中文线索名（≤14字，概括这件事）。',
+    '- 如果候选里那条已有 threadTitle，threadTitle 就沿用它，不要另起新名。',
+    '- 不确定、只是话题相近但不是同一件事、或没有匹配时，relatedEntryId 返回 null。',
+    '- 宁可漏判也不要误判；不要为了凑结果硬连。',
+    `新记录：${input.content}`,
+    `候选记录：${JSON.stringify(candidates)}`,
+  ].join('\n');
+}
+
+function parseThreadLinkSuggestion(
+  rawOutput: string,
+  input: SuggestThreadLinkInput,
+): ThreadLinkSuggestion {
+  const parsed = parseStrictJSON<{ relatedEntryId?: unknown; threadTitle?: unknown }>(rawOutput);
+  const candidateIds = new Set(input.candidates.map((candidate) => candidate.id));
+  const relatedEntryId =
+    typeof parsed.relatedEntryId === 'string' && candidateIds.has(parsed.relatedEntryId)
+      ? parsed.relatedEntryId
+      : null;
+  const threadTitle = typeof parsed.threadTitle === 'string' ? parsed.threadTitle.trim() : '';
+
+  return { relatedEntryId, threadTitle };
 }
 
 function reportStyleInstruction(input: GenerateRangeReportInput) {

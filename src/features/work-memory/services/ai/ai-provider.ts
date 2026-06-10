@@ -7,6 +7,8 @@ import type {
   GenerateRangeReportInput,
   GenerateWeeklyReportInput,
   SuggestClarificationsInput,
+  SuggestThreadLinkInput,
+  ThreadLinkSuggestion,
 } from '../../types';
 
 export type AIProviderId = 'ai-codex-cli' | 'openai-compatible' | 'ollama';
@@ -56,6 +58,10 @@ export type AIProvider = {
     input: SuggestClarificationsInput,
     options: AIProviderOptions,
   ): Promise<string[]>;
+  suggestThreadLink?(
+    input: SuggestThreadLinkInput,
+    options: AIProviderOptions,
+  ): Promise<ThreadLinkSuggestion>;
   checkHealth?(options: AIProviderOptions): Promise<ProviderHealth>;
 };
 

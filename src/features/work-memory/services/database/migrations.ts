@@ -7,10 +7,13 @@ import {
   createEntriesFtsTriggersSql,
   createEntriesIndexSql,
   createEntriesTableSql,
+  createEntriesThreadIndexSql,
   createEntryClarificationsIndexSql,
   createEntryClarificationsTableSql,
   createReportSourcesTableSql,
   createReportsTableSql,
+  createThreadsIndexSql,
+  createThreadsTableSql,
 } from './schema';
 import { logger } from '../logger/logger';
 
@@ -20,6 +23,9 @@ export async function runMigrations(database: DatabaseClient) {
   await database.execute(createReportSourcesTableSql);
   await database.execute(createEntriesTableSql);
   await database.execute(createEntriesIndexSql);
+  await database.execute(createEntriesThreadIndexSql);
+  await database.execute(createThreadsTableSql);
+  await database.execute(createThreadsIndexSql);
   await database.execute(createEntryClarificationsTableSql);
   await database.execute(createEntryClarificationsIndexSql);
   await setupEntriesFts(database);

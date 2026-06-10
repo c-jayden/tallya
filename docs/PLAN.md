@@ -20,34 +20,28 @@
 | # | 里程碑 | 状态 |
 | --- | --- | --- |
 | M1 | 核心模型：entry 多条捕获 + FTS5 搜索 + 解绑 AI + 报告降级 | ✅ 已完成并提交（commit `389f420`） |
-| M2 | AI 追问式补全：clarification 表 + 手动/AI 补充 + 搜索纳入 | ✅ 代码完成，待提交 |
-| M3 | 跨天线索关联：threads + AI 建议归并 + 线索视图 | ⏳ 未开始 |
+| M2 | AI 追问式补全：clarification 表 + 手动/AI 补充 + 搜索纳入 | ✅ 已完成并提交（commit `7d60d44`） |
+| M3 | 跨天线索关联：threads + AI 建议归并 + 线索视图 | ✅ 代码完成，待真机验证/提交 |
 | M4 | 提醒可靠性：开机自启 + 重排逻辑 | ⏳ 未开始 |
 | M5 | 报告重接 entry：周报按线索聚合 + 缺口补全 | ⏳ 未开始 |
 | — | 清理：删除旧 daily_memories 读路径 / drop 旧表 | ⏳ 留到验证稳定后 |
 
 ---
 
-## 已完成（M1 + M2）当前形态
+## 已完成（M1 + M2 + M3）当前形态
 
-- **数据**：`entries`（含预留 `thread_id/difficulty/effort`，恒 null）、`entries_fts`（trigram + 触发器）、`entry_clarifications`。`SCHEMA_VERSION = 5`。旧 `daily_memories` 一次性迁成 entry 后保留为归档。
-- **仓储**：[entry-repository.ts](../src/features/work-memory/services/entry-repository.ts)、[clarification-repository.ts](../src/features/work-memory/services/clarification-repository.ts)（均内存+SQLite+单例）。
+- **数据**：`entries`（含预留 `difficulty/effort`，仍 null；`thread_id` 自 M3 起启用）、`entries_fts`（trigram + 触发器）、`entry_clarifications`、`threads`。`SCHEMA_VERSION = 6`。旧 `daily_memories` 一次性迁成 entry 后保留为归档。
+- **仓储**：[entry-repository.ts](../src/features/work-memory/services/entry-repository.ts)、[clarification-repository.ts](../src/features/work-memory/services/clarification-repository.ts)、[thread-repository.ts](../src/features/work-memory/services/thread-repository.ts)（均内存+SQLite+单例）。entry-repository 新增 `setThread / listByThread / listRecent`。
 - **检索**：[memory-search-service.ts](../src/features/work-memory/services/memory-search-service.ts) 合并 entry 命中 + clarification 命中的父 entry。FTS5 出错回退 LIKE。点击搜索结果会跳到该 entry 所在日并短暂高亮+滚动定位。
 - **主屏**：[work-memory-home.tsx](../src/features/work-memory/work-memory-home.tsx) = composer + 当天 feed。记录全程不调用 AI。
 - **补充**：feed item 的「补充」入口 → [entry-supplement-panel.tsx](../src/features/work-memory/components/entry-supplement-panel.tsx)。打开即后台拉 AI 追问（1-2 个问题），始终有手动输入兜底；空输入失焦自动收起。补充以子条目展示在 entry 下，可删、可搜。
-- **AI**：`suggestClarifications` 贯通 ai-provider / codex(lib.rs) / openai-compatible / ai-service。AI 未配置时补充退化为纯手动。
+- **线索（M3）**：[thread-service.ts](../src/features/work-memory/services/thread-service.ts) = 线索摘要/故事线/归并。记一条 entry 后后台静默调 `suggestThreadLink` 比对最近 ~20 条；命中就在该条下方弹建议卡（归并/忽略，见 [entry-feed-item.tsx](../src/features/work-memory/components/entry-feed-item.tsx)）。线索视图是**独立面板** [threads-panel.tsx](../src/features/work-memory/components/threads-panel.tsx)（工具栏 ListTree 按钮入口，见 [use-threads-panel.ts](../src/features/work-memory/hooks/use-threads-panel.ts)）：线索列表 → 点开看跨天故事线 → 点 entry 跳到对应天。搜索面板保持纯记录搜索。建议为会话内临时态，忽略不持久化。
+- **AI**：`suggestClarifications` + `suggestThreadLink` 贯通 ai-provider / codex(lib.rs) / openai-compatible / ai-service。AI 未配置时补充退化为纯手动、归并建议后台静默跳过。
 - **报告**：周报/范围报告入口与"报告偏好"设置项已隐藏（代码保留，待 M5 重接 entry）。
 
 ---
 
-## 下一步（M3 起，回来从这里继续）
-
-### M3：跨天线索关联
-- 建 `threads` 表（id, title, status, created_at, updated_at），启用 `entries.thread_id`。
-- 仓储：thread-repository（参照现有双实现模式）。
-- AI：检测新 entry 与历史 entry 是否同一件事 → 建议归并；用户一键确认/忽略（绝不手动维护关联树）。
-- UI：线索视图——点开 thread 看跨天故事线（周报展开素材）。
-- 同期可启用难度/工时一键标记 UI（列已预留）。
+## 下一步（M4 起，回来从这里继续）
 
 ### M4：提醒可靠性
 - 接入 `tauri-plugin-autostart`，设置加"开机自启"开关。
@@ -73,4 +67,5 @@
 
 - **FTS trigram 中文搜索**：需 SQLite ≥ 3.34。真机里若日志出现 `entry.search_fts_fallback`，说明 trigram 不可用、已退回 LIKE，要换分词方案。
 - **真机验证项**：无 AI 配置下记录→搜索→补充全流程；旧 daily_memories 迁移；补充面板交互；搜索点击定位高亮。
+- **M3 真机验证项**：配好 AI 后跨天记两条同一件事→第二条下方出现归并建议→「归并」后搜索面板（空关键词）能看到线索→点开看到跨天故事线→点 entry 跳到对应天高亮；AI 未配置时记录无建议卡、不报错；「忽略」后建议卡消失。
 - 旧 `daily_memories` 表与相关读路径仍在，留到 entry 模型验证稳定后再清理（早期数据不重要）。

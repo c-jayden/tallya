@@ -1,5 +1,5 @@
 export const DATABASE_PATH = 'sqlite:tallya.db';
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 6;
 
 export const createDailyMemoriesTableSql = `
   CREATE TABLE IF NOT EXISTS daily_memories (
@@ -34,6 +34,29 @@ export const createEntriesTableSql = `
 
 export const createEntriesIndexSql = `
   CREATE INDEX IF NOT EXISTS idx_entries_occurred_on ON entries(occurred_on)
+`;
+
+// thread_id was reserved on entries since M1; the index is added now that M3
+// links entries into cross-day threads so listing a thread's entries is cheap.
+export const createEntriesThreadIndexSql = `
+  CREATE INDEX IF NOT EXISTS idx_entries_thread_id ON entries(thread_id)
+`;
+
+// A thread is a cross-day storyline: several entries that turned out to be the
+// same piece of work. Threads emerge after the fact (AI-suggested merges), so
+// the table is intentionally minimal — no parent/child tree, no task state.
+export const createThreadsTableSql = `
+  CREATE TABLE IF NOT EXISTS threads (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    status TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  )
+`;
+
+export const createThreadsIndexSql = `
+  CREATE INDEX IF NOT EXISTS idx_threads_updated_at ON threads(updated_at)
 `;
 
 // Clarifications add detail to an entry (AI-asked or manual). They are short and

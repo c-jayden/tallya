@@ -107,6 +107,49 @@ describe('LocalStorageEntryRepository', () => {
 
     expect(results.map((entry) => entry.content)).toEqual(['in range']);
   });
+
+  it('assigns a thread and lists its entries chronologically across days', async () => {
+    const repository = createLocalRepository();
+
+    const first = await repository.create({
+      content: 'kickoff',
+      occurredAt: '2026-06-08T03:00:00.000Z',
+    });
+    const second = await repository.create({
+      content: 'follow up',
+      occurredAt: '2026-06-10T03:00:00.000Z',
+    });
+    await repository.create({ content: 'unrelated', occurredAt: '2026-06-09T03:00:00.000Z' });
+
+    await repository.setThread(first.id, 'thread_1');
+    await repository.setThread(second.id, 'thread_1');
+
+    const threadEntries = await repository.listByThread('thread_1');
+    expect(threadEntries.map((entry) => entry.content)).toEqual(['kickoff', 'follow up']);
+  });
+
+  it('clears a thread assignment with a null thread id', async () => {
+    const repository = createLocalRepository();
+    const entry = await repository.create({ content: 'note' });
+
+    await repository.setThread(entry.id, 'thread_1');
+    expect((await repository.getById(entry.id))?.threadId).toBe('thread_1');
+
+    await repository.setThread(entry.id, null);
+    expect((await repository.getById(entry.id))?.threadId).toBeNull();
+  });
+
+  it('lists recent entries newest first up to the limit', async () => {
+    const repository = createLocalRepository();
+
+    await repository.create({ content: 'oldest', occurredAt: '2026-06-08T03:00:00.000Z' });
+    await repository.create({ content: 'middle', occurredAt: '2026-06-09T03:00:00.000Z' });
+    await repository.create({ content: 'newest', occurredAt: '2026-06-10T03:00:00.000Z' });
+
+    const recent = await repository.listRecent(2);
+
+    expect(recent.map((entry) => entry.content)).toEqual(['newest', 'middle']);
+  });
 });
 
 describe('SQLiteEntryRepository', () => {
@@ -145,6 +188,28 @@ describe('SQLiteEntryRepository', () => {
     const results = await repository.search('订单');
 
     expect(results.map((entry) => entry.content)).toEqual(['开会讨论订单结算', '对接订单接口']);
+  });
+
+  it('assigns threads and lists thread entries / recent entries through SQL', async () => {
+    const { repository } = createSqliteRepository();
+
+    const first = await repository.create({
+      content: 'kickoff',
+      occurredAt: '2026-06-08T03:00:00.000Z',
+    });
+    const second = await repository.create({
+      content: 'follow up',
+      occurredAt: '2026-06-10T03:00:00.000Z',
+    });
+
+    await repository.setThread(first.id, 'thread_1');
+    await repository.setThread(second.id, 'thread_1');
+
+    expect((await repository.listByThread('thread_1')).map((entry) => entry.content)).toEqual([
+      'kickoff',
+      'follow up',
+    ]);
+    expect((await repository.listRecent(1)).map((entry) => entry.content)).toEqual(['follow up']);
   });
 });
 

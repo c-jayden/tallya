@@ -173,6 +173,60 @@ export type CreateClarificationInput = {
   answer: string;
 };
 
+export type ThreadStatus = 'open' | 'archived';
+
+// A thread groups entries that turned out to be the same cross-day piece of
+// work. Threads have no hierarchy or task state — just a title for the
+// storyline. Entries point at a thread via Entry.threadId.
+export type Thread = {
+  id: string;
+  title: string;
+  status: ThreadStatus;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CreateThreadInput = {
+  title: string;
+  status?: ThreadStatus;
+};
+
+export type UpdateThreadInput = {
+  title?: string;
+  status?: ThreadStatus;
+};
+
+// A thread plus the aggregate stats the thread browser needs (entry count and
+// the span of days it covers), so the list can render without loading entries.
+export type ThreadSummary = Thread & {
+  entryCount: number;
+  firstOccurredOn: string;
+  lastOccurredOn: string;
+};
+
+// One recent entry offered to the AI as a possible match for a new entry. The
+// thread fields are set when the candidate already belongs to a thread, so the
+// AI can suggest joining an existing storyline instead of starting a new one.
+export type ThreadLinkCandidate = {
+  id: string;
+  content: string;
+  occurredOn: string;
+  threadId: string | null;
+  threadTitle: string | null;
+};
+
+export type SuggestThreadLinkInput = {
+  content: string;
+  candidates: ThreadLinkCandidate[];
+};
+
+// relatedEntryId is the candidate the new entry continues (or null when the AI
+// finds no match). threadTitle is a short suggested name for the shared thread.
+export type ThreadLinkSuggestion = {
+  relatedEntryId: string | null;
+  threadTitle: string;
+};
+
 export type ReportType = 'weekly' | 'monthly' | 'yearly' | 'custom' | 'performance' | 'handoff';
 
 export type ReportStatus = 'generated' | 'stale' | 'locked';

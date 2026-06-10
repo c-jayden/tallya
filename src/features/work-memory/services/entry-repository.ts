@@ -19,6 +19,9 @@ export type EntryRepository = {
   getById(id: string): Promise<Entry | null>;
   listByDate(date: string): Promise<Entry[]>;
   listRange(startDate: string, endDate: string): Promise<Entry[]>;
+  listByThread(threadId: string): Promise<Entry[]>;
+  listRecent(limit: number): Promise<Entry[]>;
+  setThread(id: string, threadId: string | null): Promise<Entry | null>;
   search(keyword: string): Promise<Entry[]>;
   clearLocalData(): Promise<void>;
 };
@@ -46,6 +49,12 @@ function getBrowserStorage() {
 function compareByOccurredAtDesc(first: Entry, second: Entry) {
   return (
     second.occurredAt.localeCompare(first.occurredAt) || second.id.localeCompare(first.id)
+  );
+}
+
+function compareByOccurredAtAsc(first: Entry, second: Entry) {
+  return (
+    first.occurredAt.localeCompare(second.occurredAt) || first.id.localeCompare(second.id)
   );
 }
 
@@ -130,6 +139,36 @@ export class LocalStorageEntryRepository implements EntryRepository {
     return this.readAll()
       .filter((entry) => entry.occurredOn >= startDate && entry.occurredOn <= endDate)
       .sort(compareByOccurredAtDesc);
+  }
+
+  async listByThread(threadId: string) {
+    return this.readAll()
+      .filter((entry) => entry.threadId === threadId)
+      .sort(compareByOccurredAtAsc);
+  }
+
+  async listRecent(limit: number) {
+    return this.readAll().sort(compareByOccurredAtDesc).slice(0, Math.max(0, limit));
+  }
+
+  async setThread(id: string, threadId: string | null) {
+    const entries = this.readAll();
+    const index = entries.findIndex((entry) => entry.id === id);
+
+    if (index === -1) {
+      return null;
+    }
+
+    const updated: Entry = {
+      ...entries[index],
+      threadId,
+      updatedAt: this.now().toISOString(),
+    };
+
+    entries[index] = updated;
+    this.writeAll(entries);
+
+    return updated;
   }
 
   async search(keyword: string) {
@@ -287,6 +326,52 @@ export class SQLiteEntryRepository implements EntryRepository {
 
       return rows.map(mapRowToEntry);
     }, []);
+  }
+
+  async listByThread(threadId: string) {
+    return this.safeRead(async (database) => {
+      const rows = await database.select<EntryRow[]>(
+        'SELECT * FROM entries WHERE thread_id = $1 ORDER BY occurred_at ASC',
+        [threadId],
+      );
+
+      return rows.map(mapRowToEntry);
+    }, []);
+  }
+
+  async listRecent(limit: number) {
+    return this.safeRead(async (database) => {
+      const rows = await database.select<EntryRow[]>(
+        'SELECT * FROM entries ORDER BY occurred_at DESC LIMIT $1',
+        [Math.max(0, limit)],
+      );
+
+      return rows.map(mapRowToEntry);
+    }, []);
+  }
+
+  async setThread(id: string, threadId: string | null) {
+    const existing = await this.getById(id);
+
+    if (!existing) {
+      return null;
+    }
+
+    const updated: Entry = {
+      ...existing,
+      threadId,
+      updatedAt: this.now().toISOString(),
+    };
+
+    await this.write((database) =>
+      database.execute('UPDATE entries SET thread_id = $1, updated_at = $2 WHERE id = $3', [
+        updated.threadId,
+        updated.updatedAt,
+        updated.id,
+      ]),
+    );
+
+    return updated;
   }
 
   async search(keyword: string) {

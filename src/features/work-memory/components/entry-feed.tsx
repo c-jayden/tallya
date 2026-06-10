@@ -10,11 +10,13 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { EntryFeedItem } from './entry-feed-item';
+import type { ThreadSuggestionView } from '../hooks/use-entries-controller';
 import type { Clarification, Entry } from '../types';
 
 type EntryFeedProps = {
   entries: Entry[];
   clarificationsByEntry: Record<string, Clarification[]>;
+  threadSuggestionByEntry: Record<string, ThreadSuggestionView>;
   focusedEntryId: string | null;
   isLoading: boolean;
   emptyHint: string;
@@ -26,12 +28,15 @@ type EntryFeedProps = {
     answer: string,
   ) => Promise<boolean> | boolean;
   onRemoveClarification: (id: string) => void;
+  onConfirmThreadSuggestion: (entryId: string) => void;
+  onDismissThreadSuggestion: (entryId: string) => void;
   onSuggestQuestions: (content: string) => Promise<string[]>;
 };
 
 export function EntryFeed({
   entries,
   clarificationsByEntry,
+  threadSuggestionByEntry,
   focusedEntryId,
   isLoading,
   emptyHint,
@@ -39,6 +44,8 @@ export function EntryFeed({
   onRemoveEntry,
   onAddClarification,
   onRemoveClarification,
+  onConfirmThreadSuggestion,
+  onDismissThreadSuggestion,
   onSuggestQuestions,
 }: EntryFeedProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -77,6 +84,7 @@ export function EntryFeed({
               key={entry.id}
               entry={entry}
               clarifications={clarificationsByEntry[entry.id] ?? []}
+              threadSuggestion={threadSuggestionByEntry[entry.id]}
               isEditing={editingId === entry.id}
               isFocused={focusedEntryId === entry.id}
               onStartEdit={() => setEditingId(entry.id)}
@@ -87,6 +95,8 @@ export function EntryFeed({
                 onAddClarification(entry.id, question, answer)
               }
               onRemoveClarification={onRemoveClarification}
+              onConfirmThreadSuggestion={() => onConfirmThreadSuggestion(entry.id)}
+              onDismissThreadSuggestion={() => onDismissThreadSuggestion(entry.id)}
               onSuggestQuestions={onSuggestQuestions}
             />
           ))}

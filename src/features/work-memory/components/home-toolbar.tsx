@@ -1,7 +1,8 @@
 import type { Ref } from 'react';
-import { ChevronDown, Search, Settings } from 'lucide-react';
+import { ChevronDown, ListTree, Search, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Kbd, KbdGroup } from '@/components/ui/kbd';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { DatePickerPopover } from './date-picker-popover';
 
 type HomeToolbarProps = {
@@ -10,10 +11,12 @@ type HomeToolbarProps = {
   dateTime: string;
   maxDate: string;
   searchButtonRef: Ref<HTMLButtonElement>;
+  threadsButtonRef: Ref<HTMLButtonElement>;
   selectedDate: string;
   weekday: string;
   onDateChange: (date: string) => void;
   onSearchClick: () => void;
+  onThreadsClick: () => void;
   onSettingsClick: () => void;
 };
 
@@ -23,10 +26,12 @@ export function HomeToolbar({
   dateTime,
   maxDate,
   searchButtonRef,
+  threadsButtonRef,
   selectedDate,
   weekday,
   onDateChange,
   onSearchClick,
+  onThreadsClick,
   onSettingsClick,
 }: HomeToolbarProps) {
   return (
@@ -66,16 +71,39 @@ export function HomeToolbar({
             <Kbd>K</Kbd>
           </KbdGroup>
         </Button>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          type="button"
-          className="size-8.75 cursor-pointer rounded-xl text-app-ink-muted hover:bg-app-surface-muted hover:text-app-ink focus-visible:bg-app-surface-muted focus-visible:text-app-ink [&_svg]:size-3.5"
-          onClick={onSettingsClick}
-        >
-          <Settings aria-hidden="true" />
-          <span className="sr-only">设置</span>
-        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              ref={threadsButtonRef}
+              variant="ghost"
+              size="icon-sm"
+              type="button"
+              className="size-8.75 cursor-pointer rounded-xl text-app-ink-muted hover:bg-app-surface-muted hover:text-app-ink focus-visible:bg-app-surface-muted focus-visible:text-app-ink [&_svg]:size-3.5"
+              aria-label="线索"
+              onClick={onThreadsClick}
+            >
+              <ListTree aria-hidden="true" />
+              <span className="sr-only">线索</span>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>线索</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              type="button"
+              className="size-8.75 cursor-pointer rounded-xl text-app-ink-muted hover:bg-app-surface-muted hover:text-app-ink focus-visible:bg-app-surface-muted focus-visible:text-app-ink [&_svg]:size-3.5"
+              aria-label="设置"
+              onClick={onSettingsClick}
+            >
+              <Settings aria-hidden="true" />
+              <span className="sr-only">设置</span>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>设置</TooltipContent>
+        </Tooltip>
       </div>
     </header>
   );

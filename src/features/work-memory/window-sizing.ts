@@ -1,7 +1,10 @@
 import { getCurrentWindow, LogicalSize } from '@tauri-apps/api/window';
 
 const HOME_WINDOW_WIDTH = 720;
-const HOME_MIN_HEIGHT = 420;
+// Floor sits just below the empty-state natural height (toolbar + hero +
+// composer + empty hint ≈ 393px) so a short day fits snugly instead of leaving
+// a blank band; the window still grows with the feed up to the max.
+const HOME_MIN_HEIGHT = 360;
 const HOME_MAX_HEIGHT = 700;
 const MANUAL_RESIZE_TOLERANCE = 16;
 

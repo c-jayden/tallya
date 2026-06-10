@@ -6,10 +6,13 @@ import { HomeToolbar } from './components/home-toolbar';
 import { MemoryHero } from './components/memory-hero';
 import { SettingsDialog } from './components/settings-dialog';
 import { SpotlightSearchPanel } from './components/spotlight-search-panel';
+import { ThreadsPanel } from './components/threads-panel';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import { getCommandKeyLabel } from '@/lib/platform';
 import { useEntriesController } from './hooks/use-entries-controller';
 import { useHomeWindowSizing } from './hooks/use-home-window-sizing';
 import { useMemorySearch } from './hooks/use-memory-search';
+import { useThreadsPanel } from './hooks/use-threads-panel';
 import { useTrayWindowEvents } from './hooks/use-tray-window-events';
 import { useWorkMemoryShortcuts } from './hooks/use-work-memory-shortcuts';
 import {
@@ -58,6 +61,12 @@ export function WorkMemoryHome() {
   }
 
   const search = useMemorySearch({ onOpenMemory: openEntry });
+  const threads = useThreadsPanel();
+
+  function openEntryFromThread(entry: Entry) {
+    threads.closeThreadsPanel();
+    openEntry(entry);
+  }
 
   const toolbarDate = formatToolbarDate(selectedDate);
   const heroCopy = getDailyMemoryHeroCopy(selectedDate, todayDate);
@@ -75,21 +84,27 @@ export function WorkMemoryHome() {
     isSearchOpen: search.isSearchOpen,
     onCloseSearch: search.closeSearchPanel,
     onSettleTodayMemory: () => entries.composerRef.current?.focus(),
-    onTriggerSearch: search.openSearchPanel,
+    onTriggerSearch: () => {
+      threads.closeThreadsPanel();
+      search.openSearchPanel();
+    },
   });
 
   useTrayWindowEvents({
     onFocusEntry: () => {
       setIsSettingsOpen(false);
       search.closeSearchPanel();
+      threads.closeThreadsPanel();
       window.setTimeout(() => entries.composerRef.current?.focus(), 0);
     },
     onOpenSearch: () => {
       setIsSettingsOpen(false);
+      threads.closeThreadsPanel();
       search.openSearchPanel();
     },
     onOpenSettings: () => {
       search.closeSearchPanel();
+      threads.closeThreadsPanel();
       setIsSettingsOpen(true);
     },
   });
@@ -110,7 +125,8 @@ export function WorkMemoryHome() {
   }
 
   return (
-    <main className="max-h-screen w-screen bg-app-bg">
+    <TooltipProvider>
+      <main className="max-h-screen w-screen bg-app-bg">
       <section
         className="mx-auto flex max-h-screen w-[min(calc(100%-88px),748px)] flex-col overflow-y-auto py-6 scrollbar-none [&::-webkit-scrollbar]:hidden max-[560px]:w-[min(calc(100%-28px),748px)] max-[560px]:pt-6 max-[560px]:pb-5 max-[600px]:pt-5"
         aria-label="工作记忆首页"
@@ -122,11 +138,23 @@ export function WorkMemoryHome() {
             dateTime={toolbarDate.dateTime}
             maxDate={todayDate}
             searchButtonRef={search.searchButtonRef}
+            threadsButtonRef={threads.threadsButtonRef}
             selectedDate={selectedDate}
             weekday={toolbarDate.weekday}
             onDateChange={updateSelectedDate}
-            onSearchClick={search.openSearchPanel}
-            onSettingsClick={() => setIsSettingsOpen(true)}
+            onSearchClick={() => {
+              threads.closeThreadsPanel();
+              search.openSearchPanel();
+            }}
+            onThreadsClick={() => {
+              search.closeSearchPanel();
+              setIsSettingsOpen(false);
+              threads.openThreadsPanel();
+            }}
+            onSettingsClick={() => {
+              threads.closeThreadsPanel();
+              setIsSettingsOpen(true);
+            }}
           />
 
           <MemoryHero
@@ -145,6 +173,7 @@ export function WorkMemoryHome() {
           <EntryFeed
             entries={entries.entries}
             clarificationsByEntry={entries.clarificationsByEntry}
+            threadSuggestionByEntry={entries.threadSuggestionByEntry}
             focusedEntryId={focusedEntryId}
             isLoading={entries.isLoading}
             emptyHint={emptyHint}
@@ -152,6 +181,8 @@ export function WorkMemoryHome() {
             onRemoveEntry={entries.removeEntry}
             onAddClarification={entries.addClarification}
             onRemoveClarification={entries.removeClarification}
+            onConfirmThreadSuggestion={entries.confirmThreadSuggestion}
+            onDismissThreadSuggestion={entries.dismissThreadSuggestion}
             onSuggestQuestions={entries.suggestQuestions}
           />
         </div>
@@ -175,12 +206,24 @@ export function WorkMemoryHome() {
         onOpenMemory={search.openSearchMemory}
       />
 
+      <ThreadsPanel
+        open={threads.isThreadsOpen}
+        currentDate={todayDate}
+        threadSummaries={threads.threadSummaries}
+        selectedThread={threads.selectedThread}
+        onClose={threads.closeThreadsPanel}
+        onOpenThread={threads.openThread}
+        onBackThreadList={threads.backToThreadList}
+        onOpenEntry={openEntryFromThread}
+      />
+
       <SettingsDialog
         open={isSettingsOpen}
         onOpenChange={setIsSettingsOpen}
         onClearLocalData={handleClearLocalData}
         onDataRestored={entries.reload}
       />
-    </main>
+      </main>
+    </TooltipProvider>
   );
 }

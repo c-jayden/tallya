@@ -160,6 +160,35 @@ struct SuggestedClarifications {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+struct ThreadLinkCandidate {
+    id: String,
+    content: String,
+    occurred_on: String,
+    #[serde(default)]
+    thread_id: Option<String>,
+    #[serde(default)]
+    thread_title: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SuggestThreadLinkInput {
+    content: String,
+    #[serde(default)]
+    candidates: Vec<ThreadLinkCandidate>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ThreadLinkSuggestion {
+    #[serde(default)]
+    related_entry_id: Option<String>,
+    #[serde(default)]
+    thread_title: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct DailyMemoryForReport {
     id: String,
     date: String,
@@ -313,6 +342,22 @@ async fn suggest_clarifications_with_codex(
     .map_err(|error| {
         eprintln!("Codex clarifications task join failed: {error}");
         "Codex 追问失败，请检查 Codex CLI 是否可用。".to_string()
+    })?
+}
+
+#[tauri::command]
+async fn suggest_thread_link_with_codex(
+    input: SuggestThreadLinkInput,
+    codex_command: String,
+    codex_model: String,
+) -> Result<ThreadLinkSuggestion, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        run_codex_thread_link(input, codex_command, codex_model)
+    })
+    .await
+    .map_err(|error| {
+        eprintln!("Codex thread link task join failed: {error}");
+        "Codex 线索归并建议失败，请检查 Codex CLI 是否可用。".to_string()
     })?
 }
 
@@ -491,6 +536,21 @@ fn run_codex_clarifications(
         codex_model,
         "clarifications",
         parse_suggested_clarifications,
+    )
+}
+
+fn run_codex_thread_link(
+    input: SuggestThreadLinkInput,
+    codex_command: String,
+    codex_model: String,
+) -> Result<ThreadLinkSuggestion, String> {
+    let prompt = build_codex_thread_link_prompt(&input);
+    run_codex_prompt_generation(
+        prompt,
+        codex_command,
+        codex_model,
+        "thread-link",
+        |raw_output| parse_thread_link_suggestion(raw_output, &input),
     )
 }
 
@@ -818,6 +878,31 @@ JSON keys: questions:string[].
     )
 }
 
+fn build_codex_thread_link_prompt(input: &SuggestThreadLinkInput) -> String {
+    let candidates = input
+        .candidates
+        .iter()
+        .map(|candidate| {
+            serde_json::json!({
+                "id": candidate.id,
+                "content": candidate.content,
+                "occurredOn": candidate.occurred_on,
+                "threadTitle": candidate.thread_title,
+            })
+        })
+        .collect::<Vec<_>>();
+    let candidates_json = serde_json::to_string(&candidates).unwrap_or_else(|_| "[]".to_string());
+
+    format!(
+        r#"用户刚记下一条新的工作记录。下面给出最近的若干历史记录作为候选。判断这条新记录是不是在延续候选里的某一件事（同一个任务/问题/项目的后续进展）。只输出合法 JSON，不要 markdown、解释、代码块或工具调用。
+JSON keys: relatedEntryId:string|null, threadTitle:string.
+要求：命中时 relatedEntryId 必须是候选里某条的 id（原样返回），threadTitle 给一个简短中文线索名（≤14字，概括这件事）；如果命中那条已有 threadTitle，threadTitle 就沿用它，不要另起新名；不确定、只是话题相近但不是同一件事、或没有匹配时 relatedEntryId 返回 null；宁可漏判也不要误判，不要为了凑结果硬连。
+新记录：{}
+候选记录：{}"#,
+        input.content, candidates_json
+    )
+}
+
 fn report_style_instruction(input: &GenerateRangeReportInput) -> String {
     let mut instructions = vec![
         "风格提示只影响表达方式，不允许改变事实内容，也不允许加入样本里的具体业务信息。"
@@ -1013,6 +1098,55 @@ mod tests {
         assert!(prompt.contains("对接订单接口"));
     }
 
+    fn thread_link_input() -> SuggestThreadLinkInput {
+        SuggestThreadLinkInput {
+            content: "继续联调订单接口".to_string(),
+            candidates: vec![ThreadLinkCandidate {
+                id: "entry_1".to_string(),
+                content: "对接订单接口".to_string(),
+                occurred_on: "2026-06-08".to_string(),
+                thread_id: None,
+                thread_title: None,
+            }],
+        }
+    }
+
+    #[test]
+    fn parse_thread_link_suggestion_keeps_only_candidate_ids_and_tolerates_empty() {
+        let input = thread_link_input();
+
+        assert_eq!(
+            parse_thread_link_suggestion("", &input).expect("empty"),
+            ThreadLinkSuggestion::default()
+        );
+        assert!(parse_thread_link_suggestion("not json", &input).is_err());
+
+        let matched = parse_thread_link_suggestion(
+            r#"{"relatedEntryId":"entry_1","threadTitle":" 订单接口 "}"#,
+            &input,
+        )
+        .expect("matched");
+        assert_eq!(matched.related_entry_id.as_deref(), Some("entry_1"));
+        assert_eq!(matched.thread_title, "订单接口");
+
+        // A hallucinated id that is not among the candidates is rejected.
+        let unmatched = parse_thread_link_suggestion(
+            r#"{"relatedEntryId":"entry_999","threadTitle":"x"}"#,
+            &input,
+        )
+        .expect("unmatched");
+        assert_eq!(unmatched.related_entry_id, None);
+    }
+
+    #[test]
+    fn build_thread_link_prompt_includes_record_candidates_and_json_keys() {
+        let prompt = build_codex_thread_link_prompt(&thread_link_input());
+
+        assert!(prompt.contains("relatedEntryId"));
+        assert!(prompt.contains("继续联调订单接口"));
+        assert!(prompt.contains("entry_1"));
+    }
+
     #[test]
     fn normalize_report_text_collapses_extra_blank_lines() {
         let normalized = normalize_report_text("# Title\n\n\n## Summary\n\nText\n\n\n- A");
@@ -1204,6 +1338,37 @@ fn parse_suggested_clarifications(raw_output: &str) -> Result<Vec<String>, Strin
         .filter(|question| !question.is_empty())
         .take(2)
         .collect())
+}
+
+fn parse_thread_link_suggestion(
+    raw_output: &str,
+    input: &SuggestThreadLinkInput,
+) -> Result<ThreadLinkSuggestion, String> {
+    let raw_output = raw_output.trim();
+
+    // No output means the model found no link; treat as "no suggestion" rather
+    // than an error so the background merge check stays silent.
+    if raw_output.is_empty() {
+        return Ok(ThreadLinkSuggestion::default());
+    }
+
+    let parsed = serde_json::from_str::<ThreadLinkSuggestion>(raw_output).map_err(|error| {
+        eprintln!("Codex thread link output is not valid JSON: {error}");
+        "AI 返回内容不是合法 JSON，请重试。".to_string()
+    })?;
+
+    // Only accept ids that are actually among the offered candidates, so a
+    // hallucinated id never produces a bogus merge suggestion.
+    let candidate_ids: std::collections::HashSet<&str> =
+        input.candidates.iter().map(|c| c.id.as_str()).collect();
+    let related_entry_id = parsed
+        .related_entry_id
+        .filter(|id| candidate_ids.contains(id.as_str()));
+
+    Ok(ThreadLinkSuggestion {
+        related_entry_id,
+        thread_title: parsed.thread_title.trim().to_string(),
+    })
 }
 
 fn normalize_generated_range_report(
@@ -1467,6 +1632,7 @@ pub fn run() {
             set_window_behavior,
             show_main_window,
             suggest_clarifications_with_codex,
+            suggest_thread_link_with_codex,
             toggle_main_window
         ])
         .run(tauri::generate_context!())
