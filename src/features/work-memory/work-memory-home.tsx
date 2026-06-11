@@ -137,7 +137,7 @@ export function WorkMemoryHome() {
 
   return (
     <TooltipProvider>
-      <main className="max-h-screen w-screen bg-app-bg">
+      <main className="flex min-h-screen w-screen flex-col justify-center bg-app-bg">
       <section
         className="mx-auto flex max-h-screen w-[min(calc(100%-88px),748px)] flex-col overflow-y-auto py-6 scrollbar-none [&::-webkit-scrollbar]:hidden max-[560px]:w-[min(calc(100%-28px),748px)] max-[560px]:pt-6 max-[560px]:pb-5 max-[600px]:pt-5"
         aria-label="工作记忆首页"

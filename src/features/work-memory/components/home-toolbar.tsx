@@ -56,7 +56,7 @@ export function HomeToolbar({
           aria-hidden="true"
         />
       </DatePickerPopover>
-      <div className="flex min-w-0 items-center gap-1">
+      <div className="flex min-w-0 items-center gap-3">
         <Button
           ref={searchButtonRef}
           variant="ghost"
@@ -75,6 +75,7 @@ export function HomeToolbar({
             <Kbd>K</Kbd>
           </KbdGroup>
         </Button>
+        <div className="flex items-center gap-1">
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
@@ -125,6 +126,7 @@ export function HomeToolbar({
           </TooltipTrigger>
           <TooltipContent>设置</TooltipContent>
         </Tooltip>
+        </div>
       </div>
     </header>
   );
