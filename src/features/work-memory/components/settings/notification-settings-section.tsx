@@ -8,7 +8,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import {
   DEFAULT_APP_SETTINGS,
@@ -62,8 +61,6 @@ export function NotificationSettingsSection({
           </Field>
         </div>
       </div>
-
-      <Separator />
 
       <div className="space-y-3">
         <SwitchField

@@ -4,74 +4,44 @@ import { describe, expect, it } from 'vitest';
 describe('AISettingsSection', () => {
   const source = readFileSync(new URL('../ai-settings-section.tsx', import.meta.url), 'utf8');
 
-  it('shows Codex CLI and OpenAI-compatible services without exposing Mock', () => {
+  it('offers Codex CLI and OpenAI-compatible services without exposing Mock', () => {
     expect(source).toContain("label: 'Codex CLI'");
     expect(source).toContain("label: 'OpenAI 兼容服务'");
-    expect(source).toContain("description: '使用本机 Codex CLI，适合作为稳定回退。'");
-    expect(source).toContain('DeepSeek、通义、Kimi、OpenRouter、OpenAI');
-    expect(source).toContain('Anthropic 格式可先通过网关转成 OpenAI 兼容接口。');
-    expect(source).not.toContain("label: 'OpenAI Compatible'");
     expect(source).not.toContain("label: 'Mock'");
+    expect(source).not.toContain("value: 'cc-switch'");
+    expect(source).not.toContain("value: 'codex-proxy'");
   });
 
-  it('puts the common AI path before advanced provider configuration', () => {
-    expect(source).toContain('当前使用路径');
-    expect(source).toContain('回退服务');
-    expect(source).toContain('检测 AI 连接');
-    expect(source).toContain('handleCheckAIConnection');
-    expect(source).toContain('高级设置');
+  it('picks a service first and only shows the chosen service fields', () => {
+    expect(source).toContain('label="AI 服务"');
+    // Codex -> model select; OpenAI-compatible -> preset/url/key/model under isCodexProvider branch
+    expect(source).toContain('isCodexProvider ?');
+    expect(source).toContain('已内置 DeepSeek、通义、Kimi、OpenRouter、OpenAI');
+  });
+
+  it('demotes the local gateway to an advanced switch, not a co-equal route', () => {
+    expect(source).toContain('<LocalGatewaySettingsSection');
     expect(source).toContain('<details');
-    expect(source).toContain('ChevronRight');
-    expect(source).toContain('group-open/ai-advanced:rotate-90');
-    expect(source).toContain('group-open/openai-compatible:rotate-90');
-    expect(source).not.toContain('默认 AI 服务');
-    expect(source).not.toContain('连接状态');
+    expect(source).toContain('高级');
+    // No more "回退服务 / 当前使用路径" plumbing leaking into the UI.
+    expect(source).not.toContain('回退服务');
+    expect(source).not.toContain('当前使用路径');
   });
 
-  it('keeps API Key in a password input', () => {
+  it('keeps API Key in a password input with a warm placeholder', () => {
     expect(source).toContain('label="密钥"');
     expect(source).toContain('type="password"');
-  });
-
-  it('uses a warmer API Key placeholder without exposing a real key', () => {
     expect(source).toContain('placeholder="粘贴服务商提供的 API Key"');
     expect(source).not.toContain('placeholder="sk-xxxxxx"');
   });
 
-  it('uses a lighter placeholder color for OpenAI Compatible inputs', () => {
-    expect(source).toContain("const openAIInputClassName = 'placeholder:text-slate-400'");
-    expect(source.match(/className={openAIInputClassName}/g)).toHaveLength(3);
-  });
-
-  it('uses a segmented control for compatible service interface mode', () => {
+  it('uses a segmented control for interface mode and stores config via settings patches', () => {
     expect(source).toContain('接口模式');
     expect(source).toContain('Chat Completions');
     expect(source).toContain('Responses API');
     expect(source).toContain('apiMode: mode');
-    expect(source).toContain('inline-flex w-fit gap-1 rounded-xl bg-gray-100 p-1 dark:bg-app-surface-muted');
-    expect(source).toContain('h-8 cursor-pointer rounded-lg bg-transparent px-3.5');
-    expect(source).toContain('大多数兼容服务都可以先用这个模式。');
-    expect(source).toContain('服务明确要求 /v1/responses 时再切换。');
-    expect(source).not.toContain('SelectValue placeholder="接口模式"');
-  });
-
-  it('mentions CC Switch responses errors without making it a provider', () => {
-    expect(source).toContain('本地网关');
-    expect(source).toContain('only /v1/responses');
-    expect(source).toContain('切换到 Responses API');
-    expect(source).not.toContain("value: 'cc-switch'");
-  });
-
-  it('uses the shared OpenAI Compatible default model placeholder', () => {
-    expect(source).toContain('placeholder={DEFAULT_OPENAI_COMPATIBLE_MODEL}');
-    expect(source).not.toContain('placeholder="gpt-4.1-mini"');
-  });
-
-  it('stores compatible service configuration through settings patches', () => {
-    expect(source).toContain('openAICompatible');
     expect(source).toContain('baseUrl: event.target.value');
     expect(source).toContain('apiKey: event.target.value');
     expect(source).toContain('model: event.target.value');
-    expect(source).toContain('apiMode: mode');
   });
 });

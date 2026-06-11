@@ -1,4 +1,3 @@
-import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import type { AppSettings } from '../../services/app-settings-repository';
 import { SwitchField } from './settings-shared';
@@ -45,8 +44,6 @@ export function AppSettingsSection({ settings, onUpdateSettings }: AppSettingsSe
           </p>
         </div>
       </div>
-
-      <Separator />
 
       <div className="space-y-3">
         <h3 className="text-sm font-semibold text-app-ink">启动与托盘</h3>

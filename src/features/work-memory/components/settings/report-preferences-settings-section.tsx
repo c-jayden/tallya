@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { AppSettings } from '../../services/app-settings-repository';
@@ -31,8 +31,8 @@ export function ReportPreferencesSettingsSection({
   const [isStyleExtractOpen, setIsStyleExtractOpen] = useState(false);
 
   return (
-    <section className="space-y-7" aria-label="整理偏好">
-      <PreferenceGroup title="基础偏好">
+    <section className="space-y-6" aria-label="整理偏好">
+      <div className="space-y-5">
         <ReportPreferenceItem
           label="整理详略"
           description="控制整理时保留多少细节。"
@@ -54,7 +54,7 @@ export function ReportPreferencesSettingsSection({
           value={settings.reportFocus}
           onChange={(reportFocus) => onUpdateSettings({ reportFocus })}
         />
-      </PreferenceGroup>
+      </div>
 
       <div className="space-y-3">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -93,21 +93,6 @@ export function ReportPreferencesSettingsSection({
   );
 }
 
-function PreferenceGroup({
-  title,
-  children,
-}: {
-  title: string;
-  children: ReactNode;
-}) {
-  return (
-    <div className="space-y-4">
-      <div className="text-sm font-semibold text-app-ink">{title}</div>
-      <div className="space-y-4">{children}</div>
-    </div>
-  );
-}
-
 function ReportPreferenceItem<T extends ReportLength | ReportTone | ReportFocus>({
   label,
   description,
@@ -122,12 +107,12 @@ function ReportPreferenceItem<T extends ReportLength | ReportTone | ReportFocus>
   onChange: (value: T) => void;
 }) {
   return (
-    <div className="space-y-2.5 rounded-lg bg-slate-50/70 px-4 py-3">
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
       <div className="space-y-0.5">
         <div className="text-sm font-semibold text-app-ink">{label}</div>
         <p className="text-[13px] leading-5 text-app-ink-subtle">{description}</p>
       </div>
-      <div className="inline-flex w-fit max-w-full flex-wrap gap-1 rounded-xl bg-gray-100 p-1 dark:bg-app-surface-muted">
+      <div className="inline-flex w-fit max-w-full shrink-0 flex-wrap gap-1 rounded-xl bg-gray-100 p-1 dark:bg-app-surface-muted">
         {options.map((option) => {
           const isActive = value === option.value;
 

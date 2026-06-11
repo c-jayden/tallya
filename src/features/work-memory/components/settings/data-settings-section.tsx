@@ -37,11 +37,6 @@ export function DataSettingsSection({
 }: DataSettingsSectionProps) {
   return (
     <section className="space-y-6" aria-label="本地数据">
-      <div className="space-y-1.5">
-        <div className="text-sm font-semibold text-app-ink">本地数据</div>
-        <p className="text-sm text-app-ink-subtle">工作记忆默认留在本机，你可以按需备份或迁移。</p>
-      </div>
-
       <UsageStatsBlock />
 
       <DataActionRow

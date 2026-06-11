@@ -16,12 +16,6 @@ export function KeyboardShortcutsSettingsSection() {
 
   return (
     <section className="space-y-4" aria-label="快捷键">
-      <div className="space-y-1.5">
-        <p className="text-sm text-app-ink-subtle">
-          常用快捷键会根据当前系统显示对应按键。
-        </p>
-      </div>
-
       <div className="space-y-3">
         {shortcuts.map((shortcut) => (
           <div
