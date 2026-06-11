@@ -12,9 +12,9 @@
     "windows": [
       {
         "title": "Tallya",
-        "width": 720,
+        "width": 750,
         "height": 480,
-        "minWidth": 600,
+        "minWidth": 750,
         "minHeight": 480,
         "decorations": true,
         "shadow": true

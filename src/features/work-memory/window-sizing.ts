@@ -1,6 +1,6 @@
 import { getCurrentWindow, LogicalSize } from '@tauri-apps/api/window';
 
-const HOME_WINDOW_WIDTH = 720;
+const HOME_WINDOW_WIDTH = 750;
 // Floor gives dialogs and the date-picker popover enough vertical room without
 // any dynamic resizing; the window still grows with the feed up to the max.
 const HOME_MIN_HEIGHT = 480;

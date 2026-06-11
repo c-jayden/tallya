@@ -19,7 +19,7 @@ vi.mock('@tauri-apps/api/window', () => {
     getCurrentWindow: () => ({
       innerSize: () =>
         Promise.resolve({
-          toLogical: () => ({ width: 720, height: currentLogicalHeight }),
+          toLogical: () => ({ width: 750, height: currentLogicalHeight }),
         }),
       scaleFactor: () => Promise.resolve(2),
       setSize,
@@ -57,7 +57,7 @@ describe('resizeHomeWindowToContent', () => {
 
     await resizeHomeWindowToContent(contentElement);
 
-    expect(setSize).toHaveBeenCalledWith(expect.objectContaining({ width: 720, height: 528 }));
+    expect(setSize).toHaveBeenCalledWith(expect.objectContaining({ width: 750, height: 528 }));
   });
 
   it('compensates when the browser viewport is shorter than the current native size', async () => {
@@ -80,6 +80,6 @@ describe('resizeHomeWindowToContent', () => {
 
     await resizeHomeWindowToContent(contentElement);
 
-    expect(setSize).toHaveBeenCalledWith(expect.objectContaining({ width: 720, height: 532 }));
+    expect(setSize).toHaveBeenCalledWith(expect.objectContaining({ width: 750, height: 532 }));
   });
 });
