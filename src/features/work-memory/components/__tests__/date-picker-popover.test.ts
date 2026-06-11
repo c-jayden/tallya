@@ -5,8 +5,10 @@ describe('DatePickerPopover layering', () => {
   it('renders the calendar popover above dialog content', () => {
     const source = readFileSync(new URL('../date-picker-popover.tsx', import.meta.url), 'utf8');
 
-    expect(source).toContain('side="bottom"');
-    expect(source).toContain('align="start"');
+    expect(source).toContain("side = 'bottom'");
+    expect(source).toContain("align = 'start'");
+    expect(source).toContain('side={side}');
+    expect(source).toContain('align={align}');
     expect(source).toContain('avoidCollisions');
     expect(source).toContain('collisionPadding={16}');
     expect(source).toContain('sticky="always"');

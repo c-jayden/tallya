@@ -9,6 +9,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { TallyaScrollArea } from '@/components/tallya-scroll-area';
 import { EntryFeedItem } from './entry-feed-item';
 import type { ThreadSuggestionView } from '../hooks/use-entries-controller';
 import type { Clarification, Entry } from '../types';
@@ -17,6 +18,9 @@ import type { Clarification, Entry } from '../types';
 // the empty bottom of the page — but never below the floor so it stays readable.
 const FADE_STEP = 0.1;
 const FADE_FLOOR = 0.45;
+// Past this height the list scrolls inside its own container instead of pushing
+// the composer and toolbar off the top of the (auto-sized) home window.
+const FEED_MAX_HEIGHT = 280;
 
 type EntryFeedProps = {
   entries: Entry[];
@@ -83,30 +87,32 @@ export function EntryFeed({
           {emptyHint}
         </p>
       ) : (
-        <ul className="grid gap-0">
-          {entries.map((entry, index) => (
-            <EntryFeedItem
-              key={entry.id}
-              entry={entry}
-              clarifications={clarificationsByEntry[entry.id] ?? []}
-              threadSuggestion={threadSuggestionByEntry[entry.id]}
-              fadeOpacity={Math.max(FADE_FLOOR, 1 - index * FADE_STEP)}
-              isEditing={editingId === entry.id}
-              isFocused={focusedEntryId === entry.id}
-              onStartEdit={() => setEditingId(entry.id)}
-              onCancelEdit={() => setEditingId(null)}
-              onSubmitEdit={(content) => void handleSubmitEdit(entry.id, content)}
-              onRequestDelete={() => setPendingDeleteId(entry.id)}
-              onAddClarification={(question, answer) =>
-                onAddClarification(entry.id, question, answer)
-              }
-              onRemoveClarification={onRemoveClarification}
-              onConfirmThreadSuggestion={() => onConfirmThreadSuggestion(entry.id)}
-              onDismissThreadSuggestion={() => onDismissThreadSuggestion(entry.id)}
-              onSuggestQuestions={onSuggestQuestions}
-            />
-          ))}
-        </ul>
+        <TallyaScrollArea className="-mx-1 px-1" maxHeight={FEED_MAX_HEIGHT}>
+          <ul className="grid gap-0">
+            {entries.map((entry, index) => (
+              <EntryFeedItem
+                key={entry.id}
+                entry={entry}
+                clarifications={clarificationsByEntry[entry.id] ?? []}
+                threadSuggestion={threadSuggestionByEntry[entry.id]}
+                fadeOpacity={Math.max(FADE_FLOOR, 1 - index * FADE_STEP)}
+                isEditing={editingId === entry.id}
+                isFocused={focusedEntryId === entry.id}
+                onStartEdit={() => setEditingId(entry.id)}
+                onCancelEdit={() => setEditingId(null)}
+                onSubmitEdit={(content) => void handleSubmitEdit(entry.id, content)}
+                onRequestDelete={() => setPendingDeleteId(entry.id)}
+                onAddClarification={(question, answer) =>
+                  onAddClarification(entry.id, question, answer)
+                }
+                onRemoveClarification={onRemoveClarification}
+                onConfirmThreadSuggestion={() => onConfirmThreadSuggestion(entry.id)}
+                onDismissThreadSuggestion={() => onDismissThreadSuggestion(entry.id)}
+                onSuggestQuestions={onSuggestQuestions}
+              />
+            ))}
+          </ul>
+        </TallyaScrollArea>
       )}
 
       <AlertDialog

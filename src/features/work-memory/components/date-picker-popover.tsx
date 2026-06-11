@@ -10,6 +10,10 @@ type DatePickerPopoverProps = {
   value: string;
   triggerClassName: string;
   maxDate?: string;
+  // Defaults pop the calendar downward; callers in short windows can pop it
+  // sideways instead so its height never gets clipped by the window edge.
+  side?: 'top' | 'right' | 'bottom' | 'left';
+  align?: 'start' | 'center' | 'end';
   onChange: (date: string) => void;
 };
 
@@ -19,6 +23,8 @@ export function DatePickerPopover({
   value,
   triggerClassName,
   maxDate,
+  side = 'bottom',
+  align = 'start',
   onChange,
 }: DatePickerPopoverProps) {
   const [open, setOpen] = useState(false);
@@ -32,8 +38,8 @@ export function DatePickerPopover({
         </button>
       </PopoverTrigger>
       <PopoverContent
-        align="start"
-        side="bottom"
+        align={align}
+        side={side}
         sideOffset={8}
         avoidCollisions
         collisionPadding={16}

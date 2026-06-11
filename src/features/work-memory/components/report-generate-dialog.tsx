@@ -153,12 +153,14 @@ export function ReportGenerateDialog({
                   <ReportDateInput
                     ariaLabel="选择开始日期"
                     value={customStartDate}
+                    side="right"
                     onChange={onCustomStartDateChange}
                   />
                   <span className="text-[13px] text-app-ink-subtle">至</span>
                   <ReportDateInput
                     ariaLabel="选择结束日期"
                     value={customEndDate}
+                    side="left"
                     onChange={onCustomEndDateChange}
                   />
                 </div>
@@ -211,7 +213,7 @@ export function ReportGenerateDialog({
               onClick={onViewReports}
               disabled={!dialogState.canClose}
             >
-              已保存
+              查看整理记录
             </Button>
             <div className="flex items-center gap-2">
               {dialogState.showCancel ? (
@@ -302,10 +304,12 @@ function ReportTypeButton({
 function ReportDateInput({
   ariaLabel,
   value,
+  side,
   onChange,
 }: {
   ariaLabel: string;
   value: string;
+  side: 'left' | 'right';
   onChange: (value: string) => void;
 }) {
   return (
@@ -313,6 +317,8 @@ function ReportDateInput({
       <DatePickerPopover
         ariaLabel={ariaLabel}
         value={value}
+        side={side}
+        align="center"
         triggerClassName="flex h-9 w-full cursor-pointer items-center justify-between gap-2 rounded-xl border border-app-border bg-app-surface px-3 text-left text-[13px] text-app-ink outline-none transition-colors duration-150 hover:border-app-border-strong focus-visible:border-app-border-strong focus-visible:outline-none"
         onChange={onChange}
       >
