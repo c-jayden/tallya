@@ -17,6 +17,12 @@ import {
   getKnownProviderModels,
   normalizeProviderModel,
 } from '../../services/ai/known-models';
+import {
+  CUSTOM_OPENAI_PROVIDER_ID,
+  getOpenAIProviderPreset,
+  matchOpenAIProviderPreset,
+  openAICompatibleProviderPresets,
+} from '../../services/ai/known-openai-providers';
 import { Field, StatusLine } from './settings-shared';
 import type { ProviderHealth } from './settings-types';
 
@@ -75,6 +81,26 @@ export function AISettingsSection({
   const selectedCodexModel =
     normalizeProviderModel('ai-codex-cli', settings.codexModel) ||
     getDefaultProviderModel('ai-codex-cli');
+  const selectedPresetId = matchOpenAIProviderPreset(settings.openAICompatible.baseUrl);
+  const activePresetHint = getOpenAIProviderPreset(selectedPresetId)?.hint;
+
+  function applyProviderPreset(presetId: string) {
+    const preset = getOpenAIProviderPreset(presetId);
+
+    // 自定义: keep whatever the user already typed; only presets prefill fields.
+    if (!preset) {
+      return;
+    }
+
+    onUpdateSettings({
+      openAICompatible: {
+        ...settings.openAICompatible,
+        baseUrl: preset.baseUrl,
+        apiMode: preset.apiMode,
+        model: preset.defaultModel || settings.openAICompatible.model,
+      },
+    });
+  }
 
   return (
     <section className="space-y-7" aria-label="AI 配置">
@@ -130,6 +156,22 @@ export function AISettingsSection({
           </Field>
         ) : (
           <div className="space-y-5">
+            <Field label="服务商" description="选择常用服务商可自动填入地址，也可选自定义手动填写。">
+              <Select value={selectedPresetId} onValueChange={applyProviderPreset}>
+                <SelectTrigger className="h-10 w-56 bg-app-surface">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {openAICompatibleProviderPresets.map((preset) => (
+                    <SelectItem key={preset.id} value={preset.id}>
+                      {preset.label}
+                    </SelectItem>
+                  ))}
+                  <SelectItem value={CUSTOM_OPENAI_PROVIDER_ID}>自定义</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
+
             <Field label="Base URL">
               <Input
                 className={openAIInputClassName}
@@ -179,6 +221,10 @@ export function AISettingsSection({
                 placeholder={DEFAULT_OPENAI_COMPATIBLE_MODEL}
               />
             </Field>
+
+            {activePresetHint ? (
+              <p className="text-[13px] leading-5 text-app-ink-subtle">{activePresetHint}</p>
+            ) : null}
 
             <div className="space-y-1.5">
               <div className="flex items-center justify-between gap-3 text-sm">
