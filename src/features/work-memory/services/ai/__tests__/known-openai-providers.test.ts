@@ -13,6 +13,27 @@ describe('known OpenAI-compatible providers', () => {
     expect(getOpenAIProviderPreset(CUSTOM_OPENAI_PROVIDER_ID)).toBeNull();
   });
 
+  it('keeps Claude out of OpenAI-compatible presets and includes Kimi Code', () => {
+    expect(openAICompatibleProviderPresets.map((preset) => preset.id)).not.toContain('anthropic');
+    expect(getOpenAIProviderPreset('kimi-code')).toMatchObject({
+      label: 'Kimi Code',
+      baseUrl: 'https://api.kimi.com/coding/v1',
+      defaultModel: 'kimi-for-coding',
+      apiMode: 'chat-completions',
+    });
+  });
+
+  it('prefills request parameters only where the preset needs them', () => {
+    expect(getOpenAIProviderPreset('moonshot')).toMatchObject({
+      defaultModel: 'kimi-k2.6',
+      parameters: {
+        temperature: '1',
+        topP: '0.95',
+      },
+    });
+    expect(getOpenAIProviderPreset('deepseek')?.parameters).toBeUndefined();
+  });
+
   it('matches a saved Base URL back to its preset, normalizing /v1', () => {
     // DeepSeek's preset URL has no /v1; normalization adds it, and a saved URL
     // with /v1 still matches.
@@ -20,6 +41,7 @@ describe('known OpenAI-compatible providers', () => {
     expect(matchOpenAIProviderPreset('https://api.deepseek.com/v1/')).toBe('deepseek');
     expect(matchOpenAIProviderPreset('https://example.com/v1')).toBe(CUSTOM_OPENAI_PROVIDER_ID);
     expect(matchOpenAIProviderPreset('')).toBe(CUSTOM_OPENAI_PROVIDER_ID);
+    expect(matchOpenAIProviderPreset('https://api.kimi.com/coding/v1')).toBe('kimi-code');
   });
 
   it('keeps non-/v1 versioned paths intact so Zhipu and Volcengine work', () => {

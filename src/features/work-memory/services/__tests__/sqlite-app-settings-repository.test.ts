@@ -66,6 +66,12 @@ describe('SQLiteAppSettingsRepository', () => {
     expect(database.appSettings.get('openAICompatibleApiMode')?.value).toBe(
       'chat-completions',
     );
+    expect(JSON.parse(database.appSettings.get('openAICompatibleParameters')?.value ?? '{}')).toEqual({
+      temperature: '',
+      topP: '',
+      presencePenalty: '',
+      frequencyPenalty: '',
+    });
     expect(database.appSettings.get('localGatewayEnabled')?.value).toBe('true');
     expect(database.appSettings.get('localGatewayBaseUrl')?.value).toBe(
       'http://localhost:8080',
@@ -137,6 +143,12 @@ describe('SQLiteAppSettingsRepository', () => {
         apiKey: 'legacy-key',
         model: 'legacy-model',
         apiMode: 'chat-completions',
+        parameters: {
+          temperature: '',
+          topP: '',
+          presencePenalty: '',
+          frequencyPenalty: '',
+        },
       },
     });
   });

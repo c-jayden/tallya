@@ -60,6 +60,12 @@ const settings: AppSettings = {
     apiKey: '',
     model: 'gpt-5.4-mini',
     apiMode: 'chat-completions',
+    parameters: {
+      temperature: '',
+      topP: '',
+      presencePenalty: '',
+      frequencyPenalty: '',
+    },
   },
   ollama: {
     baseUrl: 'http://localhost:11434',

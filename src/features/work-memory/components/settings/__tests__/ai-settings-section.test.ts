@@ -14,16 +14,22 @@ describe('AISettingsSection', () => {
 
   it('picks a service first and only shows the chosen service fields', () => {
     expect(source).toContain('label="AI 服务"');
-    // Codex -> model select; OpenAI-compatible -> preset/url/key/model under isCodexProvider branch
     expect(source).toContain('isCodexProvider ?');
-    expect(source).toContain('已内置 DeepSeek、通义、Kimi、OpenRouter、OpenAI');
+    expect(source).toContain('DeepSeek');
+    expect(source).toContain('Kimi');
+    expect(source).toContain('OpenRouter');
+    expect(source).toContain('OpenAI');
+  });
+
+  it('renders OpenAI-compatible presets without keeping a Claude literal in this UI', () => {
+    expect(source).toContain('openAICompatibleProviderPresets.map');
+    expect(source).not.toContain('Claude');
   });
 
   it('demotes the local gateway to an advanced switch, not a co-equal route', () => {
     expect(source).toContain('<LocalGatewaySettingsSection');
     expect(source).toContain('<details');
     expect(source).toContain('高级');
-    // No more "回退服务 / 当前使用路径" plumbing leaking into the UI.
     expect(source).not.toContain('回退服务');
     expect(source).not.toContain('当前使用路径');
   });
@@ -43,5 +49,13 @@ describe('AISettingsSection', () => {
     expect(source).toContain('baseUrl: event.target.value');
     expect(source).toContain('apiKey: event.target.value');
     expect(source).toContain('model: event.target.value');
+  });
+
+  it('lets OpenAI-compatible users tune optional request parameters', () => {
+    expect(source).toContain('请求参数');
+    expect(source).toContain('temperature');
+    expect(source).toContain('topP');
+    expect(source).toContain('presencePenalty');
+    expect(source).toContain('frequencyPenalty');
   });
 });

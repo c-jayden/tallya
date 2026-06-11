@@ -9,7 +9,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import type { AppSettings } from '../../services/app-settings-repository';
+import {
+  DEFAULT_OPENAI_COMPATIBLE_PARAMETERS,
+  type AppSettings,
+} from '../../services/app-settings-repository';
 import type { AIProviderId, OpenAICompatibleApiMode } from '../../services/ai/ai-provider';
 import {
   DEFAULT_OPENAI_COMPATIBLE_MODEL,
@@ -107,6 +110,25 @@ export function AISettingsSection({
         baseUrl: preset.baseUrl,
         apiMode: preset.apiMode,
         model: preset.defaultModel || settings.openAICompatible.model,
+        parameters: {
+          ...DEFAULT_OPENAI_COMPATIBLE_PARAMETERS,
+          ...preset.parameters,
+        },
+      },
+    });
+  }
+
+  function updateOpenAIParameter(
+    key: keyof AppSettings['openAICompatible']['parameters'],
+    value: string,
+  ) {
+    onUpdateSettings({
+      openAICompatible: {
+        ...settings.openAICompatible,
+        parameters: {
+          ...settings.openAICompatible.parameters,
+          [key]: value,
+        },
       },
     });
   }
@@ -296,6 +318,51 @@ export function AISettingsSection({
               <p className="text-[13px] leading-5 text-app-ink-subtle">
                 兼容服务或本地网关遇到 “only /v1/responses” 时，切换到 Responses API。
               </p>
+            </div>
+          )}
+
+          {isCodexProvider ? null : (
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <div className="text-sm font-medium text-app-ink-muted">请求参数</div>
+                <p className="text-[13px] leading-5 text-app-ink-subtle">
+                  留空时不发送对应字段。不同模型约束不同，建议先按服务商文档设置。
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Input
+                  className={openAIInputClassName}
+                  value={settings.openAICompatible.parameters.temperature}
+                  onChange={(event) => updateOpenAIParameter('temperature', event.target.value)}
+                  inputMode="decimal"
+                  placeholder="temperature"
+                />
+                <Input
+                  className={openAIInputClassName}
+                  value={settings.openAICompatible.parameters.topP}
+                  onChange={(event) => updateOpenAIParameter('topP', event.target.value)}
+                  inputMode="decimal"
+                  placeholder="top_p"
+                />
+                <Input
+                  className={openAIInputClassName}
+                  value={settings.openAICompatible.parameters.presencePenalty}
+                  onChange={(event) =>
+                    updateOpenAIParameter('presencePenalty', event.target.value)
+                  }
+                  inputMode="decimal"
+                  placeholder="presence_penalty"
+                />
+                <Input
+                  className={openAIInputClassName}
+                  value={settings.openAICompatible.parameters.frequencyPenalty}
+                  onChange={(event) =>
+                    updateOpenAIParameter('frequencyPenalty', event.target.value)
+                  }
+                  inputMode="decimal"
+                  placeholder="frequency_penalty"
+                />
+              </div>
             </div>
           )}
         </div>

@@ -19,6 +19,7 @@ import {
   type AIProvider,
   type AIProviderOptions,
   type OpenAICompatibleApiMode,
+  type OpenAICompatibleParameters,
 } from './ai-provider';
 
 const OPENAI_COMPATIBLE_PROVIDER_ID = 'openai-compatible';
@@ -39,6 +40,7 @@ type OpenAICompatibleConfig = {
   apiKey: string;
   model: string;
   apiMode: OpenAICompatibleApiMode;
+  parameters?: OpenAICompatibleParameters;
 };
 
 type ChatRequestOptions = {
@@ -149,7 +151,7 @@ export function createOpenAICompatibleProvider(fetchImpl: FetchLike = fetch): AI
           content: prompt,
         },
       ],
-      temperature: 0.2,
+      ...buildOpenAICompatibleRequestParameters(config.parameters),
     };
 
     if (requestOptions.strictJsonMode) {
@@ -226,7 +228,8 @@ export function createOpenAICompatibleProvider(fetchImpl: FetchLike = fetch): AI
     const requestBody = {
       model: config.model,
       input: buildResponsesInput(prompt),
-      temperature: 0.2,
+      stream: true,
+      ...buildOpenAICompatibleRequestParameters(config.parameters),
     };
 
     let response: Response;
@@ -237,6 +240,7 @@ export function createOpenAICompatibleProvider(fetchImpl: FetchLike = fetch): AI
         normalizedBaseUrl: config.normalizedBaseUrl,
         model: config.model,
         apiMode: config.apiMode,
+        stream: true,
         hasApiKey: Boolean(config.apiKey),
       });
       response = await fetchWithTimeout(toResponsesUrl(config.normalizedBaseUrl), {
@@ -395,6 +399,30 @@ export function createOpenAICompatibleProvider(fetchImpl: FetchLike = fetch): AI
       );
     }
 
+    if (isResponsesEventStream(attempt.contentType, attempt.bodyText)) {
+      try {
+        return parseResponsesEventStream(attempt.bodyText);
+      } catch (error) {
+        logOpenAIDiagnostic('openai-compatible.response_parse_failed', {
+          config,
+          httpStatus: attempt.status,
+          contentType: attempt.contentType,
+          errorMessage: error instanceof Error ? error.message : String(error),
+          responseBody: attempt.bodyText,
+          responseFormatFallbackUsed: false,
+          detectedShape: 'responses-sse',
+        });
+
+        throw error instanceof AIProviderError
+          ? error
+          : new AIProviderError(
+              '当前服务返回的流式数据无法解析，请检查接口模式或模型。',
+              OPENAI_COMPATIBLE_PROVIDER_ID,
+              error,
+            );
+      }
+    }
+
     let payload: unknown;
 
     try {
@@ -540,6 +568,7 @@ function getOpenAICompatibleConfig(options: AIProviderOptions): OpenAICompatible
   const apiKey = config?.apiKey.trim() ?? '';
   const model = config?.model.trim() ?? '';
   const apiMode = getOpenAICompatibleApiMode(config?.apiMode);
+  const parameters = config?.parameters;
   const normalizedBaseUrl = normalizeOpenAICompatibleBaseUrl(baseUrl);
 
   if (!baseUrl) {
@@ -554,7 +583,7 @@ function getOpenAICompatibleConfig(options: AIProviderOptions): OpenAICompatible
     throw new AIProviderError('请填写模型名称。', OPENAI_COMPATIBLE_PROVIDER_ID);
   }
 
-  return { baseUrl, normalizedBaseUrl, apiKey, model, apiMode };
+  return { baseUrl, normalizedBaseUrl, apiKey, model, apiMode, parameters };
 }
 
 function getOpenAICompatibleApiMode(value: unknown): OpenAICompatibleApiMode {
@@ -586,6 +615,33 @@ function buildResponsesInput(prompt: string) {
       content: [{ type: 'input_text', text }],
     },
   ];
+}
+
+function buildOpenAICompatibleRequestParameters(parameters?: OpenAICompatibleParameters) {
+  const requestParameters: Record<string, number> = {};
+
+  setOptionalNumber(requestParameters, 'temperature', parameters?.temperature);
+  setOptionalNumber(requestParameters, 'top_p', parameters?.topP);
+  setOptionalNumber(requestParameters, 'presence_penalty', parameters?.presencePenalty);
+  setOptionalNumber(requestParameters, 'frequency_penalty', parameters?.frequencyPenalty);
+
+  return requestParameters;
+}
+
+function setOptionalNumber(
+  target: Record<string, number>,
+  key: string,
+  value: string | undefined,
+) {
+  if (!value?.trim()) {
+    return;
+  }
+
+  const numberValue = Number(value);
+
+  if (Number.isFinite(numberValue)) {
+    target[key] = numberValue;
+  }
 }
 
 function extractModelText(payload: unknown): string {
@@ -679,6 +735,148 @@ function extractResponsesModelText(payload: unknown): string {
     '当前服务返回格式不符合 Responses API，请检查接口模式或模型。',
     OPENAI_COMPATIBLE_PROVIDER_ID,
   );
+}
+
+function isResponsesEventStream(contentType: string, bodyText: string) {
+  return /text\/event-stream/i.test(contentType) || /^\s*(event:|data:)/m.test(bodyText);
+}
+
+function parseResponsesEventStream(bodyText: string): string {
+  const deltas: string[] = [];
+  const chatDeltas: string[] = [];
+  let doneText = '';
+  let finalResponse: unknown = null;
+
+  for (const rawEvent of splitSSEEvents(bodyText)) {
+    const dataPayload = extractSSEData(rawEvent);
+
+    if (!dataPayload || dataPayload === '[DONE]') {
+      continue;
+    }
+
+    let evt: unknown;
+    try {
+      evt = JSON.parse(dataPayload);
+    } catch {
+      continue;
+    }
+
+    if (!isRecord(evt)) {
+      continue;
+    }
+
+    const type = typeof evt.type === 'string' ? evt.type : '';
+
+    if (
+      type === 'error' ||
+      type === 'response.failed' ||
+      type === 'response.error' ||
+      isRecord(evt.error)
+    ) {
+      const message =
+        (isRecord(evt.error) && typeof evt.error.message === 'string' && evt.error.message) ||
+        (isRecord(evt.response) &&
+          isRecord(evt.response.error) &&
+          typeof evt.response.error.message === 'string' &&
+          evt.response.error.message) ||
+        '流式响应返回了错误。';
+
+      throw new AIProviderError(
+        truncate(String(message), SERVER_MESSAGE_LIMIT),
+        OPENAI_COMPATIBLE_PROVIDER_ID,
+      );
+    }
+
+    if (type === 'response.output_text.delta' && typeof evt.delta === 'string') {
+      deltas.push(evt.delta);
+      continue;
+    }
+
+    if (type === 'response.output_text.done' && typeof evt.text === 'string') {
+      doneText = evt.text;
+      continue;
+    }
+
+    if (
+      (type === 'response.completed' || type === 'response.incomplete') &&
+      isRecord(evt.response)
+    ) {
+      finalResponse = evt.response;
+      continue;
+    }
+
+    if ('output' in evt || 'output_text' in evt) {
+      finalResponse = evt;
+    }
+
+    const chatChunk = extractChatStreamDelta(evt);
+    if (chatChunk) {
+      chatDeltas.push(chatChunk);
+    }
+  }
+
+  if (doneText.trim()) {
+    return doneText.trim();
+  }
+
+  if (deltas.length > 0) {
+    return deltas.join('').trim();
+  }
+
+  if (finalResponse) {
+    return extractResponsesModelText(finalResponse);
+  }
+
+  if (chatDeltas.length > 0) {
+    return chatDeltas.join('').trim();
+  }
+
+  throw new AIProviderError(
+    '当前服务返回的流式数据为空或不含可用文本，请检查接口模式或模型。',
+    OPENAI_COMPATIBLE_PROVIDER_ID,
+  );
+}
+
+function splitSSEEvents(bodyText: string): string[] {
+  return bodyText.split(/\r?\n\r?\n/);
+}
+
+function extractSSEData(rawEvent: string): string {
+  const dataLines: string[] = [];
+
+  for (const line of rawEvent.split(/\r?\n/)) {
+    const match = /^data:\s?(.*)$/.exec(line);
+
+    if (match) {
+      dataLines.push(match[1]);
+    }
+  }
+
+  return dataLines.join('\n').trim();
+}
+
+function extractChatStreamDelta(evt: Record<string, unknown>): string {
+  const choices = evt.choices;
+
+  if (!Array.isArray(choices) || choices.length === 0) {
+    return '';
+  }
+
+  const first = choices[0];
+
+  if (!isRecord(first)) {
+    return '';
+  }
+
+  if (isRecord(first.delta) && typeof first.delta.content === 'string') {
+    return first.delta.content;
+  }
+
+  if (isRecord(first.message) && typeof first.message.content === 'string') {
+    return first.message.content;
+  }
+
+  return '';
 }
 
 function extractChatCompletionText(payload: Record<string, unknown>) {

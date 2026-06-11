@@ -1,4 +1,8 @@
-import type { AIProviderId, OpenAICompatibleApiMode } from './ai/ai-provider';
+import type {
+  AIProviderId,
+  OpenAICompatibleApiMode,
+  OpenAICompatibleParameters,
+} from './ai/ai-provider';
 import {
   DEFAULT_CODEX_MODEL,
   DEFAULT_OPENAI_COMPATIBLE_MODEL,
@@ -17,6 +21,7 @@ export type OpenAICompatibleSettings = {
   apiKey: string;
   model: string;
   apiMode: OpenAICompatibleApiMode;
+  parameters: OpenAICompatibleParameters;
 };
 
 export type LocalGatewaySettings = {
@@ -61,6 +66,13 @@ const STORAGE_KEY = 'tallya.app-settings.v1';
 const LEGACY_MIGRATION_KEY = 'tallya.app-settings.sqlite-migrated.v1';
 export const DEFAULT_CODEX_COMMAND = 'codex';
 
+export const DEFAULT_OPENAI_COMPATIBLE_PARAMETERS: OpenAICompatibleParameters = {
+  temperature: '',
+  topP: '',
+  presencePenalty: '',
+  frequencyPenalty: '',
+};
+
 // Defaults define the first-run and reset state. Components should go through
 // this repository instead of reading storage directly.
 export const DEFAULT_APP_SETTINGS: AppSettings = {
@@ -72,6 +84,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
     apiKey: '',
     model: DEFAULT_OPENAI_COMPATIBLE_MODEL,
     apiMode: 'chat-completions',
+    parameters: DEFAULT_OPENAI_COMPATIBLE_PARAMETERS,
   },
   localGateway: {
     enabled: true,
@@ -295,6 +308,7 @@ function appSettingsToRows(settings: AppSettings): Record<string, string> {
     openAICompatibleApiKey: settings.openAICompatible.apiKey,
     openAICompatibleModel: settings.openAICompatible.model,
     openAICompatibleApiMode: settings.openAICompatible.apiMode,
+    openAICompatibleParameters: JSON.stringify(settings.openAICompatible.parameters),
     localGatewayEnabled: String(settings.localGateway.enabled),
     localGatewayBaseUrl: settings.localGateway.baseUrl,
     localGatewayModel: settings.localGateway.model,
@@ -333,6 +347,7 @@ function rowsToAppSettingsInput(rows: AppSettingsRow[]) {
       apiKey: values.openAICompatibleApiKey,
       model: values.openAICompatibleModel,
       apiMode: values.openAICompatibleApiMode,
+      parameters: parseRowJSON(values.openAICompatibleParameters),
     },
     localGateway: {
       enabled: getBooleanString(values.localGatewayEnabled),
@@ -503,7 +518,37 @@ function normalizeOpenAICompatibleSettings(value: unknown): OpenAICompatibleSett
     apiKey: getString(input.apiKey, DEFAULT_APP_SETTINGS.openAICompatible.apiKey),
     model: getString(input.model, DEFAULT_APP_SETTINGS.openAICompatible.model),
     apiMode: getOpenAICompatibleApiMode(input.apiMode),
+    parameters: normalizeOpenAICompatibleParameters(input.parameters),
   };
+}
+
+function normalizeOpenAICompatibleParameters(value: unknown): OpenAICompatibleParameters {
+  if (!value || typeof value !== 'object') {
+    return DEFAULT_OPENAI_COMPATIBLE_PARAMETERS;
+  }
+
+  const input = value as Record<string, unknown>;
+
+  return {
+    temperature: getOptionalNumberString(input.temperature),
+    topP: getOptionalNumberString(input.topP),
+    presencePenalty: getOptionalNumberString(input.presencePenalty),
+    frequencyPenalty: getOptionalNumberString(input.frequencyPenalty),
+  };
+}
+
+function getOptionalNumberString(value: unknown) {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return String(value);
+  }
+
+  if (typeof value !== 'string') {
+    return '';
+  }
+
+  const trimmed = value.trim();
+
+  return trimmed && Number.isFinite(Number(trimmed)) ? trimmed : '';
 }
 
 function normalizeLocalGatewaySettings(value: unknown): LocalGatewaySettings {

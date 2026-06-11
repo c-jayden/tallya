@@ -68,6 +68,12 @@ describe('LocalStorageAppSettingsRepository', () => {
         apiKey: 'test-key',
         model: 'gpt-test',
         apiMode: 'responses',
+        parameters: {
+          temperature: '1',
+          topP: '0.95',
+          presencePenalty: '',
+          frequencyPenalty: '0',
+        },
       },
       ollama: {
         baseUrl: 'http://localhost:11434',
@@ -92,6 +98,12 @@ describe('LocalStorageAppSettingsRepository', () => {
         apiKey: 'test-key',
         model: 'gpt-test',
         apiMode: 'responses',
+        parameters: {
+          temperature: '1',
+          topP: '0.95',
+          presencePenalty: '',
+          frequencyPenalty: '0',
+        },
       },
       ollama: {
         baseUrl: 'http://localhost:11434',
@@ -138,6 +150,12 @@ describe('LocalStorageAppSettingsRepository', () => {
         apiKey: '',
         model: 'gpt-5.4-mini',
         apiMode: 'chat-completions',
+        parameters: {
+          temperature: '',
+          topP: '',
+          presencePenalty: '',
+          frequencyPenalty: '',
+        },
       },
     });
 
@@ -161,6 +179,12 @@ describe('LocalStorageAppSettingsRepository', () => {
         apiKey: 'legacy-key',
         model: 'legacy-model',
         apiMode: 'chat-completions',
+        parameters: {
+          temperature: '',
+          topP: '',
+          presencePenalty: '',
+          frequencyPenalty: '',
+        },
       },
     });
 

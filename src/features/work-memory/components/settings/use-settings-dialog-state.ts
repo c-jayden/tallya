@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 import { aiService } from '../../services/ai/ai-service';
 import { probeLocalGateway } from '../../services/ai/local-gateway';
 import {
+  DEFAULT_OPENAI_COMPATIBLE_PARAMETERS,
   DEFAULT_APP_SETTINGS,
   appSettingsRepository,
   type AppSettings,
@@ -526,6 +527,10 @@ function normalizeProviderSettings(settings: AppSettings) {
         DEFAULT_APP_SETTINGS.openAICompatible.model,
       apiMode:
         settings.openAICompatible.apiMode || DEFAULT_APP_SETTINGS.openAICompatible.apiMode,
+      parameters: {
+        ...DEFAULT_OPENAI_COMPATIBLE_PARAMETERS,
+        ...settings.openAICompatible.parameters,
+      },
     },
     localGateway: {
       enabled: settings.localGateway.enabled,

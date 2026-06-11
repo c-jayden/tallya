@@ -16,6 +16,13 @@ import type {
 export type AIProviderId = 'ai-codex-cli' | 'openai-compatible' | 'ollama';
 export type OpenAICompatibleApiMode = 'chat-completions' | 'responses';
 
+export type OpenAICompatibleParameters = {
+  temperature: string;
+  topP: string;
+  presencePenalty: string;
+  frequencyPenalty: string;
+};
+
 export type GenerateDailyMemoryOptions = {
   codexCommand: string;
   codexModel: string;
@@ -24,6 +31,7 @@ export type GenerateDailyMemoryOptions = {
     apiKey: string;
     model: string;
     apiMode?: OpenAICompatibleApiMode;
+    parameters?: OpenAICompatibleParameters;
   };
 };
 

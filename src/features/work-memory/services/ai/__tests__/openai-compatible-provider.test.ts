@@ -107,11 +107,92 @@ describe('OpenAI Compatible Provider', () => {
 
     expect(fetch).toHaveBeenCalledWith(expectedUrl, expect.any(Object));
     const responsesBody = JSON.parse(String(fetch.mock.calls[0]?.[1]?.body));
-    expect(responsesBody).toMatchObject({ model: 'gpt-test', temperature: 0.2 });
+    expect(responsesBody).toMatchObject({ model: 'gpt-test' });
+    expect(responsesBody).not.toHaveProperty('temperature');
     // input must be a list of message items (Codex channel rejects a bare string).
     expect(Array.isArray(responsesBody.input)).toBe(true);
     expect(responsesBody.input[0]).toMatchObject({ type: 'message', role: 'user' });
     expect(JSON.stringify(responsesBody.input)).toContain('JSON');
+  });
+
+  it('omits optional OpenAI-compatible request parameters when they are blank', async () => {
+    const fetch = vi.fn().mockResolvedValue(chatResponse(dailyMemoryPayload()));
+    const provider = createOpenAICompatibleProvider(fetch);
+
+    await provider.generateDailyMemory(dailyInput, options);
+
+    const body = JSON.parse(String(fetch.mock.calls[0]?.[1]?.body));
+    expect(body).not.toHaveProperty('temperature');
+    expect(body).not.toHaveProperty('top_p');
+    expect(body).not.toHaveProperty('presence_penalty');
+    expect(body).not.toHaveProperty('frequency_penalty');
+  });
+
+  it('sends configured OpenAI-compatible request parameters in chat mode', async () => {
+    const fetch = vi.fn().mockResolvedValue(chatResponse(dailyMemoryPayload()));
+    const provider = createOpenAICompatibleProvider(fetch);
+
+    await provider.generateDailyMemory(dailyInput, withOpenAIParameters(options));
+
+    const body = JSON.parse(String(fetch.mock.calls[0]?.[1]?.body));
+    expect(body).toMatchObject({
+      temperature: 1,
+      top_p: 0.95,
+      presence_penalty: 0.2,
+      frequency_penalty: 0,
+    });
+  });
+
+  it('sends configured OpenAI-compatible request parameters in responses mode', async () => {
+    const fetch = vi.fn().mockResolvedValue(responsesOutputTextResponse(dailyMemoryPayload()));
+    const provider = createOpenAICompatibleProvider(fetch);
+
+    await provider.generateDailyMemory(dailyInput, withOpenAIParameters(responsesOptions));
+
+    const body = JSON.parse(String(fetch.mock.calls[0]?.[1]?.body));
+    expect(body).toMatchObject({
+      stream: true,
+      temperature: 1,
+      top_p: 0.95,
+      presence_penalty: 0.2,
+      frequency_penalty: 0,
+    });
+  });
+
+  it('reassembles streamed Responses SSE into model output', async () => {
+    const fetch = vi.fn().mockResolvedValue(responsesStreamResponse(dailyMemoryPayload()));
+    const provider = createOpenAICompatibleProvider(fetch);
+
+    const expected = dailyMemoryPayload();
+    await expect(provider.generateDailyMemory(dailyInput, responsesOptions)).resolves.toMatchObject(
+      {
+        summary: expected.summary,
+      },
+    );
+  });
+
+  it('sends stream:true in responses mode', async () => {
+    const fetch = vi.fn().mockResolvedValue(responsesStreamResponse(dailyMemoryPayload()));
+    const provider = createOpenAICompatibleProvider(fetch);
+
+    await provider.generateDailyMemory(dailyInput, responsesOptions);
+
+    const body = JSON.parse(String(fetch.mock.calls[0]?.[1]?.body));
+    expect(body).toMatchObject({ stream: true });
+  });
+
+  it('throws a friendly error when the SSE stream carries an error event', async () => {
+    const body = `data: ${JSON.stringify({ type: 'error', error: { message: 'quota exceeded' } })}\n\n`;
+    const fetch = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(body, { status: 200, headers: { 'Content-Type': 'text/event-stream' } }),
+      );
+    const provider = createOpenAICompatibleProvider(fetch);
+
+    await expect(provider.generateDailyMemory(dailyInput, responsesOptions)).rejects.toMatchObject({
+      message: expect.stringContaining('quota exceeded'),
+    });
   });
 
   it('reports a friendly timeout when the OpenAI Compatible request does not finish', async () => {
@@ -577,6 +658,38 @@ function responsesOutputTextResponse(content: unknown, status = 200) {
   );
 }
 
+function responsesStreamResponse(content: unknown, status = 200) {
+  const text = typeof content === 'string' ? content : JSON.stringify(content);
+  const mid = Math.ceil(text.length / 2);
+  const body =
+    `event: response.output_text.delta\n` +
+    `data: ${JSON.stringify({ type: 'response.output_text.delta', delta: text.slice(0, mid) })}\n\n` +
+    `event: response.output_text.delta\n` +
+    `data: ${JSON.stringify({ type: 'response.output_text.delta', delta: text.slice(mid) })}\n\n` +
+    `event: response.completed\n` +
+    `data: ${JSON.stringify({ type: 'response.completed', response: { output_text: text } })}\n\n` +
+    `data: [DONE]\n\n`;
+  return new Response(body, {
+    status,
+    headers: { 'Content-Type': 'text/event-stream; charset=utf-8' },
+  });
+}
+
 async function waitForAsyncLogs() {
   await new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+function withOpenAIParameters(options: AIProviderOptions): AIProviderOptions {
+  return {
+    ...options,
+    openAICompatible: {
+      ...options.openAICompatible!,
+      parameters: {
+        temperature: '1',
+        topP: '0.95',
+        presencePenalty: '0.2',
+        frequencyPenalty: '0',
+      },
+    },
+  };
 }
