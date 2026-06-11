@@ -571,7 +571,8 @@ fn spawn_codex_cli(
                 return Ok(child);
             }
             Err(error) => {
-                eprintln!("Failed to start Codex CLI with {command}: {error}");
+                // Missing a candidate (e.g. bare `codex` before `codex.cmd` on
+                // Windows) is expected; only the all-candidates failure matters.
                 last_error = Some(error);
             }
         }
@@ -653,7 +654,8 @@ fn run_codex_cli_check(command: String) -> Result<String, String> {
                 return Err("检测 Codex 超时，请稍后重试。".to_string());
             }
             Err(error) => {
-                eprintln!("Failed to start Codex check with {command}: {error}");
+                // Probing each candidate; a miss here is expected. Only log if
+                // every candidate fails (handled below).
                 last_error = Some(error);
             }
         }
