@@ -1,7 +1,8 @@
-import type { ReactNode } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import type { AppSettings } from '../../services/app-settings-repository';
+import { usageStatsRepository } from '../../services/usage-stats-repository';
 
 type DataSettingsSectionProps = {
   settings: AppSettings;
@@ -40,6 +41,8 @@ export function DataSettingsSection({
         <div className="text-sm font-semibold text-app-ink">本地数据</div>
         <p className="text-sm text-app-ink-subtle">你的工作记忆默认保存在本机。</p>
       </div>
+
+      <UsageStatsBlock />
 
       <DataActionRow
         title="数据备份"
@@ -145,6 +148,45 @@ export function DataSettingsSection({
         }
       />
     </section>
+  );
+}
+
+function UsageStatsBlock() {
+  // Snapshot read on open; local-only, never uploaded. Helps validate whether
+  // the tool is actually being used over time (see docs/PLAN.md retention).
+  const summary = useMemo(() => usageStatsRepository.getSummary(), []);
+
+  const hitRate =
+    summary.searchHitRate === null ? '—' : `${Math.round(summary.searchHitRate * 100)}%`;
+
+  return (
+    <div className="rounded-lg border border-app-border bg-app-surface-muted/40 px-3.5 py-3">
+      <div className="text-sm font-semibold text-app-ink">本机使用情况</div>
+      <p className="mt-1 text-[13px] leading-[1.5] text-app-ink-subtle">
+        仅保存在本机、不会上传，用于了解自己的使用情况。
+      </p>
+      {summary.firstUseDate ? (
+        <dl className="mt-2.5 grid grid-cols-2 gap-x-4 gap-y-1.5 text-[13px]">
+          <UsageStat label="已使用" value={`${summary.totalDays} 天`} />
+          <UsageStat label="有记录的天数" value={`${summary.activeDays} 天`} />
+          <UsageStat label="累计记录" value={`${summary.totalEntries} 条`} />
+          <UsageStat label="近 7 天搜索" value={`${summary.recentSearchSessions} 次`} />
+          <UsageStat label="搜得到率" value={hitRate} />
+          <UsageStat label="近 7 天打开结果" value={`${summary.recentRetrievals} 次`} />
+        </dl>
+      ) : (
+        <p className="mt-2.5 text-[13px] text-app-ink-muted">还没有使用数据。</p>
+      )}
+    </div>
+  );
+}
+
+function UsageStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-baseline justify-between gap-2">
+      <dt className="text-app-ink-subtle">{label}</dt>
+      <dd className="font-medium text-app-ink tabular-nums">{value}</dd>
+    </div>
   );
 }
 

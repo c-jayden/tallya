@@ -5,11 +5,17 @@ import { clarificationRepository } from '../services/clarification-repository';
 import { entryRepository } from '../services/entry-repository';
 import { threadRepository } from '../services/thread-repository';
 import { threadService } from '../services/thread-service';
+import { usageStatsRepository } from '../services/usage-stats-repository';
 import type { Clarification, Entry, ThreadLinkCandidate } from '../types';
 
 // How many recent entries are offered to the AI as merge candidates. Capped to
 // keep the prompt small and the background call cheap.
 const THREAD_LINK_CANDIDATE_LIMIT = 20;
+
+// Debounce window before a freshly-logged entry triggers the thread-link call.
+// Rapid logging collapses to a single call for the latest entry, so a burst of
+// captures never spawns a burst of (cold-starting) Codex processes.
+const THREAD_SUGGESTION_DEBOUNCE_MS = 1500;
 
 // A pending merge suggestion for one freshly-created entry. existingThreadId is
 // set when the matched entry already belongs to a thread (join it); otherwise a
@@ -72,6 +78,8 @@ export function useEntriesController({ currentDate, todayDate }: UseEntriesContr
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const composerRef = useRef<HTMLTextAreaElement>(null);
+  const suggestionTimeoutRef = useRef<number | null>(null);
+  const suggestionInFlightRef = useRef(false);
 
   const applyDayData = useCallback((data: DayData) => {
     setEntries(data.entries);
@@ -152,6 +160,41 @@ export function useEntriesController({ currentDate, todayDate }: UseEntriesContr
     }
   }, []);
 
+  // Debounced + single-flight wrapper: collapses a burst of captures into one
+  // call for the latest entry, and never runs two thread-link calls at once.
+  const scheduleThreadSuggestion = useCallback(
+    (entry: Entry) => {
+      if (suggestionTimeoutRef.current !== null) {
+        window.clearTimeout(suggestionTimeoutRef.current);
+      }
+
+      suggestionTimeoutRef.current = window.setTimeout(() => {
+        suggestionTimeoutRef.current = null;
+
+        // If a call is still running, skip this one — suggestions are
+        // best-effort, and never stacking a concurrent (cold-starting) call
+        // matters more than catching every entry.
+        if (suggestionInFlightRef.current) {
+          return;
+        }
+
+        suggestionInFlightRef.current = true;
+        void requestThreadSuggestion(entry).finally(() => {
+          suggestionInFlightRef.current = false;
+        });
+      }, THREAD_SUGGESTION_DEBOUNCE_MS);
+    },
+    [requestThreadSuggestion],
+  );
+
+  useEffect(() => {
+    return () => {
+      if (suggestionTimeoutRef.current !== null) {
+        window.clearTimeout(suggestionTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const createEntry = useCallback(
     async (content: string) => {
       const trimmed = content.trim();
@@ -167,9 +210,11 @@ export function useEntriesController({ currentDate, todayDate }: UseEntriesContr
           content: trimmed,
           occurredAt: computeOccurredAt(currentDate, todayDate),
         });
+        usageStatsRepository.recordEntryCreated();
         await reload();
-        // Fire-and-forget: don't block the composer on the AI round-trip.
-        void requestThreadSuggestion(newEntry);
+        // Fire-and-forget + debounced: don't block the composer, and don't let
+        // rapid logging spawn concurrent AI calls.
+        scheduleThreadSuggestion(newEntry);
 
         return true;
       } catch (error) {
@@ -180,7 +225,7 @@ export function useEntriesController({ currentDate, todayDate }: UseEntriesContr
         setIsSaving(false);
       }
     },
-    [currentDate, isSaving, reload, requestThreadSuggestion, todayDate],
+    [currentDate, isSaving, reload, scheduleThreadSuggestion, todayDate],
   );
 
   const updateEntry = useCallback(

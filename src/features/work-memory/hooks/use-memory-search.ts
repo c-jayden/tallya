@@ -6,6 +6,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
 } from 'react';
 import { memorySearch } from '../services/memory-search-service';
+import { usageStatsRepository } from '../services/usage-stats-repository';
 import type { Entry } from '../types';
 
 type UseMemorySearchOptions = {
@@ -20,12 +21,22 @@ export function useMemorySearch({ onOpenMemory }: UseMemorySearchOptions) {
   const [activeSearchIndex, setActiveSearchIndex] = useState(-1);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const searchButtonRef = useRef<HTMLButtonElement>(null);
+  // Per-session usage signal: did the user actually run a query, and did the
+  // last query find anything. Recorded once on close to avoid keystroke noise.
+  const searchRanRef = useRef(false);
+  const lastHadResultsRef = useRef(false);
 
   const openSearchPanel = useCallback(() => {
     setIsSearchOpen(true);
   }, []);
 
   const closeSearchPanel = useCallback(() => {
+    if (searchRanRef.current) {
+      usageStatsRepository.recordSearchSession(lastHadResultsRef.current);
+      searchRanRef.current = false;
+      lastHadResultsRef.current = false;
+    }
+
     setIsSearchOpen(false);
     setSearchKeyword('');
     setIsSearchComposing(false);
@@ -50,6 +61,8 @@ export function useMemorySearch({ onOpenMemory }: UseMemorySearchOptions) {
       if (isMounted) {
         setSearchResults(results);
         setActiveSearchIndex(results.length > 0 ? 0 : -1);
+        searchRanRef.current = true;
+        lastHadResultsRef.current = results.length > 0;
       }
     });
 
@@ -133,13 +146,15 @@ export function useMemorySearch({ onOpenMemory }: UseMemorySearchOptions) {
 
       if (activeMemory) {
         event.preventDefault();
-        closeSearchPanel();
-        onOpenMemory(activeMemory);
+        openSearchMemory(activeMemory);
       }
     }
   }
 
   function openSearchMemory(entry: Entry) {
+    // A retrieval = the user opened a result; recorded before close so the
+    // session's hit state is still intact.
+    usageStatsRepository.recordRetrieval();
     closeSearchPanel();
     onOpenMemory(entry);
   }
