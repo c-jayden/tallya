@@ -46,6 +46,12 @@ describe('LocalStorageAppSettingsRepository', () => {
         updatedAt: '',
       },
       diagnosticLoggingEnabled: false,
+      localGateway: {
+        enabled: true,
+        baseUrl: 'http://localhost:8080',
+        model: '',
+        apiMode: 'chat-completions',
+      },
     });
   });
 
@@ -67,6 +73,12 @@ describe('LocalStorageAppSettingsRepository', () => {
         baseUrl: 'http://localhost:11434',
         model: 'llama3',
       },
+      localGateway: {
+        enabled: false,
+        baseUrl: 'http://localhost:8787',
+        model: 'gpt-5',
+        apiMode: 'responses',
+      },
       dailyReminderEnabled: true,
       theme: 'dark',
       closeToTray: false,
@@ -84,6 +96,12 @@ describe('LocalStorageAppSettingsRepository', () => {
       ollama: {
         baseUrl: 'http://localhost:11434',
         model: 'llama3',
+      },
+      localGateway: {
+        enabled: false,
+        baseUrl: 'http://localhost:8787',
+        model: 'gpt-5',
+        apiMode: 'responses',
       },
       dailyReminderEnabled: true,
       theme: 'dark',
@@ -172,6 +190,42 @@ describe('LocalStorageAppSettingsRepository', () => {
       ...DEFAULT_APP_SETTINGS,
       diagnosticLoggingEnabled: true,
     });
+
+    storage.setItem(
+      'tallya.app-settings.v1',
+      JSON.stringify({
+        localGateway: {
+          enabled: false,
+          baseUrl: 'http://localhost:8787/v1',
+          model: 'gpt-5',
+          apiMode: 'responses',
+        },
+      }),
+    );
+
+    await expect(repository.getSettings()).resolves.toEqual({
+      ...DEFAULT_APP_SETTINGS,
+      localGateway: {
+        enabled: false,
+        baseUrl: 'http://localhost:8787/v1',
+        model: 'gpt-5',
+        apiMode: 'responses',
+      },
+    });
+
+    storage.setItem(
+      'tallya.app-settings.v1',
+      JSON.stringify({
+        localGateway: {
+          enabled: 'yes',
+          baseUrl: '',
+          model: '',
+          apiMode: 'unknown',
+        },
+      }),
+    );
+
+    await expect(repository.getSettings()).resolves.toEqual(DEFAULT_APP_SETTINGS);
 
     storage.setItem(
       'tallya.app-settings.v1',

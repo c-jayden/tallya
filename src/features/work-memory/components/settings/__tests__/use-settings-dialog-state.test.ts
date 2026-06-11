@@ -30,4 +30,11 @@ describe('useSettingsDialogState', () => {
     expect(source).not.toContain('enabled: true');
     expect(source).not.toContain('reportStyleSample');
   });
+
+  it('checks the local gateway through the AI service layer without direct UI storage access', () => {
+    expect(source).toContain('probeLocalGateway');
+    expect(source).toContain('checkLocalGateway');
+    expect(source).toContain('setLocalGatewayHealth');
+    expect(source).toContain('normalizeProviderSettings(latestSettingsRef.current)');
+  });
 });

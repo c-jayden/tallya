@@ -66,6 +66,14 @@ describe('SQLiteAppSettingsRepository', () => {
     expect(database.appSettings.get('openAICompatibleApiMode')?.value).toBe(
       'chat-completions',
     );
+    expect(database.appSettings.get('localGatewayEnabled')?.value).toBe('true');
+    expect(database.appSettings.get('localGatewayBaseUrl')?.value).toBe(
+      'http://localhost:8080',
+    );
+    expect(database.appSettings.get('localGatewayModel')?.value).toBe('');
+    expect(database.appSettings.get('localGatewayApiMode')?.value).toBe(
+      'chat-completions',
+    );
     expect(database.appSettings.get('closeToTray')?.value).toBe('false');
     expect(database.appSettings.get('dailyReminderEnabled')?.value).toBe('true');
     expect(database.appSettings.get('reportLength')?.value).toBe('standard');
@@ -128,6 +136,35 @@ describe('SQLiteAppSettingsRepository', () => {
         baseUrl: 'https://gateway.example.com/v1',
         apiKey: 'legacy-key',
         model: 'legacy-model',
+        apiMode: 'chat-completions',
+      },
+    });
+  });
+
+  it('fills missing local gateway settings from defaults when reading older settings rows', async () => {
+    const database = new TestDatabaseClient();
+    database.appSettings.set('localGatewayEnabled', {
+      key: 'localGatewayEnabled',
+      value: 'false',
+      updated_at: '2026-06-11T01:00:00.000Z',
+    });
+    database.appSettings.set('localGatewayBaseUrl', {
+      key: 'localGatewayBaseUrl',
+      value: 'http://localhost:8787',
+      updated_at: '2026-06-11T01:00:00.000Z',
+    });
+    database.appSettings.set('localGatewayModel', {
+      key: 'localGatewayModel',
+      value: 'gpt-5',
+      updated_at: '2026-06-11T01:00:00.000Z',
+    });
+    const repository = new SQLiteAppSettingsRepository(Promise.resolve(database));
+
+    await expect(repository.getSettings()).resolves.toMatchObject({
+      localGateway: {
+        enabled: false,
+        baseUrl: 'http://localhost:8787',
+        model: 'gpt-5',
         apiMode: 'chat-completions',
       },
     });

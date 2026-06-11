@@ -15,7 +15,9 @@ export type SettingsContentProps = {
   settings: AppSettings;
   isLoadingSettings: boolean;
   providerHealth: ProviderHealth;
+  localGatewayHealth: ProviderHealth;
   isCheckingProvider: boolean;
+  isCheckingLocalGateway: boolean;
   isExportingBackup: boolean;
   isImportingBackup: boolean;
   isOpeningDataDirectory: boolean;
@@ -25,6 +27,7 @@ export type SettingsContentProps = {
   isSendingTestNotification: boolean;
   onUpdateSettings: (patch: Partial<AppSettings>) => void;
   onCheckHealth: () => void;
+  onCheckLocalGateway: () => void;
   onExportBackup: () => void;
   onImportBackup: () => void;
   onOpenDataDirectory: () => void;
@@ -58,7 +61,9 @@ function SettingsSectionContent({
   activeSection,
   settings,
   providerHealth,
+  localGatewayHealth,
   isCheckingProvider,
+  isCheckingLocalGateway,
   isExportingBackup,
   isImportingBackup,
   isOpeningDataDirectory,
@@ -68,6 +73,7 @@ function SettingsSectionContent({
   isSendingTestNotification,
   onUpdateSettings,
   onCheckHealth,
+  onCheckLocalGateway,
   onExportBackup,
   onImportBackup,
   onOpenDataDirectory,
@@ -82,9 +88,12 @@ function SettingsSectionContent({
       <AISettingsSection
         settings={settings}
         providerHealth={providerHealth}
+        localGatewayHealth={localGatewayHealth}
         isCheckingProvider={isCheckingProvider}
+        isCheckingLocalGateway={isCheckingLocalGateway}
         onUpdateSettings={onUpdateSettings}
         onCheckHealth={onCheckHealth}
+        onCheckLocalGateway={onCheckLocalGateway}
       />
     );
   }

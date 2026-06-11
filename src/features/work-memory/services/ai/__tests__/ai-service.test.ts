@@ -65,6 +65,12 @@ const settings: AppSettings = {
     baseUrl: 'http://localhost:11434',
     model: '',
   },
+  localGateway: {
+    enabled: false,
+    baseUrl: 'http://localhost:8080',
+    model: 'gpt-5',
+    apiMode: 'chat-completions',
+  },
   dailyReminderEnabled: false,
   dailyReminderTime: '18:00',
   dailyReminderMessage: '可以花一分钟沉淀一下今天的工作。',
@@ -90,6 +96,14 @@ const settings: AppSettings = {
 };
 
 describe('createAIService', () => {
+  const localGatewaySettings: AppSettings = {
+    ...settings,
+    localGateway: {
+      ...settings.localGateway,
+      enabled: true,
+    },
+  };
+
   it('reads the saved Codex command before generating a daily memory', async () => {
     const generateDailyMemory = vi
       .fn<AIProvider['generateDailyMemory']>()
@@ -263,6 +277,189 @@ describe('createAIService', () => {
         apiMode: 'responses',
       },
     });
+  });
+
+  it('routes daily memory generation through the local gateway when the probe succeeds', async () => {
+    const codexGenerateDailyMemory = vi.fn<AIProvider['generateDailyMemory']>();
+    const openAIGenerateDailyMemory = vi
+      .fn<AIProvider['generateDailyMemory']>()
+      .mockResolvedValue(generated);
+    const localGatewayProbe = vi.fn().mockResolvedValue({ reachable: true });
+    const service = createAIService({
+      settingsRepository: {
+        getSettings: vi.fn().mockResolvedValue(localGatewaySettings),
+      },
+      codexProvider: {
+        id: 'ai-codex-cli',
+        name: 'Codex CLI',
+        generateDailyMemory: codexGenerateDailyMemory,
+        generateWeeklyReport: vi.fn(),
+        generateRangeReport: vi.fn(),
+      },
+      openAICompatibleProvider: {
+        id: 'openai-compatible',
+        name: 'OpenAI Compatible',
+        generateDailyMemory: openAIGenerateDailyMemory,
+        generateWeeklyReport: vi.fn(),
+        generateRangeReport: vi.fn(),
+      },
+      localGatewayProbe,
+    });
+
+    await expect(service.generateDailyMemory(input)).resolves.toEqual(generated);
+
+    expect(localGatewayProbe).toHaveBeenCalledWith('http://localhost:8080');
+    expect(openAIGenerateDailyMemory).toHaveBeenCalledWith(input, {
+      codexCommand: 'custom-codex',
+      codexModel: 'gpt-5.4-mini',
+      openAICompatible: {
+        baseUrl: 'http://localhost:8080',
+        apiKey: 'local-gateway',
+        model: 'gpt-5',
+        apiMode: 'chat-completions',
+      },
+    });
+    expect(codexGenerateDailyMemory).not.toHaveBeenCalled();
+  });
+
+  it('falls back to the selected provider when the local gateway is unavailable', async () => {
+    const codexGenerateDailyMemory = vi
+      .fn<AIProvider['generateDailyMemory']>()
+      .mockResolvedValue(generated);
+    const openAIGenerateDailyMemory = vi.fn<AIProvider['generateDailyMemory']>();
+    const localGatewayProbe = vi.fn().mockResolvedValue({ reachable: false });
+    const service = createAIService({
+      settingsRepository: {
+        getSettings: vi.fn().mockResolvedValue(localGatewaySettings),
+      },
+      codexProvider: {
+        id: 'ai-codex-cli',
+        name: 'Codex CLI',
+        generateDailyMemory: codexGenerateDailyMemory,
+        generateWeeklyReport: vi.fn(),
+        generateRangeReport: vi.fn(),
+      },
+      openAICompatibleProvider: {
+        id: 'openai-compatible',
+        name: 'OpenAI Compatible',
+        generateDailyMemory: openAIGenerateDailyMemory,
+        generateWeeklyReport: vi.fn(),
+        generateRangeReport: vi.fn(),
+      },
+      localGatewayProbe,
+    });
+
+    await expect(service.generateDailyMemory(input)).resolves.toEqual(generated);
+
+    expect(codexGenerateDailyMemory).toHaveBeenCalledWith(input, {
+      codexCommand: 'custom-codex',
+      codexModel: 'gpt-5.4-mini',
+      openAICompatible: settings.openAICompatible,
+    });
+    expect(openAIGenerateDailyMemory).not.toHaveBeenCalled();
+  });
+
+  it('does not probe when local gateway mode is disabled', async () => {
+    const codexGenerateDailyMemory = vi
+      .fn<AIProvider['generateDailyMemory']>()
+      .mockResolvedValue(generated);
+    const localGatewayProbe = vi.fn();
+    const service = createAIService({
+      settingsRepository: {
+        getSettings: vi.fn().mockResolvedValue({
+          ...settings,
+          localGateway: {
+            ...settings.localGateway,
+            enabled: false,
+          },
+        }),
+      },
+      codexProvider: {
+        id: 'ai-codex-cli',
+        name: 'Codex CLI',
+        generateDailyMemory: codexGenerateDailyMemory,
+        generateWeeklyReport: vi.fn(),
+        generateRangeReport: vi.fn(),
+      },
+      localGatewayProbe,
+    });
+
+    await expect(service.generateDailyMemory(input)).resolves.toEqual(generated);
+
+    expect(localGatewayProbe).not.toHaveBeenCalled();
+    expect(codexGenerateDailyMemory).toHaveBeenCalledTimes(1);
+  });
+
+  it('silently retries the selected provider when a reachable gateway fails at runtime', async () => {
+    const codexGenerateDailyMemory = vi
+      .fn<AIProvider['generateDailyMemory']>()
+      .mockResolvedValue(generated);
+    const openAIGenerateDailyMemory = vi
+      .fn<AIProvider['generateDailyMemory']>()
+      .mockRejectedValue(new Error('gateway down'));
+    const service = createAIService({
+      settingsRepository: {
+        getSettings: vi.fn().mockResolvedValue(localGatewaySettings),
+      },
+      codexProvider: {
+        id: 'ai-codex-cli',
+        name: 'Codex CLI',
+        generateDailyMemory: codexGenerateDailyMemory,
+        generateWeeklyReport: vi.fn(),
+        generateRangeReport: vi.fn(),
+      },
+      openAICompatibleProvider: {
+        id: 'openai-compatible',
+        name: 'OpenAI Compatible',
+        generateDailyMemory: openAIGenerateDailyMemory,
+        generateWeeklyReport: vi.fn(),
+        generateRangeReport: vi.fn(),
+      },
+      localGatewayProbe: vi.fn().mockResolvedValue({ reachable: true }),
+    });
+
+    await expect(service.generateDailyMemory(input)).resolves.toEqual(generated);
+
+    expect(openAIGenerateDailyMemory).toHaveBeenCalledTimes(1);
+    expect(codexGenerateDailyMemory).toHaveBeenCalledTimes(1);
+  });
+
+  it('caches successful local gateway probes for 60 seconds', async () => {
+    let now = 1_000;
+    const localGatewayProbe = vi.fn().mockResolvedValue({ reachable: true });
+    const openAIGenerateDailyMemory = vi
+      .fn<AIProvider['generateDailyMemory']>()
+      .mockResolvedValue(generated);
+    const service = createAIService({
+      settingsRepository: {
+        getSettings: vi.fn().mockResolvedValue(localGatewaySettings),
+      },
+      codexProvider: {
+        id: 'ai-codex-cli',
+        name: 'Codex CLI',
+        generateDailyMemory: vi.fn(),
+        generateWeeklyReport: vi.fn(),
+        generateRangeReport: vi.fn(),
+      },
+      openAICompatibleProvider: {
+        id: 'openai-compatible',
+        name: 'OpenAI Compatible',
+        generateDailyMemory: openAIGenerateDailyMemory,
+        generateWeeklyReport: vi.fn(),
+        generateRangeReport: vi.fn(),
+      },
+      localGatewayProbe,
+      now: () => now,
+    });
+
+    await service.generateDailyMemory(input);
+    now += 59_000;
+    await service.generateDailyMemory(input);
+    now += 1_001;
+    await service.generateDailyMemory(input);
+
+    expect(localGatewayProbe).toHaveBeenCalledTimes(2);
+    expect(openAIGenerateDailyMemory).toHaveBeenCalledTimes(3);
   });
 
   it('analyzes report style with the selected provider', async () => {

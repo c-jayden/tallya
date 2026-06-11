@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { aiService } from '../../services/ai/ai-service';
+import { probeLocalGateway } from '../../services/ai/local-gateway';
 import {
   DEFAULT_APP_SETTINGS,
   appSettingsRepository,
@@ -28,6 +29,11 @@ const initialProviderHealth: ProviderHealth = {
   message: '尚未检测',
 };
 
+const initialLocalGatewayHealth: ProviderHealth = {
+  status: 'unknown',
+  message: '尚未检测',
+};
+
 const SETTINGS_SAVE_DEBOUNCE_MS = 500;
 const REPORT_STYLE_EXTRACT_TIMEOUT_MS = 60_000;
 
@@ -45,6 +51,7 @@ export function useSettingsDialogState({
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_APP_SETTINGS);
   const [isLoadingSettings, setIsLoadingSettings] = useState(false);
   const [isCheckingProvider, setIsCheckingProvider] = useState(false);
+  const [isCheckingLocalGateway, setIsCheckingLocalGateway] = useState(false);
   const [isExportingBackup, setIsExportingBackup] = useState(false);
   const [isSelectingBackupFile, setIsSelectingBackupFile] = useState(false);
   const [isImportingBackup, setIsImportingBackup] = useState(false);
@@ -59,6 +66,8 @@ export function useSettingsDialogState({
   const [isImportConfirmOpen, setIsImportConfirmOpen] = useState(false);
   const [pendingBackupPayload, setPendingBackupPayload] = useState<BackupPayload | null>(null);
   const [providerHealth, setProviderHealth] = useState<ProviderHealth>(initialProviderHealth);
+  const [localGatewayHealth, setLocalGatewayHealth] =
+    useState<ProviderHealth>(initialLocalGatewayHealth);
 
   useEffect(() => {
     if (!open) {
@@ -203,6 +212,45 @@ export function useSettingsDialogState({
     } finally {
       if (runId === asyncRunId.current) {
         setIsCheckingProvider(false);
+      }
+    }
+  }
+
+  async function checkLocalGateway() {
+    const runId = ++asyncRunId.current;
+
+    setIsCheckingLocalGateway(true);
+    setLocalGatewayHealth({ status: 'checking', message: '正在检测网关...' });
+
+    try {
+      const savedSettings = await persistSettings(normalizeProviderSettings(latestSettingsRef.current));
+      const result = await probeLocalGateway(savedSettings.localGateway.baseUrl);
+
+      if (runId === asyncRunId.current) {
+        setLocalGatewayHealth(
+          result.reachable
+            ? {
+                status: 'available',
+                message: '检测到网关，可用',
+              }
+            : {
+                status: 'unavailable',
+                message: '未检测到本地网关',
+                detail: '将使用 Codex CLI',
+              },
+        );
+      }
+    } catch {
+      if (runId === asyncRunId.current) {
+        setLocalGatewayHealth({
+          status: 'unavailable',
+          message: '检测失败',
+          detail: '将使用 Codex CLI',
+        });
+      }
+    } finally {
+      if (runId === asyncRunId.current) {
+        setIsCheckingLocalGateway(false);
       }
     }
   }
@@ -406,6 +454,7 @@ export function useSettingsDialogState({
     setIsClearConfirmOpen(false);
     setIsImportConfirmOpen(false);
     setIsCheckingProvider(false);
+    setIsCheckingLocalGateway(false);
     setIsExportingBackup(false);
     setIsSelectingBackupFile(false);
     setIsImportingBackup(false);
@@ -417,15 +466,19 @@ export function useSettingsDialogState({
     setIsSendingTestNotification(false);
     setPendingBackupPayload(null);
     setProviderHealth(initialProviderHealth);
+    setLocalGatewayHealth(initialLocalGatewayHealth);
   }
 
   return {
     activeSection,
+    checkLocalGateway,
     checkProviderHealth,
     confirmImportBackup,
     clearLocalData,
     exportBackup,
+    localGatewayHealth,
     providerHealth,
+    isCheckingLocalGateway,
     isCheckingProvider,
     isClearConfirmOpen,
     isClearingData,
@@ -469,6 +522,13 @@ function normalizeProviderSettings(settings: AppSettings) {
         DEFAULT_APP_SETTINGS.openAICompatible.model,
       apiMode:
         settings.openAICompatible.apiMode || DEFAULT_APP_SETTINGS.openAICompatible.apiMode,
+    },
+    localGateway: {
+      enabled: settings.localGateway.enabled,
+      baseUrl:
+        settings.localGateway.baseUrl.trim() || DEFAULT_APP_SETTINGS.localGateway.baseUrl,
+      model: settings.localGateway.model.trim(),
+      apiMode: settings.localGateway.apiMode || DEFAULT_APP_SETTINGS.localGateway.apiMode,
     },
   };
 }

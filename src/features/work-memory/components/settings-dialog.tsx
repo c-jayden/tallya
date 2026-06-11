@@ -65,7 +65,9 @@ export function SettingsDialog({
               settings={settingsState.settings}
               isLoadingSettings={settingsState.isLoadingSettings}
               providerHealth={settingsState.providerHealth}
+              localGatewayHealth={settingsState.localGatewayHealth}
               isCheckingProvider={settingsState.isCheckingProvider}
+              isCheckingLocalGateway={settingsState.isCheckingLocalGateway}
               isExportingBackup={settingsState.isExportingBackup}
               isImportingBackup={settingsState.isImportingBackup}
               isOpeningDataDirectory={settingsState.isOpeningDataDirectory}
@@ -75,6 +77,7 @@ export function SettingsDialog({
               isSendingTestNotification={settingsState.isSendingTestNotification}
               onUpdateSettings={settingsState.updateSettings}
               onCheckHealth={settingsState.checkProviderHealth}
+              onCheckLocalGateway={settingsState.checkLocalGateway}
               onExportBackup={settingsState.exportBackup}
               onImportBackup={settingsState.requestImportBackup}
               onOpenDataDirectory={settingsState.openDataDirectory}

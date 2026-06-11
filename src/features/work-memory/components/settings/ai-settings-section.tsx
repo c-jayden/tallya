@@ -23,6 +23,7 @@ import {
   matchOpenAIProviderPreset,
   openAICompatibleProviderPresets,
 } from '../../services/ai/known-openai-providers';
+import { LocalGatewaySettingsSection } from './local-gateway-settings-section';
 import { Field, StatusLine } from './settings-shared';
 import type { ProviderHealth } from './settings-types';
 
@@ -61,17 +62,23 @@ const apiModeOptions: {
 type AISettingsSectionProps = {
   settings: AppSettings;
   providerHealth: ProviderHealth;
+  localGatewayHealth: ProviderHealth;
   isCheckingProvider: boolean;
+  isCheckingLocalGateway: boolean;
   onUpdateSettings: (patch: Partial<AppSettings>) => void;
   onCheckHealth: () => void;
+  onCheckLocalGateway: () => void;
 };
 
 export function AISettingsSection({
   settings,
   providerHealth,
+  localGatewayHealth,
   isCheckingProvider,
+  isCheckingLocalGateway,
   onUpdateSettings,
   onCheckHealth,
+  onCheckLocalGateway,
 }: AISettingsSectionProps) {
   const selectedProvider =
     visibleProviderOptions.find((option) => option.value === settings.aiProviderId) ??
@@ -107,6 +114,14 @@ export function AISettingsSection({
       <p className="text-sm text-app-ink-subtle">选择用于整理工作记忆的 AI 服务。</p>
 
       <div className="space-y-6">
+        <LocalGatewaySettingsSection
+          settings={settings}
+          localGatewayHealth={localGatewayHealth}
+          isCheckingLocalGateway={isCheckingLocalGateway}
+          onUpdateSettings={onUpdateSettings}
+          onCheckLocalGateway={onCheckLocalGateway}
+        />
+
         <Field label="AI 服务" description={selectedProvider.description}>
           <Select
             value={selectedProvider.value}

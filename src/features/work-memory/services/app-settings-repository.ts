@@ -19,6 +19,13 @@ export type OpenAICompatibleSettings = {
   apiMode: OpenAICompatibleApiMode;
 };
 
+export type LocalGatewaySettings = {
+  enabled: boolean;
+  baseUrl: string;
+  model: string;
+  apiMode: OpenAICompatibleApiMode;
+};
+
 export type OllamaSettings = {
   baseUrl: string;
   model: string;
@@ -29,6 +36,7 @@ export type AppSettings = {
   codexCommand: string;
   codexModel: string;
   openAICompatible: OpenAICompatibleSettings;
+  localGateway: LocalGatewaySettings;
   ollama: OllamaSettings;
   dailyReminderEnabled: boolean;
   dailyReminderTime: string;
@@ -63,6 +71,12 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
     baseUrl: 'https://api.openai.com/v1',
     apiKey: '',
     model: DEFAULT_OPENAI_COMPATIBLE_MODEL,
+    apiMode: 'chat-completions',
+  },
+  localGateway: {
+    enabled: true,
+    baseUrl: 'http://localhost:8080',
+    model: '',
     apiMode: 'chat-completions',
   },
   ollama: {
@@ -281,6 +295,10 @@ function appSettingsToRows(settings: AppSettings): Record<string, string> {
     openAICompatibleApiKey: settings.openAICompatible.apiKey,
     openAICompatibleModel: settings.openAICompatible.model,
     openAICompatibleApiMode: settings.openAICompatible.apiMode,
+    localGatewayEnabled: String(settings.localGateway.enabled),
+    localGatewayBaseUrl: settings.localGateway.baseUrl,
+    localGatewayModel: settings.localGateway.model,
+    localGatewayApiMode: settings.localGateway.apiMode,
     ollamaBaseUrl: settings.ollama.baseUrl,
     ollamaModel: settings.ollama.model,
     dailyReminderEnabled: String(settings.dailyReminderEnabled),
@@ -315,6 +333,12 @@ function rowsToAppSettingsInput(rows: AppSettingsRow[]) {
       apiKey: values.openAICompatibleApiKey,
       model: values.openAICompatibleModel,
       apiMode: values.openAICompatibleApiMode,
+    },
+    localGateway: {
+      enabled: getBooleanString(values.localGatewayEnabled),
+      baseUrl: values.localGatewayBaseUrl,
+      model: values.localGatewayModel,
+      apiMode: values.localGatewayApiMode,
     },
     ollama: {
       baseUrl: values.ollamaBaseUrl,
@@ -371,6 +395,7 @@ function normalizeAppSettings(value: unknown): AppSettings {
       getString(input.codexModel, DEFAULT_APP_SETTINGS.codexModel),
     ),
     openAICompatible: normalizeOpenAICompatibleSettings(input.openAICompatible),
+    localGateway: normalizeLocalGatewaySettings(input.localGateway),
     ollama: normalizeOllamaSettings(input.ollama),
     dailyReminderEnabled: getBoolean(
       input.dailyReminderEnabled,
@@ -477,6 +502,21 @@ function normalizeOpenAICompatibleSettings(value: unknown): OpenAICompatibleSett
     baseUrl: getString(input.baseUrl, DEFAULT_APP_SETTINGS.openAICompatible.baseUrl),
     apiKey: getString(input.apiKey, DEFAULT_APP_SETTINGS.openAICompatible.apiKey),
     model: getString(input.model, DEFAULT_APP_SETTINGS.openAICompatible.model),
+    apiMode: getOpenAICompatibleApiMode(input.apiMode),
+  };
+}
+
+function normalizeLocalGatewaySettings(value: unknown): LocalGatewaySettings {
+  if (!value || typeof value !== 'object') {
+    return DEFAULT_APP_SETTINGS.localGateway;
+  }
+
+  const input = value as Record<string, unknown>;
+
+  return {
+    enabled: getBoolean(input.enabled, DEFAULT_APP_SETTINGS.localGateway.enabled),
+    baseUrl: getString(input.baseUrl, DEFAULT_APP_SETTINGS.localGateway.baseUrl),
+    model: getString(input.model, DEFAULT_APP_SETTINGS.localGateway.model),
     apiMode: getOpenAICompatibleApiMode(input.apiMode),
   };
 }
