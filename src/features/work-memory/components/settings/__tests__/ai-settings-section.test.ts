@@ -14,6 +14,20 @@ describe('AISettingsSection', () => {
     expect(source).not.toContain("label: 'Mock'");
   });
 
+  it('puts the common AI path before advanced provider configuration', () => {
+    expect(source).toContain('当前使用路径');
+    expect(source).toContain('回退服务');
+    expect(source).toContain('检测 AI 连接');
+    expect(source).toContain('handleCheckAIConnection');
+    expect(source).toContain('高级设置');
+    expect(source).toContain('<details');
+    expect(source).toContain('ChevronRight');
+    expect(source).toContain('group-open/ai-advanced:rotate-90');
+    expect(source).toContain('group-open/openai-compatible:rotate-90');
+    expect(source).not.toContain('默认 AI 服务');
+    expect(source).not.toContain('连接状态');
+  });
+
   it('keeps API Key in a password input', () => {
     expect(source).toContain('label="密钥"');
     expect(source).toContain('type="password"');

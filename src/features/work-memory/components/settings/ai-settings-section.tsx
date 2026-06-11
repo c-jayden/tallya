@@ -1,4 +1,4 @@
-import { Loader2 } from 'lucide-react';
+import { ChevronRight, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
@@ -24,7 +24,7 @@ import {
   openAICompatibleProviderPresets,
 } from '../../services/ai/known-openai-providers';
 import { LocalGatewaySettingsSection } from './local-gateway-settings-section';
-import { Field, StatusLine } from './settings-shared';
+import { Field } from './settings-shared';
 import type { ProviderHealth } from './settings-types';
 
 const visibleProviderOptions: { value: AIProviderId; label: string; description: string }[] = [
@@ -88,8 +88,18 @@ export function AISettingsSection({
   const selectedCodexModel =
     normalizeProviderModel('ai-codex-cli', settings.codexModel) ||
     getDefaultProviderModel('ai-codex-cli');
+  const selectedCodexModelLabel =
+    codexModelOptions.find((option) => option.value === selectedCodexModel)?.label ??
+    selectedCodexModel;
   const selectedPresetId = matchOpenAIProviderPreset(settings.openAICompatible.baseUrl);
   const activePresetHint = getOpenAIProviderPreset(selectedPresetId)?.hint;
+  const fallbackLabel = isCodexProvider
+    ? `Codex CLI · ${selectedCodexModelLabel}`
+    : 'OpenAI 兼容服务';
+  const routeSummary = settings.localGateway.enabled
+    ? `优先本地网关；不可用时回退到 ${fallbackLabel}`
+    : `直接使用 ${fallbackLabel}`;
+  const isCheckingAIConnection = isCheckingProvider || isCheckingLocalGateway;
 
   function applyProviderPreset(presetId: string) {
     const preset = getOpenAIProviderPreset(presetId);
@@ -109,61 +119,71 @@ export function AISettingsSection({
     });
   }
 
+  function handleCheckAIConnection() {
+    if (settings.localGateway.enabled) {
+      onCheckLocalGateway();
+    }
+
+    onCheckHealth();
+  }
+
   return (
-    <section className="space-y-7" aria-label="AI 配置">
+    <section className="space-y-6" aria-label="AI 配置">
       <p className="text-sm text-app-ink-subtle">
-        选择帮你整理工作记忆的 AI 服务；没有本地网关时会按这里回退。
+        Tallya 会先走本机网关；不可用时安静回到你选的服务。
       </p>
 
-      <div className="space-y-6">
-        <LocalGatewaySettingsSection
-          settings={settings}
-          localGatewayHealth={localGatewayHealth}
-          isCheckingLocalGateway={isCheckingLocalGateway}
-          onUpdateSettings={onUpdateSettings}
-          onCheckLocalGateway={onCheckLocalGateway}
-        />
+      <div className="grid gap-6">
+        <div className="grid gap-3 border-y border-app-border py-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="grid gap-1">
+              <span className="text-sm font-semibold text-app-ink">当前使用路径</span>
+              <p className="text-[13px] leading-5 text-app-ink-muted">{routeSummary}</p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={isCheckingAIConnection}
+              onClick={handleCheckAIConnection}
+            >
+              {isCheckingAIConnection && (
+                <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+              )}
+              检测 AI 连接
+            </Button>
+          </div>
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-[13px] leading-5 text-app-ink-subtle">
+            {settings.localGateway.enabled ? (
+              <span>本地网关：{formatProviderHealth(localGatewayHealth)}</span>
+            ) : null}
+            <span>回退服务：{formatProviderHealth(providerHealth)}</span>
+          </div>
+        </div>
 
-        <Field label="默认 AI 服务" description={selectedProvider.description}>
-          <Select
-            value={selectedProvider.value}
-            onValueChange={(value) => {
-              const aiProviderId = value as AIProviderId;
+        <div className="grid gap-5">
+          <LocalGatewaySettingsSection settings={settings} onUpdateSettings={onUpdateSettings} />
 
-              onUpdateSettings({
-                aiProviderId,
-                codexModel:
-                  aiProviderId === 'ai-codex-cli'
-                    ? normalizeProviderModel(aiProviderId, settings.codexModel) ||
-                      getDefaultProviderModel(aiProviderId)
-                    : settings.codexModel,
-              });
-            }}
-          >
-            <SelectTrigger className="h-10 w-56 bg-app-surface">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {visibleProviderOptions.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Field>
-
-        {isCodexProvider ? (
-          <Field label="模型" description="选择 Codex CLI 整理工作记忆时使用的模型。">
+          <Field label="回退服务" description={selectedProvider.description}>
             <Select
-              value={selectedCodexModel}
-              onValueChange={(codexModel) => onUpdateSettings({ codexModel })}
+              value={selectedProvider.value}
+              onValueChange={(value) => {
+                const aiProviderId = value as AIProviderId;
+
+                onUpdateSettings({
+                  aiProviderId,
+                  codexModel:
+                    aiProviderId === 'ai-codex-cli'
+                      ? normalizeProviderModel(aiProviderId, settings.codexModel) ||
+                        getDefaultProviderModel(aiProviderId)
+                      : settings.codexModel,
+                });
+              }}
             >
               <SelectTrigger className="h-10 w-56 bg-app-surface">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {codexModelOptions.map((option) => (
+                {visibleProviderOptions.map((option) => (
                   <SelectItem key={option.value} value={option.value}>
                     {option.label}
                   </SelectItem>
@@ -171,151 +191,180 @@ export function AISettingsSection({
               </SelectContent>
             </Select>
           </Field>
-        ) : (
-          <div className="space-y-5">
-            <Field
-              label="服务商"
-              description="已内置 DeepSeek、通义、Kimi、OpenRouter、OpenAI 等常用接口。Anthropic 格式可先通过网关转成 OpenAI 兼容接口。"
-            >
-              <Select value={selectedPresetId} onValueChange={applyProviderPreset}>
+
+          {isCodexProvider ? (
+            <Field label="Codex 模型" description="本地网关不可用时，会用这个模型整理。">
+              <Select
+                value={selectedCodexModel}
+                onValueChange={(codexModel) => onUpdateSettings({ codexModel })}
+              >
                 <SelectTrigger className="h-10 w-56 bg-app-surface">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {openAICompatibleProviderPresets.map((preset) => (
-                    <SelectItem key={preset.id} value={preset.id}>
-                      {preset.label}
+                  {codexModelOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
                     </SelectItem>
                   ))}
-                  <SelectItem value={CUSTOM_OPENAI_PROVIDER_ID}>自定义</SelectItem>
                 </SelectContent>
               </Select>
             </Field>
+          ) : null}
+        </div>
 
-            <Field label="服务地址">
-              <Input
-                className={openAIInputClassName}
-                value={settings.openAICompatible.baseUrl}
-                onChange={(event) =>
-                  onUpdateSettings({
-                    openAICompatible: {
-                      ...settings.openAICompatible,
-                      baseUrl: event.target.value,
-                    },
-                  })
-                }
-                placeholder="https://api.openai.com/v1"
-              />
-            </Field>
+        <details className="group/ai-advanced border-t border-app-border pt-4" open={!isCodexProvider}>
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-app-ink transition-colors hover:text-app-ink-muted [&::-webkit-details-marker]:hidden">
+            <span>高级设置</span>
+            <ChevronRight
+              className="size-4 text-app-ink-subtle transition-transform group-open/ai-advanced:rotate-90"
+              aria-hidden="true"
+            />
+          </summary>
+          <div className="mt-4 grid gap-5">
+            <details
+              className="group/openai-compatible border-t border-app-border pt-3"
+              open={!isCodexProvider}
+            >
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-medium text-app-ink-muted transition-colors hover:text-app-ink [&::-webkit-details-marker]:hidden">
+                <span>OpenAI 兼容服务设置</span>
+                <ChevronRight
+                  className="size-4 text-app-ink-subtle transition-transform group-open/openai-compatible:rotate-90"
+                  aria-hidden="true"
+                />
+              </summary>
+              <div className="mt-3 grid gap-4">
+                <Field
+                  label="服务商"
+                  description="已内置 DeepSeek、通义、Kimi、OpenRouter、OpenAI 等常用接口。Anthropic 格式可先通过网关转成 OpenAI 兼容接口。"
+                >
+                  <Select value={selectedPresetId} onValueChange={applyProviderPreset}>
+                    <SelectTrigger className="h-10 w-56 bg-app-surface">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {openAICompatibleProviderPresets.map((preset) => (
+                        <SelectItem key={preset.id} value={preset.id}>
+                          {preset.label}
+                        </SelectItem>
+                      ))}
+                      <SelectItem value={CUSTOM_OPENAI_PROVIDER_ID}>自定义</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </Field>
 
-            <Field label="密钥">
-              <Input
-                className={openAIInputClassName}
-                type="password"
-                value={settings.openAICompatible.apiKey}
-                onChange={(event) =>
-                  onUpdateSettings({
-                    openAICompatible: {
-                      ...settings.openAICompatible,
-                      apiKey: event.target.value,
-                    },
-                  })
-                }
-                placeholder="粘贴服务商提供的 API Key"
-                autoComplete="off"
-              />
-            </Field>
+                <Field label="服务地址">
+                  <Input
+                    className={openAIInputClassName}
+                    value={settings.openAICompatible.baseUrl}
+                    onChange={(event) =>
+                      onUpdateSettings({
+                        openAICompatible: {
+                          ...settings.openAICompatible,
+                          baseUrl: event.target.value,
+                        },
+                      })
+                    }
+                    placeholder="https://api.openai.com/v1"
+                  />
+                </Field>
 
-            <Field label="模型">
-              <Input
-                className={openAIInputClassName}
-                value={settings.openAICompatible.model}
-                onChange={(event) =>
-                  onUpdateSettings({
-                    openAICompatible: {
-                      ...settings.openAICompatible,
-                      model: event.target.value,
-                    },
-                  })
-                }
-                placeholder={DEFAULT_OPENAI_COMPATIBLE_MODEL}
-              />
-            </Field>
+                <Field label="密钥">
+                  <Input
+                    className={openAIInputClassName}
+                    type="password"
+                    value={settings.openAICompatible.apiKey}
+                    onChange={(event) =>
+                      onUpdateSettings({
+                        openAICompatible: {
+                          ...settings.openAICompatible,
+                          apiKey: event.target.value,
+                        },
+                      })
+                    }
+                    placeholder="粘贴服务商提供的 API Key"
+                    autoComplete="off"
+                  />
+                </Field>
 
-            {activePresetHint ? (
-              <p className="text-[13px] leading-5 text-app-ink-subtle">{activePresetHint}</p>
-            ) : null}
+                <Field label="模型">
+                  <Input
+                    className={openAIInputClassName}
+                    value={settings.openAICompatible.model}
+                    onChange={(event) =>
+                      onUpdateSettings({
+                        openAICompatible: {
+                          ...settings.openAICompatible,
+                          model: event.target.value,
+                        },
+                      })
+                    }
+                    placeholder={DEFAULT_OPENAI_COMPATIBLE_MODEL}
+                  />
+                </Field>
 
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between gap-3 text-sm">
-                <span className="font-medium text-app-ink-muted">接口模式</span>
-                <div className="inline-flex w-fit gap-1 rounded-xl bg-gray-100 p-1 dark:bg-app-surface-muted">
-                  {apiModeOptions.map((option) => {
-                    const isSelected = settings.openAICompatible.apiMode === option.value;
+                {activePresetHint ? (
+                  <p className="text-[13px] leading-5 text-app-ink-subtle">{activePresetHint}</p>
+                ) : null}
 
-                    return (
-                      <button
-                        key={option.value}
-                        type="button"
-                        className={cn(
-                          'h-8 cursor-pointer rounded-lg bg-transparent px-3.5 text-sm text-app-ink-muted transition-colors hover:text-app-ink focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none disabled:cursor-not-allowed',
-                          isSelected &&
-                            'bg-white font-semibold text-app-ink shadow-[0_1px_1px_rgb(15_23_42/0.04)] dark:bg-app-surface dark:text-app-ink',
-                        )}
-                        aria-pressed={isSelected}
-                        onClick={() => {
-                          const mode = option.value;
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between gap-3 text-sm">
+                    <span className="font-medium text-app-ink-muted">接口模式</span>
+                    <div className="inline-flex w-fit gap-1 rounded-xl bg-gray-100 p-1 dark:bg-app-surface-muted">
+                      {apiModeOptions.map((option) => {
+                        const isSelected = settings.openAICompatible.apiMode === option.value;
 
-                          onUpdateSettings({
-                            openAICompatible: {
-                              ...settings.openAICompatible,
-                              apiMode: mode,
-                            },
-                          });
-                        }}
-                      >
-                        {option.label}
-                      </button>
-                    );
-                  })}
+                        return (
+                          <button
+                            key={option.value}
+                            type="button"
+                            className={cn(
+                              'h-8 cursor-pointer rounded-lg bg-transparent px-3.5 text-sm text-app-ink-muted transition-colors hover:text-app-ink focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none disabled:cursor-not-allowed',
+                              isSelected &&
+                                'bg-white font-semibold text-app-ink shadow-[0_1px_1px_rgb(15_23_42/0.04)] dark:bg-app-surface dark:text-app-ink',
+                            )}
+                            aria-pressed={isSelected}
+                            onClick={() => {
+                              const mode = option.value;
+
+                              onUpdateSettings({
+                                openAICompatible: {
+                                  ...settings.openAICompatible,
+                                  apiMode: mode,
+                                },
+                              });
+                            }}
+                          >
+                            {option.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    {apiModeOptions.map((option) => (
+                      <p key={option.value} className="text-[13px] leading-5 text-app-ink-subtle">
+                        {option.label}：{option.description}
+                      </p>
+                    ))}
+                  </div>
+                  <p className="text-[13px] leading-5 text-app-ink-subtle">
+                    本地网关或公司网关遇到 “only /v1/responses” 时，再切换到 Responses API。
+                  </p>
                 </div>
               </div>
-              <div className="space-y-1">
-                {apiModeOptions.map((option) => (
-                  <p key={option.value} className="text-[13px] leading-5 text-app-ink-subtle">
-                    {option.label}：{option.description}
-                  </p>
-                ))}
-              </div>
-              <p className="text-[13px] leading-5 text-app-ink-subtle">
-                本地网关或公司网关遇到 “only /v1/responses” 时，再切换到 Responses API。
-              </p>
-            </div>
+            </details>
           </div>
-        )}
-
-        <Field label="连接状态">
-          <div className="space-y-2.5">
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                disabled={isCheckingProvider}
-                onClick={onCheckHealth}
-              >
-                {isCheckingProvider && (
-                  <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
-                )}
-                检测一下
-              </Button>
-              <StatusLine health={providerHealth} />
-            </div>
-            <p className="text-[13px] leading-5 text-app-ink-subtle">
-              检测只确认服务能连通；模型和账号额度会在实际整理时继续校验。
-            </p>
-          </div>
-        </Field>
+        </details>
       </div>
     </section>
   );
+}
+
+function formatProviderHealth(health: ProviderHealth) {
+  if (health.status === 'checking') {
+    return '检测中';
+  }
+
+  return health.message;
 }

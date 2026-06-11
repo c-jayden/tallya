@@ -1,14 +1,9 @@
-import { Loader2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { ChevronRight } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import type {
-  AppSettings,
-  LocalGatewaySettings,
-} from '../../services/app-settings-repository';
+import type { AppSettings, LocalGatewaySettings } from '../../services/app-settings-repository';
 import type { OpenAICompatibleApiMode } from '../../services/ai/ai-provider';
-import { Field, StatusLine, SwitchField } from './settings-shared';
-import type { ProviderHealth } from './settings-types';
+import { SwitchField } from './settings-shared';
 
 const localGatewayInputClassName = 'bg-app-surface placeholder:text-slate-400';
 
@@ -31,18 +26,12 @@ const apiModeOptions: {
 
 type LocalGatewaySettingsSectionProps = {
   settings: AppSettings;
-  localGatewayHealth: ProviderHealth;
-  isCheckingLocalGateway: boolean;
   onUpdateSettings: (patch: Partial<AppSettings>) => void;
-  onCheckLocalGateway: () => void;
 };
 
 export function LocalGatewaySettingsSection({
   settings,
-  localGatewayHealth,
-  isCheckingLocalGateway,
   onUpdateSettings,
-  onCheckLocalGateway,
 }: LocalGatewaySettingsSectionProps) {
   function updateLocalGateway(patch: Partial<LocalGatewaySettings>) {
     onUpdateSettings({
@@ -54,39 +43,44 @@ export function LocalGatewaySettingsSection({
   }
 
   return (
-    <div className="space-y-4 border-t border-app-border pt-5" aria-label="本地 AI 网关">
-      <Field
-        label="本地 AI 网关"
-        description="没有本地网关也没关系，会继续使用 Codex CLI，无需额外操作。"
-      >
-        <div className="space-y-4">
-          <SwitchField
-            label="启用本地网关"
-            checked={settings.localGateway.enabled}
-            onCheckedChange={(enabled) => updateLocalGateway({ enabled })}
+    <section className="space-y-3" aria-label="本地 AI 网关">
+      <SwitchField
+        label="自动使用本地网关"
+        checked={settings.localGateway.enabled}
+        onCheckedChange={(enabled) => updateLocalGateway({ enabled })}
+      />
+      <p className="text-[13px] leading-5 text-app-ink-subtle">
+        打开后会自动探测本机网关，不可用时继续使用回退服务。
+      </p>
+
+      <details className="group/local-gateway border-t border-app-border pt-3">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-medium text-app-ink-muted transition-colors hover:text-app-ink [&::-webkit-details-marker]:hidden">
+          <span>本地网关高级设置</span>
+          <ChevronRight
+            className="size-4 text-app-ink-subtle transition-transform group-open/local-gateway:rotate-90"
+            aria-hidden="true"
           />
+        </summary>
+        <div className="mt-3 grid gap-3">
+          <label className="grid gap-1.5 text-sm">
+            <span className="font-medium text-app-ink-muted">网关地址</span>
+            <Input
+              className={localGatewayInputClassName}
+              value={settings.localGateway.baseUrl}
+              onChange={(event) => updateLocalGateway({ baseUrl: event.target.value })}
+              placeholder="例如 http://localhost:8080"
+            />
+          </label>
 
-          <div className="grid gap-3">
-            <label className="grid gap-1.5 text-sm">
-              <span className="font-medium text-app-ink-muted">网关地址</span>
-              <Input
-                className={localGatewayInputClassName}
-                value={settings.localGateway.baseUrl}
-                onChange={(event) => updateLocalGateway({ baseUrl: event.target.value })}
-                placeholder="例如 http://localhost:8080"
-              />
-            </label>
-
-            <label className="grid gap-1.5 text-sm">
-              <span className="font-medium text-app-ink-muted">模型</span>
-              <Input
-                className={localGatewayInputClassName}
-                value={settings.localGateway.model}
-                onChange={(event) => updateLocalGateway({ model: event.target.value })}
-                placeholder="填网关里显示的模型名"
-              />
-            </label>
-          </div>
+          <label className="grid gap-1.5 text-sm">
+            <span className="font-medium text-app-ink-muted">网关模型</span>
+            <Input
+              className={localGatewayInputClassName}
+              value={settings.localGateway.model}
+              onChange={(event) => updateLocalGateway({ model: event.target.value })}
+              placeholder="留空时沿用回退服务的模型"
+            />
+          </label>
 
           <div className="space-y-1.5">
             <div className="flex items-center justify-between gap-3 text-sm">
@@ -122,31 +116,15 @@ export function LocalGatewaySettingsSection({
             </div>
           </div>
 
-          <div className="space-y-2.5">
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                disabled={isCheckingLocalGateway}
-                onClick={onCheckLocalGateway}
-              >
-                {isCheckingLocalGateway && (
-                  <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
-                )}
-                检测
-              </Button>
-              <StatusLine health={localGatewayHealth} />
-            </div>
-            <p className="text-[13px] leading-5 text-app-ink-subtle">
-              运行 codex-proxy，或让 cc-switch 开放 OpenAI 兼容端点后，整理会优先走本地 HTTP。
-              模型留空时，会继续使用默认 AI 服务。
+          <div className="space-y-1 text-[13px] leading-5 text-app-ink-subtle">
+            <p>
+              codex-proxy 默认是本地 OpenAI 兼容端点；cc-switch 需要先开放 OpenAI
+              兼容端点。
             </p>
-            <p className="text-[13px] leading-5 text-app-ink-subtle">
-              经本地网关复用 ChatGPT 订阅额度属于非官方用法，可能违反对应服务条款，请自行评估。
-            </p>
+            <p>经本地网关复用 ChatGPT 订阅额度属于非官方用法，可能违反对应服务条款，请自行评估。</p>
           </div>
         </div>
-      </Field>
-    </div>
+      </details>
+    </section>
   );
 }
