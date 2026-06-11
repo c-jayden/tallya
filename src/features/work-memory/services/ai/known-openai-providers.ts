@@ -76,6 +76,14 @@ export const openAICompatibleProviderPresets: OpenAICompatibleProviderPreset[] =
     defaultModel: 'gpt-4o-mini',
     apiMode: 'chat-completions',
   },
+  {
+    id: 'anthropic',
+    label: 'Claude（Anthropic）',
+    baseUrl: 'https://api.anthropic.com/v1',
+    defaultModel: '',
+    apiMode: 'chat-completions',
+    hint: '密钥用 Anthropic API Key，模型填 Claude 名称（如 claude-sonnet-4-…）。这是 Anthropic 官方的 OpenAI 兼容层，官方定位为测试用途。',
+  },
 ];
 
 export function getOpenAIProviderPreset(id: string): OpenAICompatibleProviderPreset | null {
