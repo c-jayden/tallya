@@ -185,9 +185,25 @@ describe('SQLiteEntryRepository', () => {
     await repository.create({ content: '开会讨论订单结算', occurredAt: '2026-06-10T03:00:00.000Z' });
     await repository.create({ content: '无关的事', occurredAt: '2026-06-09T03:00:00.000Z' });
 
-    const results = await repository.search('订单');
+    const results = await repository.search('订单结算');
 
-    expect(results.map((entry) => entry.content)).toEqual(['开会讨论订单结算', '对接订单接口']);
+    expect(results.map((entry) => entry.content)).toEqual(['开会讨论订单结算']);
+  });
+
+  it('finds short CJK keywords the trigram index cannot match (LIKE fallback)', async () => {
+    const { repository } = createSqliteRepository();
+
+    await repository.create({ content: '完成登录功能', occurredAt: '2026-06-08T03:00:00.000Z' });
+    await repository.create({ content: '对接订单接口', occurredAt: '2026-06-10T03:00:00.000Z' });
+
+    // Two-character queries produce no trigrams, so FTS returns empty; search
+    // must fall through to LIKE rather than report "no results".
+    expect((await repository.search('登录')).map((entry) => entry.content)).toEqual([
+      '完成登录功能',
+    ]);
+    expect((await repository.search('订单')).map((entry) => entry.content)).toEqual([
+      '对接订单接口',
+    ]);
   });
 
   it('assigns threads and lists thread entries / recent entries through SQL', async () => {

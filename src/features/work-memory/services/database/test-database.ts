@@ -440,9 +440,14 @@ export class TestDatabaseClient implements DatabaseClient {
     }
 
     // FTS search path: the mock has no real FTS index, so it approximates the
-    // MATCH query with a case-insensitive substring scan over content.
+    // MATCH query with a case-insensitive substring scan over content. The
+    // trigram tokenizer only indexes 3+ character runs, so a shorter query
+    // matches nothing — mirrored here so search routing stays honest in tests.
     if (normalizedQuery.startsWith('select e.* from entries e join entries_fts')) {
       const keyword = stripFtsQuotes(String(bindValues[0])).toLowerCase();
+      if ([...keyword].length < 3) {
+        return [] as T;
+      }
       return Array.from(this.entries.values())
         .filter((row) => row.content.toLowerCase().includes(keyword))
         .sort(compareEntriesByOccurredAtDesc) as T;

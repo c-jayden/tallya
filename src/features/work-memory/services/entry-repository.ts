@@ -382,6 +382,14 @@ export class SQLiteEntryRepository implements EntryRepository {
     }
 
     return this.safeRead(async (database) => {
+      // The trigram tokenizer only indexes runs of 3+ characters, so a 1–2
+      // character query — common for CJK words like 登录/订单 — matches nothing
+      // in FTS and returns an empty set WITHOUT throwing, so the catch-based
+      // fallback below would never fire. Route short queries straight to LIKE.
+      if ([...normalized].length < 3) {
+        return this.searchByLike(database, normalized);
+      }
+
       try {
         const ftsQuery = `"${normalized.replace(/"/g, '""')}"`;
         const rows = await database.select<EntryRow[]>(
@@ -399,14 +407,18 @@ export class SQLiteEntryRepository implements EntryRepository {
           error,
         });
 
-        const rows = await database.select<EntryRow[]>(
-          `SELECT * FROM entries WHERE content LIKE $1 ESCAPE '\\' ORDER BY occurred_at DESC`,
-          [`%${escapeLikePattern(normalized)}%`],
-        );
-
-        return rows.map(mapRowToEntry);
+        return this.searchByLike(database, normalized);
       }
     }, []);
+  }
+
+  private async searchByLike(database: DatabaseClient, normalized: string) {
+    const rows = await database.select<EntryRow[]>(
+      `SELECT * FROM entries WHERE content LIKE $1 ESCAPE '\\' ORDER BY occurred_at DESC`,
+      [`%${escapeLikePattern(normalized)}%`],
+    );
+
+    return rows.map(mapRowToEntry);
   }
 
   async clearLocalData() {
