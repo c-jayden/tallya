@@ -106,11 +106,12 @@ describe('OpenAI Compatible Provider', () => {
     });
 
     expect(fetch).toHaveBeenCalledWith(expectedUrl, expect.any(Object));
-    expect(JSON.parse(String(fetch.mock.calls[0]?.[1]?.body))).toMatchObject({
-      model: 'gpt-test',
-      input: expect.stringContaining('JSON'),
-      temperature: 0.2,
-    });
+    const responsesBody = JSON.parse(String(fetch.mock.calls[0]?.[1]?.body));
+    expect(responsesBody).toMatchObject({ model: 'gpt-test', temperature: 0.2 });
+    // input must be a list of message items (Codex channel rejects a bare string).
+    expect(Array.isArray(responsesBody.input)).toBe(true);
+    expect(responsesBody.input[0]).toMatchObject({ type: 'message', role: 'user' });
+    expect(JSON.stringify(responsesBody.input)).toContain('JSON');
   });
 
   it('reports a friendly timeout when the OpenAI Compatible request does not finish', async () => {

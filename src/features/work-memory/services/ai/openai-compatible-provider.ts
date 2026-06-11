@@ -570,11 +570,22 @@ function toResponsesUrl(normalizedBaseUrl: string) {
 }
 
 function buildResponsesInput(prompt: string) {
-  return [
+  const text = [
     STRICT_JSON_SYSTEM_PROMPT,
     '只输出 JSON，不要输出 Markdown，不要输出解释。',
     prompt,
   ].join('\n');
+
+  // The Responses API — and the Codex channel that cc-switch / 公司网关 proxies —
+  // requires `input` to be a list of message items, not a bare string
+  // (otherwise it returns "Input must be a list").
+  return [
+    {
+      type: 'message',
+      role: 'user',
+      content: [{ type: 'input_text', text }],
+    },
+  ];
 }
 
 function extractModelText(payload: unknown): string {
