@@ -43,6 +43,9 @@ export function useSettingsDialogState({
   onDataRestored,
 }: UseSettingsDialogStateOptions) {
   const asyncRunId = useRef(0);
+  // Separate run-id: the AI section fires the gateway + provider checks together,
+  // so they must not share a counter or the first to start looks "stale".
+  const localGatewayRunId = useRef(0);
   const settingsSaveRunId = useRef(0);
   const latestSettingsRef = useRef<AppSettings>(DEFAULT_APP_SETTINGS);
   const pendingSettingsRef = useRef<AppSettings | null>(null);
@@ -217,7 +220,7 @@ export function useSettingsDialogState({
   }
 
   async function checkLocalGateway() {
-    const runId = ++asyncRunId.current;
+    const runId = ++localGatewayRunId.current;
 
     setIsCheckingLocalGateway(true);
     setLocalGatewayHealth({ status: 'checking', message: '正在检测网关...' });
@@ -226,7 +229,7 @@ export function useSettingsDialogState({
       const savedSettings = await persistSettings(normalizeProviderSettings(latestSettingsRef.current));
       const result = await probeLocalGateway(savedSettings.localGateway.baseUrl);
 
-      if (runId === asyncRunId.current) {
+      if (runId === localGatewayRunId.current) {
         setLocalGatewayHealth(
           result.reachable
             ? {
@@ -241,7 +244,7 @@ export function useSettingsDialogState({
         );
       }
     } catch {
-      if (runId === asyncRunId.current) {
+      if (runId === localGatewayRunId.current) {
         setLocalGatewayHealth({
           status: 'unavailable',
           message: '检测失败',
@@ -249,7 +252,7 @@ export function useSettingsDialogState({
         });
       }
     } finally {
-      if (runId === asyncRunId.current) {
+      if (runId === localGatewayRunId.current) {
         setIsCheckingLocalGateway(false);
       }
     }
@@ -450,6 +453,7 @@ export function useSettingsDialogState({
   function resetTransientState() {
     void flushPendingSettingsSave();
     asyncRunId.current += 1;
+    localGatewayRunId.current += 1;
     setActiveSection(defaultSettingsSection);
     setIsClearConfirmOpen(false);
     setIsImportConfirmOpen(false);
