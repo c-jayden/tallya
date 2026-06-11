@@ -4,11 +4,11 @@ import { describe, expect, it } from 'vitest';
 describe('daily memory AI prompt', () => {
   it('asks providers to return dailyReportText for copyable daily reports', () => {
     const openAISource = readFileSync(
-      new URL('../openai-compatible-provider.ts', import.meta.url),
+      new URL('../openai-format.ts', import.meta.url),
       'utf8',
     );
     const rustSource = readFileSync(
-      new URL('../../../../../../src-tauri/src/lib.rs', import.meta.url),
+      new URL('../../../../../../src-tauri/src/codex.rs', import.meta.url),
       'utf8',
     );
 
