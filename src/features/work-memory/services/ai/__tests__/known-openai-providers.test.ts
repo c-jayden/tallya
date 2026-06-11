@@ -13,14 +13,12 @@ describe('known OpenAI-compatible providers', () => {
     expect(getOpenAIProviderPreset(CUSTOM_OPENAI_PROVIDER_ID)).toBeNull();
   });
 
-  it('keeps Claude out of OpenAI-compatible presets and includes Kimi Code', () => {
-    expect(openAICompatibleProviderPresets.map((preset) => preset.id)).not.toContain('anthropic');
-    expect(getOpenAIProviderPreset('kimi-code')).toMatchObject({
-      label: 'Kimi Code',
-      baseUrl: 'https://api.kimi.com/coding/v1',
-      defaultModel: 'kimi-for-coding',
-      apiMode: 'chat-completions',
-    });
+  it('keeps non-general API providers out of OpenAI-compatible presets', () => {
+    const presetIds = openAICompatibleProviderPresets.map((preset) => preset.id);
+
+    expect(presetIds).not.toContain('anthropic');
+    expect(presetIds).not.toContain('kimi-code');
+    expect(getOpenAIProviderPreset('kimi-code')).toBeNull();
   });
 
   it('separates Kimi global and China presets because their API keys use different hosts', () => {
@@ -60,7 +58,9 @@ describe('known OpenAI-compatible providers', () => {
     expect(matchOpenAIProviderPreset('')).toBe(CUSTOM_OPENAI_PROVIDER_ID);
     expect(matchOpenAIProviderPreset('https://api.moonshot.cn/v1')).toBe('moonshot-cn');
     expect(matchOpenAIProviderPreset('https://api.moonshot.ai/v1')).toBe('moonshot');
-    expect(matchOpenAIProviderPreset('https://api.kimi.com/coding/v1')).toBe('kimi-code');
+    expect(matchOpenAIProviderPreset('https://api.kimi.com/coding/v1')).toBe(
+      CUSTOM_OPENAI_PROVIDER_ID,
+    );
   });
 
   it('keeps non-/v1 versioned paths intact so Zhipu and Volcengine work', () => {

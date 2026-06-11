@@ -59,14 +59,6 @@ export const openAICompatibleProviderPresets: OpenAICompatibleProviderPreset[] =
     hint: 'Kimi 国际开放平台使用 api.moonshot.ai；K2.6 / K2.5 对 temperature 与 top_p 有固定值要求。',
   },
   {
-    id: 'kimi-code',
-    label: 'Kimi Code',
-    baseUrl: 'https://api.kimi.com/coding/v1',
-    defaultModel: 'kimi-for-coding',
-    apiMode: 'chat-completions',
-    hint: '使用 Kimi Code API Key；官方 OpenAI Compatible 模型 ID 为 kimi-for-coding。',
-  },
-  {
     id: 'zhipu',
     label: '智谱 GLM',
     baseUrl: 'https://open.bigmodel.cn/api/paas/v4',
