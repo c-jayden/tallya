@@ -1,3 +1,4 @@
+import { invoke } from '@tauri-apps/api/core';
 import { logger } from '../logger/logger';
 import {
   buildClarificationsPrompt,
@@ -34,6 +35,23 @@ const STRICT_JSON_SYSTEM_PROMPT =
 
 type FetchLike = typeof fetch;
 
+type OpenAICompatibleTransportRequest = {
+  url: string;
+  apiKey: string;
+  bodyText: string;
+  timeoutMs: number;
+};
+
+type OpenAICompatibleTransportResponse = {
+  status: number;
+  contentType: string;
+  bodyText: string;
+};
+
+type OpenAICompatibleTransport = (
+  request: OpenAICompatibleTransportRequest,
+) => Promise<OpenAICompatibleTransportResponse>;
+
 type OpenAICompatibleConfig = {
   baseUrl: string;
   normalizedBaseUrl: string;
@@ -59,7 +77,11 @@ export function normalizeOpenAICompatibleBaseUrl(baseUrl: string) {
   return /\/v\d+$/i.test(normalized) ? normalized : `${normalized}${API_VERSION_PATH}`;
 }
 
-export function createOpenAICompatibleProvider(fetchImpl: FetchLike = fetch): AIProvider {
+export function createOpenAICompatibleProvider(fetchImpl?: FetchLike): AIProvider {
+  const transport = fetchImpl
+    ? createFetchOpenAICompatibleTransport(fetchImpl)
+    : invokeOpenAICompatibleRequest;
+
   async function requestJSON<T>(
     options: AIProviderOptions,
     prompt: string,
@@ -158,7 +180,7 @@ export function createOpenAICompatibleProvider(fetchImpl: FetchLike = fetch): AI
       requestBody.response_format = { type: 'json_object' };
     }
 
-    let response: Response;
+    let response: OpenAICompatibleTransportResponse;
 
     try {
       logger.debug('ai', 'openai-compatible.request_start', 'OpenAI Compatible request started', {
@@ -169,13 +191,10 @@ export function createOpenAICompatibleProvider(fetchImpl: FetchLike = fetch): AI
         strictJsonMode: requestOptions.strictJsonMode,
         hasApiKey: Boolean(config.apiKey),
       });
-      response = await fetchWithTimeout(toChatCompletionsUrl(config.normalizedBaseUrl), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${config.apiKey}`,
-        },
-        body: JSON.stringify(requestBody),
+      response = await sendOpenAICompatibleRequest({
+        url: toChatCompletionsUrl(config.normalizedBaseUrl),
+        apiKey: config.apiKey,
+        bodyText: JSON.stringify(requestBody),
       });
     } catch (error) {
       logger.error('ai', 'openai-compatible.network_failed', 'OpenAI Compatible request failed', {
@@ -192,7 +211,7 @@ export function createOpenAICompatibleProvider(fetchImpl: FetchLike = fetch): AI
       });
 
       throw new AIProviderError(
-        isAbortError(error)
+        isTimeoutError(error)
           ? 'AI 服务响应超时，请检查网关或稍后再试。'
           : '无法连接到 AI 服务，请检查服务地址或网络。',
         OPENAI_COMPATIBLE_PROVIDER_ID,
@@ -200,8 +219,8 @@ export function createOpenAICompatibleProvider(fetchImpl: FetchLike = fetch): AI
       );
     }
 
-    const bodyText = await response.text();
-    const contentType = response.headers.get('content-type') ?? '';
+    const bodyText = response.bodyText;
+    const contentType = response.contentType;
     const serverMessage = extractServerErrorMessage(bodyText);
 
     logger.debug('ai', 'openai-compatible.response_received', 'OpenAI Compatible response received', {
@@ -216,7 +235,7 @@ export function createOpenAICompatibleProvider(fetchImpl: FetchLike = fetch): AI
     });
 
     return {
-      ok: response.ok,
+      ok: isSuccessfulHTTPStatus(response.status),
       status: response.status,
       contentType,
       bodyText,
@@ -232,7 +251,7 @@ export function createOpenAICompatibleProvider(fetchImpl: FetchLike = fetch): AI
       ...buildOpenAICompatibleRequestParameters(config.parameters),
     };
 
-    let response: Response;
+    let response: OpenAICompatibleTransportResponse;
 
     try {
       logger.debug('ai', 'openai-compatible.request_start', 'OpenAI Compatible request started', {
@@ -243,13 +262,10 @@ export function createOpenAICompatibleProvider(fetchImpl: FetchLike = fetch): AI
         stream: true,
         hasApiKey: Boolean(config.apiKey),
       });
-      response = await fetchWithTimeout(toResponsesUrl(config.normalizedBaseUrl), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${config.apiKey}`,
-        },
-        body: JSON.stringify(requestBody),
+      response = await sendOpenAICompatibleRequest({
+        url: toResponsesUrl(config.normalizedBaseUrl),
+        apiKey: config.apiKey,
+        bodyText: JSON.stringify(requestBody),
       });
     } catch (error) {
       logger.error('ai', 'openai-compatible.network_failed', 'OpenAI Compatible request failed', {
@@ -266,7 +282,7 @@ export function createOpenAICompatibleProvider(fetchImpl: FetchLike = fetch): AI
       });
 
       throw new AIProviderError(
-        isAbortError(error)
+        isTimeoutError(error)
           ? 'AI 服务响应超时，请检查网关或稍后再试。'
           : '无法连接到 AI 服务，请检查服务地址或网络。',
         OPENAI_COMPATIBLE_PROVIDER_ID,
@@ -274,8 +290,8 @@ export function createOpenAICompatibleProvider(fetchImpl: FetchLike = fetch): AI
       );
     }
 
-    const bodyText = await response.text();
-    const contentType = response.headers.get('content-type') ?? '';
+    const bodyText = response.bodyText;
+    const contentType = response.contentType;
     const serverMessage = extractServerErrorMessage(bodyText);
 
     logger.debug('ai', 'openai-compatible.response_received', 'OpenAI Compatible response received', {
@@ -289,7 +305,7 @@ export function createOpenAICompatibleProvider(fetchImpl: FetchLike = fetch): AI
     });
 
     return {
-      ok: response.ok,
+      ok: isSuccessfulHTTPStatus(response.status),
       status: response.status,
       contentType,
       bodyText,
@@ -297,20 +313,13 @@ export function createOpenAICompatibleProvider(fetchImpl: FetchLike = fetch): AI
     };
   }
 
-  async function fetchWithTimeout(url: string, init: RequestInit) {
-    const abortController = new AbortController();
-    const timeoutId = globalThis.setTimeout(() => {
-      abortController.abort();
-    }, OPENAI_COMPATIBLE_REQUEST_TIMEOUT_MS);
-
-    try {
-      return await fetchImpl(url, {
-        ...init,
-        signal: abortController.signal,
-      });
-    } finally {
-      globalThis.clearTimeout(timeoutId);
-    }
+  async function sendOpenAICompatibleRequest(
+    request: Omit<OpenAICompatibleTransportRequest, 'timeoutMs'>,
+  ) {
+    return transport({
+      ...request,
+      timeoutMs: OPENAI_COMPATIBLE_REQUEST_TIMEOUT_MS,
+    });
   }
 
   function parseChatCompletionAttempt(
@@ -561,6 +570,59 @@ export function createOpenAICompatibleProvider(fetchImpl: FetchLike = fetch): AI
 }
 
 export const openAICompatibleProvider = createOpenAICompatibleProvider();
+
+function invokeOpenAICompatibleRequest(request: OpenAICompatibleTransportRequest) {
+  return invoke<OpenAICompatibleTransportResponse>('send_openai_compatible_request', request);
+}
+
+function createFetchOpenAICompatibleTransport(fetchImpl: FetchLike): OpenAICompatibleTransport {
+  return async ({ url, apiKey, bodyText, timeoutMs }) => {
+    const response = await fetchWithTimeout(
+      fetchImpl,
+      url,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: bodyText,
+      },
+      timeoutMs,
+    );
+
+    return {
+      status: response.status,
+      contentType: response.headers.get('content-type') ?? '',
+      bodyText: await response.text(),
+    };
+  };
+}
+
+async function fetchWithTimeout(
+  fetchImpl: FetchLike,
+  url: string,
+  init: RequestInit,
+  timeoutMs: number,
+) {
+  const abortController = new AbortController();
+  const timeoutId = globalThis.setTimeout(() => {
+    abortController.abort();
+  }, timeoutMs);
+
+  try {
+    return await fetchImpl(url, {
+      ...init,
+      signal: abortController.signal,
+    });
+  } finally {
+    globalThis.clearTimeout(timeoutId);
+  }
+}
+
+function isSuccessfulHTTPStatus(status: number) {
+  return status >= 200 && status <= 299;
+}
 
 function getOpenAICompatibleConfig(options: AIProviderOptions): OpenAICompatibleConfig {
   const config = options.openAICompatible;
@@ -1008,6 +1070,10 @@ function isAbortError(error: unknown) {
   }
 
   return false;
+}
+
+function isTimeoutError(error: unknown) {
+  return isAbortError(error) || /timeout|timed out|超时/i.test(String(error));
 }
 
 function shouldFallbackResponseFormat(message: string | undefined) {

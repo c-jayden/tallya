@@ -128,6 +128,34 @@ describe('OpenAI Compatible Provider', () => {
     expect(body).not.toHaveProperty('frequency_penalty');
   });
 
+  it('uses the Tauri HTTP command by default so provider calls are not blocked by browser CORS', async () => {
+    tauriMocks.invoke.mockResolvedValue({
+      status: 200,
+      contentType: 'application/json',
+      bodyText: JSON.stringify({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify(dailyMemoryPayload()),
+            },
+          },
+        ],
+      }),
+    });
+    const provider = createOpenAICompatibleProvider();
+
+    await expect(provider.generateDailyMemory(dailyInput, options)).resolves.toMatchObject({
+      summary: '整理需求并同步计划。',
+    });
+
+    expect(tauriMocks.invoke).toHaveBeenCalledWith('send_openai_compatible_request', {
+      url: 'https://api.example.com/v1/chat/completions',
+      apiKey: 'secret-api-key',
+      bodyText: expect.stringContaining('"model":"gpt-test"'),
+      timeoutMs: 45_000,
+    });
+  });
+
   it('sends configured OpenAI-compatible request parameters in chat mode', async () => {
     const fetch = vi.fn().mockResolvedValue(chatResponse(dailyMemoryPayload()));
     const provider = createOpenAICompatibleProvider(fetch);
