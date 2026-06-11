@@ -35,6 +35,18 @@ export const openAICompatibleProviderPresets: OpenAICompatibleProviderPreset[] =
     hint: 'DashScope OpenAI 兼容接口主要使用 Chat Completions；参数建议只调整 temperature 或 top_p 其中一个。',
   },
   {
+    id: 'moonshot-cn',
+    label: 'Kimi CN',
+    baseUrl: 'https://api.moonshot.cn/v1',
+    defaultModel: 'kimi-k2.6',
+    apiMode: 'chat-completions',
+    parameters: {
+      temperature: '1',
+      topP: '0.95',
+    },
+    hint: 'Kimi 国内开放平台使用 api.moonshot.cn；K2.6 / K2.5 对 temperature 与 top_p 有固定值要求。',
+  },
+  {
     id: 'moonshot',
     label: 'Kimi',
     baseUrl: 'https://api.moonshot.ai/v1',
@@ -44,7 +56,7 @@ export const openAICompatibleProviderPresets: OpenAICompatibleProviderPreset[] =
       temperature: '1',
       topP: '0.95',
     },
-    hint: 'Kimi K2.6 / K2.5 对 temperature 与 top_p 有固定值要求；如换用其他 Kimi 模型，可按模型文档调整。',
+    hint: 'Kimi 国际开放平台使用 api.moonshot.ai；K2.6 / K2.5 对 temperature 与 top_p 有固定值要求。',
   },
   {
     id: 'kimi-code',

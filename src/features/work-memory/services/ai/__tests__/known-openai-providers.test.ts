@@ -23,6 +23,23 @@ describe('known OpenAI-compatible providers', () => {
     });
   });
 
+  it('separates Kimi global and China presets because their API keys use different hosts', () => {
+    expect(getOpenAIProviderPreset('moonshot-cn')).toMatchObject({
+      label: 'Kimi CN',
+      baseUrl: 'https://api.moonshot.cn/v1',
+      defaultModel: 'kimi-k2.6',
+      apiMode: 'chat-completions',
+      parameters: {
+        temperature: '1',
+        topP: '0.95',
+      },
+    });
+    expect(getOpenAIProviderPreset('moonshot')).toMatchObject({
+      label: 'Kimi',
+      baseUrl: 'https://api.moonshot.ai/v1',
+    });
+  });
+
   it('prefills request parameters only where the preset needs them', () => {
     expect(getOpenAIProviderPreset('moonshot')).toMatchObject({
       defaultModel: 'kimi-k2.6',
@@ -41,6 +58,8 @@ describe('known OpenAI-compatible providers', () => {
     expect(matchOpenAIProviderPreset('https://api.deepseek.com/v1/')).toBe('deepseek');
     expect(matchOpenAIProviderPreset('https://example.com/v1')).toBe(CUSTOM_OPENAI_PROVIDER_ID);
     expect(matchOpenAIProviderPreset('')).toBe(CUSTOM_OPENAI_PROVIDER_ID);
+    expect(matchOpenAIProviderPreset('https://api.moonshot.cn/v1')).toBe('moonshot-cn');
+    expect(matchOpenAIProviderPreset('https://api.moonshot.ai/v1')).toBe('moonshot');
     expect(matchOpenAIProviderPreset('https://api.kimi.com/coding/v1')).toBe('kimi-code');
   });
 
