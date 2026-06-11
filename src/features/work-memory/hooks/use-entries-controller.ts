@@ -58,6 +58,22 @@ function groupByEntry(clarifications: Clarification[]): Record<string, Clarifica
   return grouped;
 }
 
+// A meaningful content change worth re-asking for a thread link. Ignores
+// whitespace-only edits and tiny tweaks (e.g. typo fixes), where one string is
+// contained in the other with only a few characters added or removed.
+function isSubstantialContentChange(oldContent: string, newContent: string) {
+  const a = oldContent.replace(/\s+/g, ' ').trim();
+  const b = newContent.replace(/\s+/g, ' ').trim();
+
+  if (a === b) {
+    return false;
+  }
+
+  const [shorter, longer] = a.length <= b.length ? [a, b] : [b, a];
+
+  return !(longer.includes(shorter) && longer.length - shorter.length < 6);
+}
+
 async function loadDayData(currentDate: string): Promise<DayData> {
   const entries = await entryRepository.listByDate(currentDate);
   const clarifications = await clarificationRepository.listByEntryIds(
@@ -237,8 +253,20 @@ export function useEntriesController({ currentDate, todayDate }: UseEntriesContr
       }
 
       try {
-        await entryRepository.update(id, { content: trimmed });
+        const existing = await entryRepository.getById(id);
+        const updated = await entryRepository.update(id, { content: trimmed });
         await reload();
+
+        // Editing only re-asks for a thread link when it's worth it: the entry
+        // isn't already in a thread, and the content actually changed in a
+        // meaningful way (so typo/whitespace fixes never spawn an AI call).
+        if (
+          updated &&
+          !existing?.threadId &&
+          isSubstantialContentChange(existing?.content ?? '', trimmed)
+        ) {
+          scheduleThreadSuggestion(updated);
+        }
 
         return true;
       } catch (error) {
@@ -247,7 +275,7 @@ export function useEntriesController({ currentDate, todayDate }: UseEntriesContr
         return false;
       }
     },
-    [reload],
+    [reload, scheduleThreadSuggestion],
   );
 
   const dropThreadSuggestion = useCallback((entryId: string) => {
