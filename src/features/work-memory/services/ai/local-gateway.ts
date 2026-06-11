@@ -18,7 +18,7 @@ export async function probeLocalGateway(
   if (!normalizedBaseUrl) {
     return {
       reachable: false,
-      detail: 'Base URL 为空',
+      detail: '网关地址为空',
     };
   }
 

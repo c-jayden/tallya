@@ -26,7 +26,7 @@ export function buildDailyMemoryPrompt(input: GenerateDailyMemoryInput) {
     '只输出合法 JSON，不要 markdown、解释、代码块或工具调用。',
     'JSON keys: summary:string, completedItems:string[], keyOutcome?:string, problems?:string, tomorrowPlan?:string, extraNote?:string, dailyReportText?:string.',
     '不要编造输入中不存在的事实；可以做温和归纳和合并。',
-    'dailyReportText 是适合复制到企业微信、飞书、日报表格或公司日报系统的日报文本；基于输入和结构化结果轻度整理，不要照抄原文，不要写成周报、复盘报告或领导评价。',
+    'dailyReportText 是适合复制到企业微信、飞书或其他同步场景的一段整理文本；基于输入和结构化结果轻度整理，不要照抄原文，不要写成复盘报告或领导评价。',
     'dailyReportText 默认优先一段自然文本；信息明显分为完成事项、问题、计划时可分点，但最多 3 个分组，不要为了分点而分点。',
     'dailyReportText 总体控制在 80-300 字；不要使用 Markdown 标题符号；不要输出“本次未提及”；不要暴露 AI 分析痕迹。',
     `输入：${JSON.stringify(input)}`,
@@ -34,7 +34,7 @@ export function buildDailyMemoryPrompt(input: GenerateDailyMemoryInput) {
 }
 
 export function buildRangeReportPrompt(input: GenerateRangeReportInput) {
-  const reportName = input.reportType === 'custom' ? '自定义范围工作总结' : '周报';
+  const reportName = input.reportType === 'custom' ? '自定义范围工作总结' : '本周回顾';
   const promptInput = {
     reportType: input.reportType,
     startDate: input.startDate,
@@ -56,14 +56,14 @@ export function buildRangeReportPrompt(input: GenerateRangeReportInput) {
     reportToneInstruction(input.reportTone),
     reportFocusInstruction(input.reportFocus),
     reportStyleInstruction(input),
-    'markdown 是可直接复制的报告文本；不要包含多余空行，section 之间最多一个空行，不要输出空 section。',
+    'markdown 是可直接复制的整理文本；不要包含多余空行，section 之间最多一个空行，不要输出空 section。',
     `输入：${JSON.stringify(promptInput)}`,
   ].join('\n');
 }
 
 export function buildReportStyleAnalysisPrompt(input: AnalyzeReportStyleInput) {
   return [
-    '请分析用户粘贴的历史日报或周报样本，只输出合法 JSON，不要输出解释或 markdown。',
+    '请分析用户粘贴的历史整理样本或工作总结，只输出合法 JSON，不要输出解释或 markdown。',
     'JSON keys: summary:string, promptHint:string.',
     '分析目标：',
     '- 只分析写作风格、表达习惯、结构倾向、语气、篇幅和信息组织方式。',
@@ -75,9 +75,9 @@ export function buildReportStyleAnalysisPrompt(input: AnalyzeReportStyleInput) {
     '- 用一句话概括样本的写作风格。',
     '- 可以写成“风格偏简洁、克制，重视进展、原因和结果”这类分析总结。',
     'promptHint 要求：',
-    '- 必须写成可直接回填到“风格偏好”输入框的长期报告写作提示。',
-    '- promptHint 应适用于日报、周报和自定义范围报告，不要只适用于某一次工作进展说明。',
-    '- promptHint 应描述“后续报告应该怎么写”，不要写成“你的风格是……”这类分析总结。',
+    '- 必须写成可直接回填到“风格偏好”输入框的长期整理写作提示。',
+    '- promptHint 应适用于单日整理、本周回顾和自定义范围总结，不要只适用于某一次工作进展说明。',
+    '- promptHint 应描述“后续整理应该怎么写”，不要写成“你的风格是……”这类分析总结。',
     '- promptHint 只能影响表达方式、结构、语气和篇幅，不能要求模型编造事实。',
     '- promptHint 不要包含具体业务名词。',
     '- promptHint 不要绑定过细的栏目，例如“页面/交互/结果”；可以抽象成“先概括主要进展，再按事项说明动作、原因和结果”。',
@@ -89,7 +89,7 @@ export function buildReportStyleAnalysisPrompt(input: AnalyzeReportStyleInput) {
 
 export function buildClarificationsPrompt(input: SuggestClarificationsInput) {
   return [
-    '用户记下了一条很简短的工作记录，你要追问 1-2 个问题，帮他之后写周报时能把这件事展开。',
+    '用户记下了一条很简短的工作记录，你要追问 1-2 个问题，帮他之后整理阶段总结时能把这件事展开。',
     '只输出合法 JSON，不要解释或 markdown。',
     'JSON keys: questions:string[]。',
     '要求：',
@@ -141,9 +141,9 @@ export function buildReportGapsPrompt(input: SuggestReportGapsInput) {
   }));
 
   return [
-    '下面是用户本周的工作记录（含所属线索 threadTitle 和已有补充数 clarificationCount）。',
-    '在写周报前，挑出"重点但信息不足"的线索：跨多条/跨天反复出现、但内容简略、补充很少的那种。',
-    '对每条这样的线索给一个候选 entryId（从输入里选一条代表记录）和一句口语化的追问，帮用户补全后写进周报。',
+    '下面是用户这段时间的工作记录（含所属线索 threadTitle 和已有补充数 clarificationCount）。',
+    '在整理前，挑出"重点但信息不足"的线索：跨多条/跨天反复出现、但内容简略、补充很少的那种。',
+    '对每条这样的线索给一个候选 entryId（从输入里选一条代表记录）和一句口语化的追问，帮用户补全后写进整理结果。',
     '只输出合法 JSON，不要解释或 markdown。',
     'JSON keys: gaps: { entryId: string, threadTitle: string, question: string }[]。',
     '要求：',
@@ -220,7 +220,7 @@ function reportStyleInstruction(input: GenerateRangeReportInput) {
 function reportLengthInstruction(reportLength: string, memoryCount: number) {
   if (reportLength === 'brief') {
     return [
-      '报告详略：精简。',
+      '整理详略：精简。',
       'summary 1 句话；highlights 2-3 条；completedItems 2-3 条；problems 最多 1 句话；nextWeekPlan 最多 1 句话；markdown 控制在 250-450 字。',
       memoryCount === 1
         ? '当前只有 1 条工作记忆，整体进一步压缩：highlights 最多 2 条，completedItems 最多 2 条，不要把同一条记忆拆成过多项目。'
@@ -229,34 +229,34 @@ function reportLengthInstruction(reportLength: string, memoryCount: number) {
   }
 
   if (reportLength === 'detailed') {
-    return '报告详略：详细。summary 2-3 句话；highlights 4-6 条；completedItems 5-8 条；markdown 控制在 800-1200 字。';
+    return '整理详略：详细。summary 2-3 句话；highlights 4-6 条；completedItems 5-8 条；markdown 控制在 800-1200 字。';
   }
 
-  return '报告详略：标准。summary 1-2 句话；highlights 3-5 条；completedItems 3-6 条；markdown 控制在 500-800 字。';
+  return '整理详略：标准。summary 1-2 句话；highlights 3-5 条；completedItems 3-6 条；markdown 控制在 500-800 字。';
 }
 
 function reportToneInstruction(reportTone: string) {
   if (reportTone === 'formal') {
-    return '报告语气：正式。表达规范但不要官样化。';
+    return '表达语气：正式。表达规范但不要官样化。';
   }
 
   if (reportTone === 'retrospective') {
-    return '报告语气：复盘型。关注阶段进展、问题和下一步计划，但不要编造反思。';
+    return '表达语气：复盘型。关注阶段进展、问题和下一步计划，但不要编造反思。';
   }
 
-  return '报告语气：自然。表达清楚、克制，不要过度正式。';
+  return '表达语气：自然。表达清楚、克制，不要过度正式。';
 }
 
 function reportFocusInstruction(reportFocus: string) {
   if (reportFocus === 'completed-items') {
-    return '报告重点：完成事项优先。优先突出具体完成事项。';
+    return '整理重点：完成事项优先。优先突出具体完成事项。';
   }
 
   if (reportFocus === 'risks') {
-    return '报告重点：问题风险优先。优先突出问题、风险、阻塞和后续跟进。';
+    return '整理重点：问题风险优先。优先突出问题、风险、阻塞和后续跟进。';
   }
 
-  return '报告重点：关键产出优先。优先突出关键产出和阶段进展。';
+  return '整理重点：关键产出优先。优先突出关键产出和阶段进展。';
 }
 
 export function parseGeneratedDailyMemory(rawOutput: string, input: GenerateDailyMemoryInput) {
@@ -300,7 +300,7 @@ export function parseGeneratedRangeReport(rawOutput: string, input: GenerateRang
     report.completedItems.length === 0 &&
     !report.markdown
   ) {
-    throw new Error('AI 没有返回有效报告内容，请稍后重试。');
+    throw new Error('AI 没有返回有效整理内容，请稍后重试。');
   }
 
   return report;
@@ -360,7 +360,7 @@ function summarizeRawContent(rawContent: string) {
 function defaultReportTitle(input: GenerateRangeReportInput) {
   return input.reportType === 'custom'
     ? `${input.startDate}-${input.endDate}工作总结`
-    : '本周周报';
+    : '本周回顾';
 }
 
 function buildRangeReportMarkdown(report: GeneratedReportContent) {
@@ -370,7 +370,7 @@ function buildRangeReportMarkdown(report: GeneratedReportContent) {
     sections.push('## 总结', report.summary);
   }
 
-  pushMarkdownList(sections, '本周重点', report.highlights);
+  pushMarkdownList(sections, '重点', report.highlights);
   pushMarkdownList(sections, '完成事项', report.completedItems);
 
   if (report.problems) {
@@ -378,7 +378,7 @@ function buildRangeReportMarkdown(report: GeneratedReportContent) {
   }
 
   if (report.nextWeekPlan) {
-    sections.push('## 下一步计划', report.nextWeekPlan);
+    sections.push('## 后续计划', report.nextWeekPlan);
   }
 
   return normalizeReportText(sections.join('\n\n'));

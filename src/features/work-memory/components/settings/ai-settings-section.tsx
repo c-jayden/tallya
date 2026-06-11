@@ -31,12 +31,12 @@ const visibleProviderOptions: { value: AIProviderId; label: string; description:
   {
     value: 'ai-codex-cli',
     label: 'Codex CLI',
-    description: '使用本机 Codex CLI。',
+    description: '使用本机 Codex CLI，适合作为稳定回退。',
   },
   {
     value: 'openai-compatible',
-    label: 'OpenAI Compatible',
-    description: '填写 OpenAI 兼容服务、CC Switch 或公司网关。',
+    label: 'OpenAI 兼容服务',
+    description: '接入兼容 OpenAI 接口的服务商、本地代理或公司网关。',
   },
 ];
 
@@ -50,12 +50,12 @@ const apiModeOptions: {
   {
     value: 'chat-completions',
     label: 'Chat Completions',
-    description: '常用兼容接口。',
+    description: '大多数兼容服务都可以先用这个模式。',
   },
   {
     value: 'responses',
     label: 'Responses API',
-    description: '仅支持 /v1/responses 时使用。',
+    description: '服务明确要求 /v1/responses 时再切换。',
   },
 ];
 
@@ -111,7 +111,9 @@ export function AISettingsSection({
 
   return (
     <section className="space-y-7" aria-label="AI 配置">
-      <p className="text-sm text-app-ink-subtle">选择用于整理工作记忆的 AI 服务。</p>
+      <p className="text-sm text-app-ink-subtle">
+        选择帮你整理工作记忆的 AI 服务；没有本地网关时会按这里回退。
+      </p>
 
       <div className="space-y-6">
         <LocalGatewaySettingsSection
@@ -122,7 +124,7 @@ export function AISettingsSection({
           onCheckLocalGateway={onCheckLocalGateway}
         />
 
-        <Field label="AI 服务" description={selectedProvider.description}>
+        <Field label="默认 AI 服务" description={selectedProvider.description}>
           <Select
             value={selectedProvider.value}
             onValueChange={(value) => {
@@ -152,7 +154,7 @@ export function AISettingsSection({
         </Field>
 
         {isCodexProvider ? (
-          <Field label="模型" description="选择 Codex CLI 用于整理工作记忆的模型。">
+          <Field label="模型" description="选择 Codex CLI 整理工作记忆时使用的模型。">
             <Select
               value={selectedCodexModel}
               onValueChange={(codexModel) => onUpdateSettings({ codexModel })}
@@ -171,7 +173,10 @@ export function AISettingsSection({
           </Field>
         ) : (
           <div className="space-y-5">
-            <Field label="服务商" description="选择常用服务商可自动填入地址，也可选自定义手动填写。">
+            <Field
+              label="服务商"
+              description="已内置 DeepSeek、通义、Kimi、OpenRouter、OpenAI 等常用接口。Anthropic 格式可先通过网关转成 OpenAI 兼容接口。"
+            >
               <Select value={selectedPresetId} onValueChange={applyProviderPreset}>
                 <SelectTrigger className="h-10 w-56 bg-app-surface">
                   <SelectValue />
@@ -187,7 +192,7 @@ export function AISettingsSection({
               </Select>
             </Field>
 
-            <Field label="Base URL">
+            <Field label="服务地址">
               <Input
                 className={openAIInputClassName}
                 value={settings.openAICompatible.baseUrl}
@@ -203,7 +208,7 @@ export function AISettingsSection({
               />
             </Field>
 
-            <Field label="API Key">
+            <Field label="密钥">
               <Input
                 className={openAIInputClassName}
                 type="password"
@@ -216,7 +221,7 @@ export function AISettingsSection({
                     },
                   })
                 }
-                placeholder="sk-xxxxxx"
+                placeholder="粘贴服务商提供的 API Key"
                 autoComplete="off"
               />
             </Field>
@@ -283,13 +288,13 @@ export function AISettingsSection({
                 ))}
               </div>
               <p className="text-[13px] leading-5 text-app-ink-subtle">
-                CC Switch 或公司网关遇到 “only /v1/responses” 时，切换到 Responses API。
+                本地网关或公司网关遇到 “only /v1/responses” 时，再切换到 Responses API。
               </p>
             </div>
           </div>
         )}
 
-        <Field label="服务状态">
+        <Field label="连接状态">
           <div className="space-y-2.5">
             <div className="flex flex-wrap items-center gap-2">
               <Button
@@ -301,12 +306,12 @@ export function AISettingsSection({
                 {isCheckingProvider && (
                   <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
                 )}
-                检测连接
+                检测一下
               </Button>
               <StatusLine health={providerHealth} />
             </div>
             <p className="text-[13px] leading-5 text-app-ink-subtle">
-              连接检测会确认当前 AI 服务是否可访问，模型和账号状态会在生成时继续校验。
+              检测只确认服务能连通；模型和账号额度会在实际整理时继续校验。
             </p>
           </div>
         </Field>

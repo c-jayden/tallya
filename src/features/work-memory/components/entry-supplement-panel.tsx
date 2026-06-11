@@ -140,7 +140,7 @@ export function EntrySupplementPanel({
       {suggestState === 'loading' ? (
         <p className="flex items-center gap-1.5 text-[12px] leading-5 text-app-ink-subtle">
           <Loader2 className="size-3 animate-spin" aria-hidden="true" />
-          AI 正在想可以补充的问题…
+          正在整理几个可以补充的问题…
         </p>
       ) : null}
 
@@ -159,7 +159,7 @@ export function EntrySupplementPanel({
                   setAnswers((current) => ({ ...current, [index]: event.currentTarget.value }))
                 }
                 onKeyDown={(event) => handleAnswerKeyDown(event, index, question)}
-                placeholder="回车保存，一两句就够"
+                placeholder="写一两句，回车保存"
                 rows={1}
               />
             </div>
@@ -176,8 +176,8 @@ export function EntrySupplementPanel({
           onKeyDown={handleManualKeyDown}
           placeholder={
             suggestState === 'unavailable'
-              ? '补充点细节，回车保存（难点、原因、卡了多久…）'
-              : '也可以直接补充，回车保存'
+              ? '补一点背景，回车保存（难点、原因、后续）'
+              : '也可以直接补一两句，回车保存'
           }
         />
       </div>

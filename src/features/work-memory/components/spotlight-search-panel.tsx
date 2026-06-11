@@ -116,7 +116,7 @@ export function SpotlightSearchPanel({
               onCompositionStart={onCompositionStart}
               onCompositionEnd={onCompositionEnd}
               onKeyDown={onKeyDown}
-              placeholder="输入关键词搜索工作记忆..."
+              placeholder="搜索项目、同事、问题或一句原话"
             />
             {hasKeyword ? (
               <button
@@ -167,10 +167,10 @@ export function SpotlightSearchPanel({
               ) : (
                 <div className="px-4 py-3.5 text-center">
                   <p className="text-[13px] leading-[1.5] font-medium text-app-ink-muted">
-                    没有找到相关记忆
+                    暂时没搜到相关记忆
                   </p>
                   <p className="mt-1 text-xs leading-[1.45] text-app-ink-subtle">
-                    换个关键词试试
+                    换个词，或试试项目名
                   </p>
                 </div>
               )}

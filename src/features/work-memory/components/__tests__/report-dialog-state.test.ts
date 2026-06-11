@@ -18,14 +18,14 @@ describe('shouldAllowReportDialogOpenChange', () => {
 
 describe('getReportGenerateActionLabel', () => {
   it('uses regenerate labels when the current weekly report already exists', () => {
-    expect(getReportGenerateActionLabel(true, false)).toBe('重新生成');
-    expect(getReportGenerateActionLabel(true, true)).toBe('重新生成中...');
+    expect(getReportGenerateActionLabel(true, false)).toBe('重新整理');
+    expect(getReportGenerateActionLabel(true, true)).toBe('重新整理中...');
   });
 
   it('uses generate labels for a new weekly report', () => {
-    expect(getReportGenerateActionLabel(false, false, 'weekly')).toBe('生成周报');
-    expect(getReportGenerateActionLabel(false, false, 'custom')).toBe('生成报告');
-    expect(getReportGenerateActionLabel(false, true)).toBe('生成中...');
+    expect(getReportGenerateActionLabel(false, false, 'weekly')).toBe('整理本周');
+    expect(getReportGenerateActionLabel(false, false, 'custom')).toBe('整理这段时间');
+    expect(getReportGenerateActionLabel(false, true)).toBe('整理中...');
   });
 });
 
@@ -45,7 +45,7 @@ describe('getReportGenerateDialogState', () => {
       cancelDisabled: false,
       showPrimary: true,
       primaryDisabled: false,
-      primaryLabel: '生成周报',
+      primaryLabel: '整理本周',
     });
   });
 
@@ -62,7 +62,7 @@ describe('getReportGenerateDialogState', () => {
       showCancel: true,
       showPrimary: true,
       primaryDisabled: false,
-      primaryLabel: '重新生成',
+      primaryLabel: '重新整理',
     });
   });
 
@@ -96,7 +96,7 @@ describe('getReportGenerateDialogState', () => {
       cancelDisabled: true,
       showPrimary: true,
       primaryDisabled: true,
-      primaryLabel: '重新生成中...',
+      primaryLabel: '重新整理中...',
     });
   });
 
@@ -115,7 +115,7 @@ describe('getReportGenerateDialogState', () => {
       showCancel: true,
       showPrimary: true,
       primaryDisabled: true,
-      primaryLabel: '生成报告',
+      primaryLabel: '整理这段时间',
     });
   });
 });

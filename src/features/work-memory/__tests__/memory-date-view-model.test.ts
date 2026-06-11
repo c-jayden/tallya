@@ -56,11 +56,11 @@ describe('memory date view model', () => {
   it('uses date-aware preview and save copy', () => {
     expect(getDailyMemoryPreviewCopy(true)).toEqual({
       title: '今日记忆预览',
-      description: '确认后会保存为今天唯一一条工作记忆。',
+      description: '确认后会沉淀为今天的工作记忆。',
     });
     expect(getDailyMemoryPreviewCopy(false)).toEqual({
       title: '这天记忆预览',
-      description: '确认后会保存为这一天的工作记忆。',
+      description: '确认后会沉淀为这一天的工作记忆。',
     });
     expect(getDailyMemorySaveSuccessToast(true)).toBe('今日记忆已保存');
     expect(getDailyMemorySaveSuccessToast(false)).toBe('这天记忆已保存');

@@ -39,10 +39,10 @@ export function DailyReportDialog({
       >
         <DialogHeader className="shrink-0 gap-1.5 px-6 pt-5 pb-4">
           <DialogTitle className="text-lg leading-6 font-semibold tracking-normal text-app-ink">
-            {dateLabel}日报
+            {dateLabel}整理
           </DialogTitle>
           <DialogDescription className="text-[13px] leading-[1.5] text-app-ink-muted">
-            可直接编辑后复制，粘贴到企业微信、钉钉等日报里。
+            可直接编辑后复制，用在需要同步的一段文字里。
           </DialogDescription>
         </DialogHeader>
 
@@ -51,7 +51,7 @@ export function DailyReportDialog({
             className="block field-sizing-content max-h-[calc(100vh-300px)] min-h-40 w-full resize-none rounded-xl border border-app-border bg-app-surface px-3 py-2.5 text-sm leading-[1.6] text-app-ink shadow-none outline-none focus-visible:border-app-border-strong focus-visible:ring-0"
             value={reportText}
             onChange={(event) => onTextChange(event.currentTarget.value)}
-            placeholder="这天还没有可整理的记录。"
+            placeholder="这天还没有可整理的内容。"
           />
         </div>
 

@@ -9,17 +9,17 @@ import {
 describe('report view model', () => {
   it('keeps empty report list copy available for UI', () => {
     expect(reportListEmptyState).toEqual({
-      title: '还没有保存的报告',
-      description: '生成一份周报后，这里会显示你的报告记录。',
+      title: '还没有保存的整理',
+      description: '整理一段时间后，这里会留下记录。',
     });
   });
 
   it('maps report type and stale status for display', () => {
-    expect(getReportTypeLabel('weekly')).toBe('周报');
+    expect(getReportTypeLabel('weekly')).toBe('本周回顾');
     expect(getReportTypeLabel('custom')).toBe('工作总结');
-    expect(getReportTypeLabel('monthly')).toBe('月报');
+    expect(getReportTypeLabel('monthly')).toBe('月度整理');
     expect(getReportStatusLabel('generated')).toBe('已保存');
-    expect(getReportStatusLabel('stale')).toBe('需要重新生成');
+    expect(getReportStatusLabel('stale')).toBe('建议重新整理');
   });
 
   it('normalizes report content for rendering', () => {

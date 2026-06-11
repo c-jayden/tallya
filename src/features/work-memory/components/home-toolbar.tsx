@@ -101,14 +101,14 @@ export function HomeToolbar({
               size="icon-sm"
               type="button"
               className="size-8.75 cursor-pointer rounded-xl text-app-ink-muted hover:bg-app-surface-muted hover:text-app-ink focus-visible:bg-app-surface-muted focus-visible:text-app-ink [&_svg]:size-3.5"
-              aria-label="报告"
+              aria-label="整理"
               onClick={onReportsClick}
             >
               <FileText aria-hidden="true" />
-              <span className="sr-only">报告</span>
+              <span className="sr-only">整理</span>
             </Button>
           </TooltipTrigger>
-          <TooltipContent>报告</TooltipContent>
+          <TooltipContent>整理</TooltipContent>
         </Tooltip>
         <Tooltip>
           <TooltipTrigger asChild>

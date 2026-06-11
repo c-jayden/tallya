@@ -44,19 +44,19 @@ export function ClearDataConfirmDialog({
         <AlertDialogHeader>
           <AlertDialogTitle>清空本地数据？</AlertDialogTitle>
           <AlertDialogDescription>
-            此操作会删除已保存的工作记忆、草稿和报告。应用设置会保留。此操作无法恢复。
+            这会删除已保存的工作记忆、草稿和报告。应用设置会保留，清理后无法恢复。
           </AlertDialogDescription>
         </AlertDialogHeader>
         <div className="space-y-2">
           <label htmlFor="clear-data-confirm-input" className="text-sm text-app-ink-muted">
-            请输入“清空本地数据”以确认。
+            照着上面的文字输入一遍，以确认这是你想做的操作。
           </label>
           <Input
             id="clear-data-confirm-input"
             className="placeholder:text-[var(--app-placeholder)]"
             value={confirmText}
             onChange={(event) => setConfirmText(event.target.value)}
-            placeholder="在此输入上面的文字以确认"
+            placeholder="输入：清空本地数据"
             disabled={isClearingData}
             autoComplete="off"
           />

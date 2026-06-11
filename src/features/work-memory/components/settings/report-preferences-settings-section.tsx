@@ -31,25 +31,25 @@ export function ReportPreferencesSettingsSection({
   const [isStyleExtractOpen, setIsStyleExtractOpen] = useState(false);
 
   return (
-    <section className="space-y-7" aria-label="报告偏好">
+    <section className="space-y-7" aria-label="整理偏好">
       <PreferenceGroup title="基础偏好">
         <ReportPreferenceItem
-          label="报告详略"
-          description="决定报告是偏简洁，还是保留更多过程细节。"
+          label="整理详略"
+          description="控制整理时保留多少细节。"
           options={reportLengthOptions}
           value={settings.reportLength}
           onChange={(reportLength) => onUpdateSettings({ reportLength })}
         />
         <ReportPreferenceItem
-          label="报告语气"
-          description="控制报告的表达方式。"
+          label="表达语气"
+          description="让整理结果更接近你平时的表达。"
           options={reportToneOptions}
           value={settings.reportTone}
           onChange={(reportTone) => onUpdateSettings({ reportTone })}
         />
         <ReportPreferenceItem
-          label="报告重点"
-          description="控制整理报告时优先突出的内容。"
+          label="优先突出"
+          description="选择整理时先照顾哪类信息。"
           options={reportFocusOptions}
           value={settings.reportFocus}
           onChange={(reportFocus) => onUpdateSettings({ reportFocus })}
@@ -61,7 +61,7 @@ export function ReportPreferencesSettingsSection({
           <div className="space-y-1">
             <div className="text-sm font-semibold text-app-ink">风格偏好</div>
             <p className="text-[13px] leading-5 text-app-ink-subtle">
-              描述你希望报告接近的表达方式。它只影响表达，不改变事实内容。
+              写一点你喜欢的表达习惯。它只影响表达，不改变事实内容。
             </p>
           </div>
           <Button
@@ -76,7 +76,7 @@ export function ReportPreferencesSettingsSection({
         </div>
         <textarea
           value={settings.reportStyleHint}
-          placeholder="例如：尽量简洁，用 3-5 条分点描述完成事项，最后用一句话说明后续计划。"
+          placeholder="例如：用 3-5 条分点整理关键进展，最后轻轻带一下后续计划。"
           className="min-h-28 w-full resize-none rounded-lg border border-app-border bg-white px-3 py-2 text-sm leading-5 text-app-ink placeholder:text-slate-400 focus:border-app-ink/30 focus:ring-2 focus:ring-app-ink/10 focus:outline-none"
           onChange={(event) => onUpdateSettings({ reportStyleHint: event.target.value })}
         />

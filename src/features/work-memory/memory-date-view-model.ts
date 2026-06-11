@@ -69,11 +69,11 @@ export function getDailyMemoryPreviewCopy(isToday: boolean) {
   return isToday
     ? {
         title: '今日记忆预览',
-        description: '确认后会保存为今天唯一一条工作记忆。',
+        description: '确认后会沉淀为今天的工作记忆。',
       }
     : {
         title: '这天记忆预览',
-        description: '确认后会保存为这一天的工作记忆。',
+        description: '确认后会沉淀为这一天的工作记忆。',
       };
 }
 

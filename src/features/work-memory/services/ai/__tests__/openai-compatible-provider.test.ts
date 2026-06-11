@@ -24,7 +24,7 @@ const reportInput: GenerateRangeReportInput = {
   reportStyleProfile: {
     enabled: true,
     summary: '偏简洁，常用分点。',
-    promptHint: '生成报告时使用 3-5 条分点，最后一句说明计划。',
+    promptHint: '整理时使用 3-5 条分点，最后一句说明计划。',
     updatedAt: '2026-06-09T10:00:00.000Z',
   },
   entries: [
@@ -135,7 +135,7 @@ describe('OpenAI Compatible Provider', () => {
     }
   });
 
-  it('requires Base URL, API Key, and model before sending requests', async () => {
+  it('requires service address, API Key, and model before sending requests', async () => {
     const provider = createOpenAICompatibleProvider(vi.fn());
 
     await expect(
@@ -143,7 +143,7 @@ describe('OpenAI Compatible Provider', () => {
         ...options,
         openAICompatible: { ...options.openAICompatible!, baseUrl: '' },
       }),
-    ).rejects.toMatchObject({ message: '请填写 Base URL。' } satisfies Partial<AIProviderError>);
+    ).rejects.toMatchObject({ message: '请填写服务地址。' } satisfies Partial<AIProviderError>);
 
     await expect(
       provider.generateDailyMemory(dailyInput, {
@@ -249,7 +249,7 @@ describe('OpenAI Compatible Provider', () => {
     });
   });
 
-  it('reports Anthropic message payloads as unsupported by OpenAI Compatible', async () => {
+  it('reports Anthropic message payloads as unsupported by the OpenAI-compatible adapter', async () => {
     const fetch = vi.fn().mockResolvedValue(
       jsonResponse({
         content: [{ type: 'text', text: JSON.stringify(dailyMemoryPayload()) }],
@@ -259,7 +259,7 @@ describe('OpenAI Compatible Provider', () => {
 
     await expect(provider.generateDailyMemory(dailyInput, options)).rejects.toMatchObject({
       message:
-        '当前服务可能是 Anthropic / Claude 格式，暂不适用于 OpenAI Compatible。请切换到 OpenAI Compatible 网关，或等待后续支持 Anthropic Compatible。',
+        '当前服务更像 Anthropic / Claude 格式。Tallya 现在只直接连接 OpenAI 兼容接口，可先通过网关转换后再使用。',
     } satisfies Partial<AIProviderError>);
   });
 
@@ -312,7 +312,7 @@ describe('OpenAI Compatible Provider', () => {
   it.each([
     [401, 'API Key 无效或没有权限，请检查密钥。'],
     [403, 'API Key 无效或没有权限，请检查密钥。'],
-    [404, '接口地址或模型可能不正确，请检查 Base URL 和模型名称。'],
+    [404, '接口地址或模型可能不正确，请检查服务地址和模型名称。'],
     [429, '请求过于频繁或额度不足，请稍后再试。'],
     [500, 'AI 服务暂时不可用，请稍后再试。'],
   ])('maps HTTP %s to a specific user message', async (status, message) => {
@@ -331,7 +331,7 @@ describe('OpenAI Compatible Provider', () => {
     const provider = createOpenAICompatibleProvider(fetch);
 
     await expect(provider.generateDailyMemory(dailyInput, options)).rejects.toMatchObject({
-      message: `接口地址或模型可能不正确，请检查 Base URL 和模型名称。 服务返回：${'x'.repeat(160)}`,
+      message: `接口地址或模型可能不正确，请检查服务地址和模型名称。 服务返回：${'x'.repeat(160)}`,
     });
   });
 
@@ -416,7 +416,7 @@ describe('OpenAI Compatible Provider', () => {
     await expect(provider.checkHealth?.(options)).resolves.toEqual({
       status: 'unavailable',
       message: '检测失败',
-      detail: '服务可访问，但返回格式不像 OpenAI Compatible。',
+      detail: '服务可访问，但返回格式不像 OpenAI 兼容接口。',
     });
   });
 
@@ -445,11 +445,11 @@ describe('OpenAI Compatible Provider', () => {
 
     expect(prompt).toContain('2026-06-01');
     expect(prompt).toContain('2026-06-07');
-    expect(prompt).toContain('报告详略：精简');
-    expect(prompt).toContain('报告语气：正式');
-    expect(prompt).toContain('报告重点：问题风险优先');
+    expect(prompt).toContain('整理详略：精简');
+    expect(prompt).toContain('表达语气：正式');
+    expect(prompt).toContain('整理重点：问题风险优先');
     expect(prompt).toContain('请保持简洁，用 3 条分点。');
-    expect(prompt).not.toContain('生成报告时使用 3-5 条分点，最后一句说明计划。');
+    expect(prompt).not.toContain('整理时使用 3-5 条分点，最后一句说明计划。');
     expect(prompt).not.toContain('已识别风格提示');
     expect(body.model).toBe('gpt-test');
   });
@@ -487,7 +487,7 @@ describe('OpenAI Compatible Provider', () => {
     const fetch = vi.fn().mockResolvedValue(
       chatResponse({
         summary: '偏简洁，常用分点结构。',
-        promptHint: '生成报告时保持简洁自然，使用 3-5 条分点。',
+        promptHint: '整理时保持简洁自然，使用 3-5 条分点。',
       }),
     );
     const provider = createOpenAICompatibleProvider(fetch);
@@ -496,7 +496,7 @@ describe('OpenAI Compatible Provider', () => {
       provider.analyzeReportStyle?.({ sampleText: '今日完成：处理客户 A 项目排期。' }, options),
     ).resolves.toEqual({
       summary: '偏简洁，常用分点结构。',
-      promptHint: '生成报告时保持简洁自然，使用 3-5 条分点。',
+      promptHint: '整理时保持简洁自然，使用 3-5 条分点。',
     });
 
     const body = JSON.parse(String(fetch.mock.calls[0]?.[1]?.body)) as {

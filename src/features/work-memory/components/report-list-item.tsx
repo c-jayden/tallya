@@ -30,7 +30,7 @@ export function ReportListItem({ report, onOpen }: ReportListItemProps) {
           </p>
           {generatedAt ? (
             <p className="mt-1 text-xs leading-[1.45] text-app-ink-subtle">
-              生成时间：{generatedAt}
+              整理时间：{generatedAt}
             </p>
           ) : null}
         </div>

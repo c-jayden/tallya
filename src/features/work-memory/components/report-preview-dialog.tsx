@@ -55,10 +55,10 @@ export function ReportPreviewDialog({
       >
         <DialogHeader className="shrink-0 gap-1.5 px-6 pt-5 pb-4">
           <DialogTitle className="text-lg leading-6 font-semibold tracking-normal text-app-ink">
-            {isCustomReport ? '报告预览' : '周报预览'}
+            {isCustomReport ? '总结预览' : '本周回顾预览'}
           </DialogTitle>
           <DialogDescription className="text-[13px] leading-[1.5] text-app-ink-muted">
-            确认后会保存这份报告。
+            确认后会保存这份整理。
           </DialogDescription>
         </DialogHeader>
         <TallyaScrollArea className="min-h-0 max-h-[calc(100vh-190px)] flex-1 px-6 pb-5">
@@ -102,7 +102,7 @@ export function ReportPreviewDialog({
             {isSaving ? (
               <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden="true" />
             ) : null}
-            {isSaving ? '保存中...' : isCustomReport ? '保存报告' : '保存周报'}
+            {isSaving ? '保存中...' : isCustomReport ? '保存总结' : '保存本周回顾'}
           </Button>
         </TallyaDialogFooter>
       </DialogContent>

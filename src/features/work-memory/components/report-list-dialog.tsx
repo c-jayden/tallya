@@ -31,10 +31,10 @@ export function ReportListDialog({
       >
         <DialogHeader className="shrink-0 gap-1.5 px-6 pt-5 pb-4">
           <DialogTitle className="text-lg leading-6 font-semibold tracking-normal text-app-ink">
-            报告
+            整理记录
           </DialogTitle>
           <DialogDescription className="text-[13px] leading-[1.5] text-app-ink-muted">
-            查看已经保存的工作报告。
+            查看已经保存的阶段整理。
           </DialogDescription>
         </DialogHeader>
         <TallyaScrollArea className="min-h-0 max-h-[calc(100vh-184px)] flex-1 px-6 pb-5">

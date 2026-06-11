@@ -8,7 +8,7 @@ type ReportDocumentProps = {
 
 export function ReportDocument({
   content,
-  fallbackTitle = '本周周报',
+  fallbackTitle = '本周回顾',
   showTitle = true,
 }: ReportDocumentProps) {
   if (!content) {
@@ -29,10 +29,10 @@ export function ReportDocument({
           ) : null}
         </header>
       ) : null}
-      <ReportTextList title="本周重点" items={content.highlights} />
+      <ReportTextList title="重点" items={content.highlights} />
       <ReportTextList title="完成事项" items={content.completedItems} />
       <ReportTextBlock title="问题与风险" content={content.problems} />
-      <ReportTextBlock title="下周计划" content={content.nextWeekPlan} />
+      <ReportTextBlock title="后续计划" content={content.nextWeekPlan} />
     </article>
   );
 }

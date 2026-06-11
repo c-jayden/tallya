@@ -327,7 +327,7 @@ async function generateReportDraft(
   context: ReportContext,
 ): Promise<ReportDraft> {
   if (context.entries.length === 0) {
-    throw new Error('这个时间范围内还没有可用于生成报告的记录。');
+    throw new Error('这个时间范围里还没有可整理的记录。');
   }
 
   const generated = await aiService.generateRangeReport({

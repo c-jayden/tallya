@@ -205,7 +205,7 @@ export function WorkMemoryHome() {
                 className="cursor-pointer rounded-lg px-2 py-1 text-[13px] text-app-ink-subtle transition-colors duration-150 hover:bg-app-surface-muted hover:text-app-ink focus-visible:bg-app-surface-muted focus-visible:text-app-ink focus-visible:outline-none"
                 onClick={openDailyReport}
               >
-                整理成日报
+                {isSelectedDateToday ? '整理今日' : '整理这天'}
               </button>
             </div>
           ) : null}

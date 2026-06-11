@@ -79,7 +79,7 @@ export function ReportGapDialog({
       >
         <DialogHeader className="shrink-0 gap-1.5 px-6 pt-5 pb-4">
           <DialogTitle className="text-lg leading-6 font-semibold tracking-normal text-app-ink">
-            补充几句，让周报更完整
+            补充几句，让整理更完整
           </DialogTitle>
           <DialogDescription className="text-[13px] leading-[1.5] text-app-ink-muted">
             这几条线索这周反复出现但记得比较简略，补一句会更好写（可跳过）。
@@ -101,7 +101,7 @@ export function ReportGapDialog({
                   onChange={(event) =>
                     setAnswers((current) => ({ ...current, [gap.entryId]: event.currentTarget.value }))
                   }
-                  placeholder="答一两句就好，留空表示跳过这条"
+                  placeholder="写一两句就好，留空也可以跳过"
                   disabled={isGenerating}
                 />
               </div>
@@ -116,7 +116,7 @@ export function ReportGapDialog({
             onClick={handleSkip}
             disabled={isGenerating}
           >
-            跳过，直接生成
+            跳过，直接整理
           </Button>
           <Button
             type="button"
@@ -128,7 +128,7 @@ export function ReportGapDialog({
             {isGenerating ? (
               <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden="true" />
             ) : null}
-            补充并生成
+            补充并整理
           </Button>
         </TallyaDialogFooter>
       </DialogContent>

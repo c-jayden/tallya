@@ -80,8 +80,8 @@ export function ReportGenerateDialog({
   });
   const existingReportCopy =
     reportType === 'custom'
-      ? '这个时间范围的报告已存在，重新生成会覆盖原报告。'
-      : '本周周报已存在，重新生成会覆盖原报告。';
+      ? '这个时间范围已保存过整理结果，重新整理会覆盖原内容。'
+      : '本周已经保存过整理结果，重新整理会覆盖原内容。';
   const countCopy =
     reportType === 'custom'
       ? `该范围内 ${availableDayCount} 天 · ${availableMemoryCount} 条记录`
@@ -127,22 +127,22 @@ export function ReportGenerateDialog({
         >
           <DialogHeader className="shrink-0 gap-1.5 px-6 pt-5 pb-4">
             <DialogTitle className="text-lg leading-6 font-semibold tracking-normal text-app-ink">
-              生成报告
+              整理一段时间
             </DialogTitle>
             <DialogDescription className="text-[13px] leading-[1.5] text-app-ink-muted">
-              从这段时间记录的内容整理一份报告。
+              把这段时间的记录收拢成一份可保存的总结。
             </DialogDescription>
           </DialogHeader>
           <div className="grid shrink-0 gap-3.5 px-6 pb-4">
             <div className="inline-flex w-fit rounded-xl bg-app-surface-muted p-1">
               <ReportTypeButton
                 active={reportType === 'weekly'}
-                label="本周周报"
+                label="本周回顾"
                 onClick={() => onReportTypeChange('weekly')}
               />
               <ReportTypeButton
                 active={reportType === 'custom'}
-                label="自定义范围"
+                label="自定义时间"
                 onClick={() => onReportTypeChange('custom')}
               />
             </div>
@@ -178,8 +178,8 @@ export function ReportGenerateDialog({
           <TallyaScrollArea className="min-h-0 flex-1 px-6 pb-5">
             <div className="grid gap-4">
               <ReportMetaRow
-                label="可用记忆"
-                value={isLoading ? '正在统计工作记忆' : countCopy}
+                label="可整理内容"
+                value={isLoading ? '正在统计可整理的记录' : countCopy}
               />
               {reportType === 'custom' && !isRangeValid ? (
                 <p className="rounded-lg bg-app-surface-muted px-3 py-2 text-[13px] leading-[1.5] text-app-ink-muted">
@@ -188,12 +188,12 @@ export function ReportGenerateDialog({
               ) : null}
               {!isLoading && availableMemoryCount === 1 ? (
                 <p className="rounded-lg bg-app-surface-muted px-3 py-2 text-[13px] leading-[1.5] text-app-ink-muted">
-                  记录较少时，报告内容可能偏简短。
+                  记录较少，整理结果可能会短一些。
                 </p>
               ) : null}
               {!isLoading && !hasAvailableMemories ? (
                 <p className="rounded-lg bg-app-surface-muted px-3 py-2 text-[13px] leading-[1.5] text-app-ink-muted">
-                  这个时间范围内还没有可用于生成报告的记录。
+                  这个时间范围里还没有可整理的记录。
                 </p>
               ) : null}
               {!isLoading && hasExistingReport ? (
@@ -211,7 +211,7 @@ export function ReportGenerateDialog({
               onClick={onViewReports}
               disabled={!dialogState.canClose}
             >
-              历史报告
+              已保存
             </Button>
             <div className="flex items-center gap-2">
               {dialogState.showCancel ? (
@@ -247,18 +247,16 @@ export function ReportGenerateDialog({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {reportType === 'custom' ? '重新生成报告？' : '重新生成周报？'}
+              {reportType === 'custom' ? '重新整理这段时间？' : '重新整理本周？'}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {reportType === 'custom'
-                ? '重新生成会覆盖当前保存的报告。'
-                : '重新生成会覆盖当前保存的周报。'}
+              重新整理会覆盖当前保存的内容。
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel className="cursor-pointer">取消</AlertDialogCancel>
             <AlertDialogAction className="cursor-pointer" onClick={handleConfirmOverwrite}>
-              重新生成
+              重新整理
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

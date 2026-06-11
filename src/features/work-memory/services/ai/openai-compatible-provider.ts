@@ -192,7 +192,7 @@ export function createOpenAICompatibleProvider(fetchImpl: FetchLike = fetch): AI
       throw new AIProviderError(
         isAbortError(error)
           ? 'AI 服务响应超时，请检查网关或稍后再试。'
-          : '无法连接到 AI 服务，请检查 Base URL 或网络。',
+          : '无法连接到 AI 服务，请检查服务地址或网络。',
         OPENAI_COMPATIBLE_PROVIDER_ID,
         error,
       );
@@ -264,7 +264,7 @@ export function createOpenAICompatibleProvider(fetchImpl: FetchLike = fetch): AI
       throw new AIProviderError(
         isAbortError(error)
           ? 'AI 服务响应超时，请检查网关或稍后再试。'
-          : '无法连接到 AI 服务，请检查 Base URL 或网络。',
+          : '无法连接到 AI 服务，请检查服务地址或网络。',
         OPENAI_COMPATIBLE_PROVIDER_ID,
         error,
       );
@@ -368,7 +368,7 @@ export function createOpenAICompatibleProvider(fetchImpl: FetchLike = fetch): AI
       throw error instanceof AIProviderError
         ? error
         : new AIProviderError(
-            '返回格式不像 OpenAI Compatible，请检查服务类型。',
+            '返回格式不像 OpenAI 兼容接口，请检查服务类型。',
             OPENAI_COMPATIBLE_PROVIDER_ID,
             error,
           );
@@ -543,7 +543,7 @@ function getOpenAICompatibleConfig(options: AIProviderOptions): OpenAICompatible
   const normalizedBaseUrl = normalizeOpenAICompatibleBaseUrl(baseUrl);
 
   if (!baseUrl) {
-    throw new AIProviderError('请填写 Base URL。', OPENAI_COMPATIBLE_PROVIDER_ID);
+    throw new AIProviderError('请填写服务地址。', OPENAI_COMPATIBLE_PROVIDER_ID);
   }
 
   if (!apiKey) {
@@ -580,7 +580,7 @@ function buildResponsesInput(prompt: string) {
 function extractModelText(payload: unknown): string {
   if (!isRecord(payload)) {
     throw new AIProviderError(
-      '返回格式不像 OpenAI Compatible，请检查服务类型。',
+      '返回格式不像 OpenAI 兼容接口，请检查服务类型。',
       OPENAI_COMPATIBLE_PROVIDER_ID,
     );
   }
@@ -631,7 +631,7 @@ function extractModelText(payload: unknown): string {
   }
 
   throw new AIProviderError(
-    '返回格式不像 OpenAI Compatible，请检查服务类型。',
+    '返回格式不像 OpenAI 兼容接口，请检查服务类型。',
     OPENAI_COMPATIBLE_PROVIDER_ID,
   );
 }
@@ -739,7 +739,7 @@ function isAnthropicContentArray(value: unknown) {
 }
 
 function getAnthropicFormatMessage() {
-  return '当前服务可能是 Anthropic / Claude 格式，暂不适用于 OpenAI Compatible。请切换到 OpenAI Compatible 网关，或等待后续支持 Anthropic Compatible。';
+  return '当前服务更像 Anthropic / Claude 格式。Tallya 现在只直接连接 OpenAI 兼容接口，可先通过网关转换后再使用。';
 }
 
 function buildFriendlyHTTPError(
@@ -775,7 +775,7 @@ function getFriendlyHTTPError(status: number) {
   }
 
   if (status === 404) {
-    return '接口地址或模型可能不正确，请检查 Base URL 和模型名称。';
+    return '接口地址或模型可能不正确，请检查服务地址和模型名称。';
   }
 
   if (status === 429) {
@@ -949,8 +949,8 @@ function sanitizeDiagnosticValue(value: unknown): unknown {
 }
 
 function normalizeHealthErrorMessage(message: string) {
-  if (message === '返回格式不像 OpenAI Compatible，请检查服务类型。') {
-    return '服务可访问，但返回格式不像 OpenAI Compatible。';
+  if (message === '返回格式不像 OpenAI 兼容接口，请检查服务类型。') {
+    return '服务可访问，但返回格式不像 OpenAI 兼容接口。';
   }
 
   return message;

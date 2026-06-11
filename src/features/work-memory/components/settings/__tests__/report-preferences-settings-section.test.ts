@@ -14,7 +14,7 @@ describe('ReportPreferencesSettingsSection', () => {
   it('keeps label and description inside the same preference item', () => {
     expect(sectionSource).toContain('ReportPreferenceItem');
     expect(sectionSource).toContain('description');
-    expect(sectionSource).toContain('决定报告是偏简洁，还是保留更多过程细节。');
+    expect(sectionSource).toContain('控制整理时保留多少细节。');
     expect(sectionSource).not.toContain('<Separator');
   });
 
@@ -34,6 +34,8 @@ describe('ReportPreferencesSettingsSection', () => {
     expect(dialogSource).toContain('原文不会被保存');
     expect(dialogSource).toContain('先粘贴样本');
     expect(dialogSource).toContain('提取');
+    expect(dialogSource).toContain('历史报告或工作总结');
+    expect(dialogSource).not.toContain('日报或周报');
     expect(dialogSource).not.toContain('onUpdateSettings');
     expect(dialogSource).not.toContain('reportStyleProfile');
   });

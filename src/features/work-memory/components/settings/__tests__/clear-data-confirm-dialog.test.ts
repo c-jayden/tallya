@@ -12,6 +12,7 @@ describe('ClearDataConfirmDialog', () => {
 
   it('explains that settings are kept when local data is cleared', () => {
     expect(source).toContain('应用设置会保留');
-    expect(source).toContain('此操作无法恢复');
+    expect(source).toContain('清理后无法恢复');
+    expect(source).toContain('照着上面的文字输入一遍');
   });
 });

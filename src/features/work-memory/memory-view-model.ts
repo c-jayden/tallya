@@ -273,8 +273,8 @@ export function getMemoryStatusSummary({
 
   if (hasCurrentWeekReport && weeklySnapshot.settledDays === 0) {
     return {
-      title: '本周周报已生成',
-      description: '可以查看已保存的报告，或在更新记忆后重新生成。',
+      title: '本周回顾已保存',
+      description: '可以查看已保存的整理，或在更新记忆后重新整理。',
       actions: baseActions,
     };
   }

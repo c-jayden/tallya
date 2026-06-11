@@ -83,7 +83,7 @@ export function ReportStyleExtractDialog({
             从样本提取风格
           </DialogTitle>
           <DialogDescription className="text-[13px] leading-[1.5] text-app-ink-muted">
-            粘贴你过去提交过的日报或周报。Tallya
+            粘贴几段历史报告或工作总结。Tallya
             会提取常用表达和结构，并回填到风格偏好中。原文不会被保存。
           </DialogDescription>
         </DialogHeader>
@@ -92,7 +92,7 @@ export function ReportStyleExtractDialog({
           <textarea
             value={sampleText}
             disabled={isExtracting}
-            placeholder="粘贴几段你过去提交过的日报或周报。内容越接近你真实写法，提取结果越有参考价值。"
+            placeholder="粘贴几段历史报告或工作总结。越接近你的真实写法，越有参考价值。"
             className="min-h-40 w-full resize-none rounded-lg border border-app-border bg-white px-3 py-2 text-sm leading-5 text-app-ink placeholder:text-slate-400 focus:border-app-ink/30 focus:ring-2 focus:ring-app-ink/10 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
             onChange={(event) => {
               setSampleText(event.target.value);

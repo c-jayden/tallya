@@ -62,7 +62,7 @@ describe('createReportService', () => {
     const service = createService({ entries: [], generateRangeReport });
 
     await expect(service.generateCurrentWeeklyReport()).rejects.toThrow(
-      '这个时间范围内还没有可用于生成报告的记录。',
+      '这个时间范围里还没有可整理的记录。',
     );
     expect(generateRangeReport).not.toHaveBeenCalled();
   });

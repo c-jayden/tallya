@@ -53,11 +53,11 @@ export function useDailyReportFlow() {
       if (text) {
         setReportText(text);
       } else {
-        toast.warning('AI 没有返回可用的日报文本，已保留原文整理。');
+        toast.warning('AI 没有返回可用内容，已保留当前整理。');
       }
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : 'AI 整理失败，可直接使用或编辑当前文本。',
+        error instanceof Error ? error.message : 'AI 整理失败，可以直接使用或编辑当前文本。',
       );
     } finally {
       setIsGenerating(false);
@@ -73,9 +73,9 @@ export function useDailyReportFlow() {
 
     try {
       await navigator.clipboard.writeText(text);
-      toast.success('日报已复制，可粘贴到企业微信、钉钉等');
+      toast.success('已复制，可粘贴到需要同步的地方');
     } catch {
-      toast.error('复制失败，请手动选择文本复制。');
+      toast.error('复制失败，可以手动选择文本复制。');
     }
   }, [reportText]);
 

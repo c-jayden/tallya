@@ -7,7 +7,7 @@ const generateMockRangeReport: AIProvider['generateRangeReport'] = async (input)
   const title =
     input.reportType === 'custom'
       ? `${input.startDate} - ${input.endDate} 工作总结`
-      : '本周周报';
+      : '本周回顾';
 
   return {
     title,
@@ -43,7 +43,7 @@ export const mockProvider: AIProvider = {
   async analyzeReportStyle() {
     return {
       summary: '偏简洁，常用分点结构，语气自然。',
-      promptHint: '生成报告时保持简洁自然，优先使用 3-5 条分点表达完成事项。',
+      promptHint: '整理时保持简洁自然，优先使用 3-5 条分点表达完成事项。',
     };
   },
 };

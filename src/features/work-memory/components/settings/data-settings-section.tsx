@@ -36,17 +36,17 @@ export function DataSettingsSection({
   onRequestClear,
 }: DataSettingsSectionProps) {
   return (
-    <section className="space-y-6" aria-label="数据管理">
+    <section className="space-y-6" aria-label="本地数据">
       <div className="space-y-1.5">
         <div className="text-sm font-semibold text-app-ink">本地数据</div>
-        <p className="text-sm text-app-ink-subtle">你的工作记忆默认保存在本机。</p>
+        <p className="text-sm text-app-ink-subtle">工作记忆默认留在本机，你可以按需备份或迁移。</p>
       </div>
 
       <UsageStatsBlock />
 
       <DataActionRow
-        title="数据备份"
-        description="导出一份本地备份，方便迁移或恢复。"
+        title="备份一份"
+        description="把工作记忆、报告和设置打包保存，方便之后迁移或恢复。"
         action={
           <Button
             type="button"
@@ -61,8 +61,8 @@ export function DataSettingsSection({
       />
 
       <DataActionRow
-        title="数据恢复"
-        description="从备份文件恢复工作记忆、报告和设置。"
+        title="从备份恢复"
+        description="选择之前导出的备份文件，把内容恢复到本机。"
         action={
           <Button
             type="button"
@@ -77,8 +77,8 @@ export function DataSettingsSection({
       />
 
       <DataActionRow
-        title="数据目录"
-        description="查看当前 SQLite 数据和应用数据所在位置。"
+        title="本地文件位置"
+        description="打开 Tallya 保存工作记忆和应用文件的目录。"
         action={
           <Button
             type="button"
@@ -94,7 +94,7 @@ export function DataSettingsSection({
 
       <DataActionRow
         title="诊断日志"
-        description="记录应用运行中的错误和诊断信息，方便排查问题。"
+        description="保留运行中的错误和诊断信息，方便之后排查。"
         action={
           <div className="flex items-center gap-2">
             <Button
@@ -121,7 +121,7 @@ export function DataSettingsSection({
 
       <DataActionRow
         title="启用详细诊断日志"
-        description="记录更多响应结构信息，但不会记录 API Key。"
+        description="记录更多响应结构信息，但不会记录 API Key。平时可以保持关闭。"
         action={
           <Switch
             checked={settings.diagnosticLoggingEnabled}
@@ -134,8 +134,8 @@ export function DataSettingsSection({
       />
 
       <DataActionRow
-        title="危险操作"
-        description="删除已保存的工作记忆和草稿。"
+        title="清理本机数据"
+        description="删除已保存的工作记忆、草稿和报告，设置会保留。"
         action={
           <Button
             type="button"

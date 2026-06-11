@@ -242,7 +242,7 @@ describe('getMemoryStatusSummary', () => {
       hasCurrentWeekReport: true,
     });
 
-    expect(summary.title).toBe('本周周报已生成');
+    expect(summary.title).toBe('本周回顾已保存');
     expect(summary.actions.canViewReports).toBe(true);
   });
 });

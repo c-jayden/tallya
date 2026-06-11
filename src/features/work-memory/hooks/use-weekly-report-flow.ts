@@ -67,7 +67,7 @@ export function useWeeklyReportFlow() {
         );
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : '报告信息读取失败，请稍后重试。';
+      const message = error instanceof Error ? error.message : '整理信息读取失败，请稍后重试。';
 
       toast.error(message);
     } finally {
@@ -79,7 +79,7 @@ export function useWeeklyReportFlow() {
     try {
       setReportListItems(await reportService.getAllReports());
     } catch (error) {
-      const message = error instanceof Error ? error.message : '报告读取失败，请稍后重试。';
+      const message = error instanceof Error ? error.message : '保存记录读取失败，请稍后重试。';
 
       toast.error(message);
     }
@@ -96,7 +96,7 @@ export function useWeeklyReportFlow() {
         }
       })
       .catch((error) => {
-        const message = error instanceof Error ? error.message : '报告读取失败，请稍后重试。';
+        const message = error instanceof Error ? error.message : '保存记录读取失败，请稍后重试。';
 
         toast.error(message);
       });
@@ -176,7 +176,7 @@ export function useWeeklyReportFlow() {
       setIsGenerateDialogOpen(false);
       setIsPreviewDialogOpen(true);
     } catch (error) {
-      const message = error instanceof Error ? error.message : '报告生成失败，请稍后重试。';
+      const message = error instanceof Error ? error.message : '整理失败，请稍后重试。';
 
       toast.error(message);
       await loadContext();
@@ -282,14 +282,14 @@ export function useWeeklyReportFlow() {
 
     try {
       await reportService.saveReport(reportDraft);
-      toast.success(reportDraft.reportType === 'custom' ? '报告已保存' : '周报已保存');
+      toast.success(reportDraft.reportType === 'custom' ? '总结已保存' : '本周回顾已保存');
       setIsPreviewDialogOpen(false);
       setReportDraft(null);
       setReportContext(null);
       setSelectedReport(null);
       await loadReports();
     } catch (error) {
-      const message = error instanceof Error ? error.message : '报告保存失败，请稍后重试。';
+      const message = error instanceof Error ? error.message : '保存失败，请稍后重试。';
 
       toast.error(message);
     } finally {
@@ -345,7 +345,7 @@ export function useWeeklyReportFlow() {
       setIsReportDetailOpen(false);
       setIsPreviewDialogOpen(true);
     } catch (error) {
-      const message = error instanceof Error ? error.message : '报告生成失败，请稍后重试。';
+      const message = error instanceof Error ? error.message : '整理失败，请稍后重试。';
 
       toast.error(message);
     } finally {
@@ -400,14 +400,14 @@ export function useWeeklyReportFlow() {
 }
 
 function getReportCopyTitle(draft: ReportDraft) {
-  const fallbackTitle = draft.reportType === 'custom' ? '工作总结' : '本周周报';
+  const fallbackTitle = draft.reportType === 'custom' ? '工作总结' : '本周回顾';
   const title = draft.generated.title || fallbackTitle;
 
   return `${title}（${formatReportDateRange(draft.startDate, draft.endDate)}）`;
 }
 
 function getSavedReportCopyTitle(report: Report) {
-  const fallbackTitle = report.type === 'custom' ? '工作总结' : '本周周报';
+  const fallbackTitle = report.type === 'custom' ? '工作总结' : '本周回顾';
 
   return `${report.title || fallbackTitle}（${formatReportDateRange(report.startDate, report.endDate)}）`;
 }

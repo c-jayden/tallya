@@ -19,14 +19,14 @@ export function getReportGenerateActionLabel(
   reportType: ReportGenerationType = 'weekly',
 ) {
   if (isGenerating) {
-    return hasExistingReport ? '重新生成中...' : '生成中...';
+    return hasExistingReport ? '重新整理中...' : '整理中...';
   }
 
   if (hasExistingReport) {
-    return '重新生成';
+    return '重新整理';
   }
 
-  return reportType === 'custom' ? '生成报告' : '生成周报';
+  return reportType === 'custom' ? '整理这段时间' : '整理本周';
 }
 
 export type ReportGenerateDialogState = {

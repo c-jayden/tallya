@@ -34,8 +34,9 @@ describe('ReportGenerateDialog layout', () => {
     const source = readFileSync(new URL('../report-generate-dialog.tsx', import.meta.url), 'utf8');
 
     expect(source).not.toContain('>报告类型<');
-    expect(source).toContain('label="本周周报"');
-    expect(source).toContain('label="自定义范围"');
+    expect(source).toContain('label="本周回顾"');
+    expect(source).toContain('label="自定义时间"');
+    expect(source).not.toContain('label="本周周报"');
     expect(source).not.toContain('label="自定义范围报告"');
   });
 
@@ -54,5 +55,16 @@ describe('ReportGenerateDialog layout', () => {
 
     expect(source).toContain("reportType === 'weekly' ? (");
     expect(source).toContain('label="时间范围"');
+  });
+
+  it('uses warmer整理 copy for generation and empty states', () => {
+    const source = readFileSync(new URL('../report-generate-dialog.tsx', import.meta.url), 'utf8');
+
+    expect(source).toContain('整理一段时间');
+    expect(source).toContain('可整理内容');
+    expect(source).toContain('记录较少，整理结果可能会短一些。');
+    expect(source).toContain('这个时间范围里还没有可整理的记录。');
+    expect(source).not.toContain('生成报告');
+    expect(source).not.toContain('可用记忆');
   });
 });

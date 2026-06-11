@@ -37,7 +37,7 @@ export function NotificationSettingsSection({
     <section className="space-y-5" aria-label="通知提醒">
       <div className="space-y-3">
         <SwitchField
-          label="启用每日记录提醒"
+          label="提醒我留下当天工作"
           checked={settings.dailyReminderEnabled}
           onCheckedChange={(checked) => onUpdateSettings({ dailyReminderEnabled: checked })}
         />
@@ -51,7 +51,7 @@ export function NotificationSettingsSection({
               onChange={(event) => onUpdateSettings({ dailyReminderTime: event.target.value })}
             />
           </Field>
-          <Field label="提醒文案">
+          <Field label="提醒内容">
             <Textarea
               value={settings.dailyReminderMessage}
               placeholder={DEFAULT_APP_SETTINGS.dailyReminderMessage}
@@ -67,13 +67,13 @@ export function NotificationSettingsSection({
 
       <div className="space-y-3">
         <SwitchField
-          label="启用周报提醒"
+          label="提醒我回顾一周"
           checked={settings.weeklyReminderEnabled}
           onCheckedChange={(checked) => onUpdateSettings({ weeklyReminderEnabled: checked })}
         />
         <div className="space-y-3">
           <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="星期">
+            <Field label="哪一天">
               <Select
                 value={settings.weeklyReminderWeekday}
                 disabled={isWeeklyReminderDisabled}
@@ -102,7 +102,7 @@ export function NotificationSettingsSection({
             </Field>
           </div>
           <div>
-            <Field label="提醒文案">
+            <Field label="提醒内容">
               <Textarea
                 value={settings.weeklyReminderMessage}
                 placeholder={DEFAULT_APP_SETTINGS.weeklyReminderMessage}
@@ -127,10 +127,10 @@ export function NotificationSettingsSection({
           {isSendingTestNotification && (
             <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
           )}
-          发送测试通知
+          试发一条通知
         </Button>
         <p className="text-sm text-app-ink-subtle">
-          提醒会通过系统通知发送，应用需要在后台运行。
+          保持 Tallya 在后台运行时，会按设定时间轻轻提醒。
         </p>
       </div>
     </section>

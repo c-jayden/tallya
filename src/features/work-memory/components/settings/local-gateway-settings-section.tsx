@@ -57,7 +57,7 @@ export function LocalGatewaySettingsSection({
     <div className="space-y-4 border-t border-app-border pt-5" aria-label="本地 AI 网关">
       <Field
         label="本地 AI 网关"
-        description="没有本地网关时，会继续使用 Codex CLI，无需额外操作。"
+        description="没有本地网关也没关系，会继续使用 Codex CLI，无需额外操作。"
       >
         <div className="space-y-4">
           <SwitchField
@@ -68,12 +68,12 @@ export function LocalGatewaySettingsSection({
 
           <div className="grid gap-3">
             <label className="grid gap-1.5 text-sm">
-              <span className="font-medium text-app-ink-muted">Base URL</span>
+              <span className="font-medium text-app-ink-muted">网关地址</span>
               <Input
                 className={localGatewayInputClassName}
                 value={settings.localGateway.baseUrl}
                 onChange={(event) => updateLocalGateway({ baseUrl: event.target.value })}
-                placeholder="http://localhost:8080"
+                placeholder="例如 http://localhost:8080"
               />
             </label>
 
@@ -83,7 +83,7 @@ export function LocalGatewaySettingsSection({
                 className={localGatewayInputClassName}
                 value={settings.localGateway.model}
                 onChange={(event) => updateLocalGateway({ model: event.target.value })}
-                placeholder="填写本地网关暴露的模型名"
+                placeholder="填网关里显示的模型名"
               />
             </label>
           </div>
@@ -138,8 +138,8 @@ export function LocalGatewaySettingsSection({
               <StatusLine health={localGatewayHealth} />
             </div>
             <p className="text-[13px] leading-5 text-app-ink-subtle">
-              运行 codex-proxy，或让 cc-switch 开放 OpenAI 兼容端点后，AI 调用会优先走本地 HTTP。
-              模型留空时，会继续使用当前 AI 服务。
+              运行 codex-proxy，或让 cc-switch 开放 OpenAI 兼容端点后，整理会优先走本地 HTTP。
+              模型留空时，会继续使用默认 AI 服务。
             </p>
             <p className="text-[13px] leading-5 text-app-ink-subtle">
               经本地网关复用 ChatGPT 订阅额度属于非官方用法，可能违反对应服务条款，请自行评估。

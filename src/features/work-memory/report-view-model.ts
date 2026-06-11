@@ -3,15 +3,15 @@ import { formatReportDateRange } from './services/report-date';
 import { normalizeReportText } from './services/report-text';
 
 export const reportListEmptyState = {
-  title: '还没有保存的报告',
-  description: '生成一份周报后，这里会显示你的报告记录。',
+  title: '还没有保存的整理',
+  description: '整理一段时间后，这里会留下记录。',
 };
 
 export function getReportTypeLabel(type: ReportType) {
   const labels: Record<ReportType, string> = {
-    weekly: '周报',
-    monthly: '月报',
-    yearly: '年报',
+    weekly: '本周回顾',
+    monthly: '月度整理',
+    yearly: '年度整理',
     custom: '工作总结',
     performance: '绩效材料',
     handoff: '交接材料',
@@ -21,7 +21,7 @@ export function getReportTypeLabel(type: ReportType) {
 }
 
 export function getReportStatusLabel(status: ReportStatus) {
-  return status === 'stale' ? '需要重新生成' : '已保存';
+  return status === 'stale' ? '建议重新整理' : '已保存';
 }
 
 export function getReportRangeLabel(report: Pick<Report, 'startDate' | 'endDate'>) {

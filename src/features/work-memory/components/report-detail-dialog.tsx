@@ -71,18 +71,18 @@ export function ReportDetailDialog({
         >
           <DialogHeader className="shrink-0 gap-1.5 px-6 pt-5 pb-4">
             <DialogTitle className="text-lg leading-6 font-semibold tracking-normal text-app-ink">
-              {isCustomReport ? '报告详情' : '周报详情'}
+              {isCustomReport ? '总结详情' : '本周回顾'}
             </DialogTitle>
           </DialogHeader>
           <TallyaScrollArea className="min-h-0 max-h-[calc(100vh-190px)] flex-1 px-6 pb-5">
             {isStale ? (
               <p className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-[13px] leading-[1.5] text-amber-800 dark:bg-amber-500/10 dark:text-amber-200">
-                这份报告引用的工作记忆已更新，建议重新生成。
+                这份整理引用的工作记忆已更新，可以重新整理一次。
               </p>
             ) : null}
             <ReportDocument
               content={content}
-              fallbackTitle={report?.title ?? (isCustomReport ? '工作总结' : '本周周报')}
+              fallbackTitle={report?.title ?? (isCustomReport ? '工作总结' : '本周回顾')}
               showTitle
             />
           </TallyaScrollArea>
@@ -124,7 +124,7 @@ export function ReportDetailDialog({
               {isRegenerating ? (
                 <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden="true" />
               ) : null}
-              {isRegenerating ? '重新生成中...' : '重新生成'}
+              {isRegenerating ? '重新整理中...' : '重新整理'}
             </Button>
           </TallyaDialogFooter>
         </DialogContent>
@@ -132,17 +132,17 @@ export function ReportDetailDialog({
       <AlertDialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{isCustomReport ? '重新生成报告？' : '重新生成周报？'}</AlertDialogTitle>
+            <AlertDialogTitle>
+              {isCustomReport ? '重新整理这段时间？' : '重新整理本周？'}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              {isCustomReport
-                ? '重新生成会覆盖当前保存的报告。'
-                : '重新生成会覆盖当前保存的周报。'}
+              重新整理会覆盖当前保存的内容。
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel className="cursor-pointer">取消</AlertDialogCancel>
             <AlertDialogAction className="cursor-pointer" onClick={handleConfirmRegenerate}>
-              重新生成
+              重新整理
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
