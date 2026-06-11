@@ -13,6 +13,11 @@ import { EntryFeedItem } from './entry-feed-item';
 import type { ThreadSuggestionView } from '../hooks/use-entries-controller';
 import type { Clarification, Entry } from '../types';
 
+// Entries are newest-first, so each older row dims a little more, fading toward
+// the empty bottom of the page — but never below the floor so it stays readable.
+const FADE_STEP = 0.1;
+const FADE_FLOOR = 0.45;
+
 type EntryFeedProps = {
   entries: Entry[];
   clarificationsByEntry: Record<string, Clarification[]>;
@@ -79,12 +84,13 @@ export function EntryFeed({
         </p>
       ) : (
         <ul className="grid gap-0">
-          {entries.map((entry) => (
+          {entries.map((entry, index) => (
             <EntryFeedItem
               key={entry.id}
               entry={entry}
               clarifications={clarificationsByEntry[entry.id] ?? []}
               threadSuggestion={threadSuggestionByEntry[entry.id]}
+              fadeOpacity={Math.max(FADE_FLOOR, 1 - index * FADE_STEP)}
               isEditing={editingId === entry.id}
               isFocused={focusedEntryId === entry.id}
               onStartEdit={() => setEditingId(entry.id)}

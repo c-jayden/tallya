@@ -1,5 +1,6 @@
 import { today } from './constants';
 import { useEffect, useRef, useState } from 'react';
+import { DailyReportDialog } from './components/daily-report-dialog';
 import { EntryComposer } from './components/entry-composer';
 import { EntryFeed } from './components/entry-feed';
 import { HomeToolbar } from './components/home-toolbar';
@@ -14,6 +15,7 @@ import { SpotlightSearchPanel } from './components/spotlight-search-panel';
 import { ThreadsPanel } from './components/threads-panel';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { getCommandKeyLabel } from '@/lib/platform';
+import { useDailyReportFlow } from './hooks/use-daily-report-flow';
 import { useEntriesController } from './hooks/use-entries-controller';
 import { useHomeWindowSizing } from './hooks/use-home-window-sizing';
 import { useMemorySearch } from './hooks/use-memory-search';
@@ -69,6 +71,7 @@ export function WorkMemoryHome() {
   const search = useMemorySearch({ onOpenMemory: openEntry });
   const threads = useThreadsPanel();
   const weeklyReport = useWeeklyReportFlow();
+  const dailyReport = useDailyReportFlow();
   const reportsButtonRef = useRef<HTMLButtonElement>(null);
 
   function openEntryFromThread(entry: Entry) {
@@ -81,6 +84,16 @@ export function WorkMemoryHome() {
     threads.closeThreadsPanel();
     setIsSettingsOpen(false);
     weeklyReport.closeReportDialogs();
+    dailyReport.close();
+  }
+
+  function openDailyReport() {
+    closeOverlays();
+    dailyReport.open({
+      date: selectedDate,
+      entries: entries.entries,
+      clarificationsByEntry: entries.clarificationsByEntry,
+    });
   }
 
   const toolbarDate = formatToolbarDate(selectedDate);
@@ -137,9 +150,9 @@ export function WorkMemoryHome() {
 
   return (
     <TooltipProvider>
-      <main className="flex min-h-screen w-screen flex-col justify-center bg-app-bg">
+      <main className="min-h-screen w-screen bg-app-bg">
       <section
-        className="mx-auto flex max-h-screen w-[min(calc(100%-88px),748px)] flex-col overflow-y-auto py-6 scrollbar-none [&::-webkit-scrollbar]:hidden max-[560px]:w-[min(calc(100%-28px),748px)] max-[560px]:pt-6 max-[560px]:pb-5 max-[600px]:pt-5"
+        className="mx-auto flex max-h-screen w-[min(calc(100%-88px),748px)] flex-col overflow-y-auto py-11 scrollbar-none [&::-webkit-scrollbar]:hidden max-[560px]:w-[min(calc(100%-28px),748px)] max-[560px]:py-3.5"
         aria-label="工作记忆首页"
       >
         <div ref={contentRef} className="flex flex-col px-1">
@@ -184,6 +197,18 @@ export function WorkMemoryHome() {
             inputRef={entries.composerRef}
             onSubmit={entries.createEntry}
           />
+
+          {entries.entries.length > 0 ? (
+            <div className="mb-1.5 flex justify-end">
+              <button
+                type="button"
+                className="cursor-pointer rounded-lg px-2 py-1 text-[13px] text-app-ink-subtle transition-colors duration-150 hover:bg-app-surface-muted hover:text-app-ink focus-visible:bg-app-surface-muted focus-visible:text-app-ink focus-visible:outline-none"
+                onClick={openDailyReport}
+              >
+                整理成日报
+              </button>
+            </div>
+          ) : null}
 
           <EntryFeed
             entries={entries.entries}
@@ -289,6 +314,21 @@ export function WorkMemoryHome() {
         onOpenChange={setIsSettingsOpen}
         onClearLocalData={handleClearLocalData}
         onDataRestored={entries.reload}
+      />
+
+      <DailyReportDialog
+        open={dailyReport.isOpen}
+        dateLabel={isSelectedDateToday ? '今天' : toolbarDate.date}
+        reportText={dailyReport.reportText}
+        isGenerating={dailyReport.isGenerating}
+        onOpenChange={(open) => {
+          if (!open) {
+            dailyReport.close();
+          }
+        }}
+        onTextChange={dailyReport.setReportText}
+        onGenerateWithAI={dailyReport.generateWithAI}
+        onCopy={dailyReport.copy}
       />
       </main>
     </TooltipProvider>

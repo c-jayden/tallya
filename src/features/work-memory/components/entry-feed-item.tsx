@@ -12,6 +12,7 @@ type EntryFeedItemProps = {
   entry: Entry;
   clarifications: Clarification[];
   threadSuggestion?: ThreadSuggestionView;
+  fadeOpacity: number;
   isEditing: boolean;
   isFocused: boolean;
   onStartEdit: () => void;
@@ -159,6 +160,7 @@ export function EntryFeedItem({
   entry,
   clarifications,
   threadSuggestion,
+  fadeOpacity,
   isEditing,
   isFocused,
   onStartEdit,
@@ -195,8 +197,9 @@ export function EntryFeedItem({
   return (
     <li
       ref={itemRef}
+      style={{ opacity: isFocused ? 1 : fadeOpacity }}
       className={cn(
-        'group rounded-lg px-2.5 py-1.5 transition-colors duration-300 hover:bg-app-surface-muted',
+        'group rounded-lg px-2.5 py-1.5 transition-[background-color,opacity] duration-300 hover:bg-app-surface-muted',
         isFocused && 'bg-[color-mix(in_srgb,#f59e0b_14%,transparent)]',
       )}
     >
