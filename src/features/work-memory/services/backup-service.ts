@@ -76,13 +76,17 @@ export function createBackupService(dependencies: BackupServiceDependencies) {
           clarifications,
           threads,
           reports,
-          // Backup files travel (cloud drives, chat apps), so the plaintext
-          // API key never leaves the local database. Users re-enter it after
+          // Backup files travel (cloud drives, chat apps), so plaintext API
+          // keys never leave the local database. Users re-enter them after
           // a restore.
           appSettings: {
             ...appSettings,
             openAICompatible: {
               ...appSettings.openAICompatible,
+              apiKey: '',
+            },
+            anthropic: {
+              ...appSettings.anthropic,
               apiKey: '',
             },
           },
@@ -141,24 +145,33 @@ export function createBackupService(dependencies: BackupServiceDependencies) {
         await dependencies.clarificationRepository.replaceAll(payload.data.clarifications);
         await dependencies.reportRepository.replaceAll(payload.data.reports);
 
-        // Exports strip the API key, so an empty key in the backup must not wipe
-        // the key already configured on this machine.
+        // Exports strip API keys, so empty keys in the backup must not wipe
+        // the keys already configured on this machine.
         const restoredSettings = payload.data.appSettings;
-        const incomingApiKey = restoredSettings.openAICompatible?.apiKey;
+        const hasOpenAIKey = hasText(restoredSettings.openAICompatible?.apiKey);
+        const hasAnthropicKey = hasText(restoredSettings.anthropic?.apiKey);
 
-        if (typeof incomingApiKey !== 'string' || !incomingApiKey.trim()) {
-          const currentSettings = await dependencies.appSettingsRepository.getSettings();
-
-          return dependencies.appSettingsRepository.saveSettings({
-            ...restoredSettings,
-            openAICompatible: {
-              ...restoredSettings.openAICompatible,
-              apiKey: currentSettings.openAICompatible.apiKey,
-            },
-          });
+        if (hasOpenAIKey && hasAnthropicKey) {
+          return dependencies.appSettingsRepository.saveSettings(restoredSettings);
         }
 
-        return dependencies.appSettingsRepository.saveSettings(restoredSettings);
+        const currentSettings = await dependencies.appSettingsRepository.getSettings();
+
+        return dependencies.appSettingsRepository.saveSettings({
+          ...restoredSettings,
+          openAICompatible: {
+            ...restoredSettings.openAICompatible,
+            apiKey: hasOpenAIKey
+              ? restoredSettings.openAICompatible.apiKey
+              : currentSettings.openAICompatible.apiKey,
+          },
+          anthropic: {
+            ...restoredSettings.anthropic,
+            apiKey: hasAnthropicKey
+              ? restoredSettings.anthropic.apiKey
+              : currentSettings.anthropic.apiKey,
+          },
+        });
       });
     },
 
@@ -274,4 +287,8 @@ function normalizeVersionedArray(version: BackupPayload['version'], value: unkno
   }
 
   return version === 1 ? [] : null;
+}
+
+function hasText(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0;
 }

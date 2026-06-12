@@ -22,6 +22,10 @@ describe('backup-service', () => {
         ...DEFAULT_APP_SETTINGS.openAICompatible,
         apiKey: 'secret-key',
       },
+      anthropic: {
+        ...DEFAULT_APP_SETTINGS.anthropic,
+        apiKey: 'anthropic-secret',
+      },
     };
     const service = createBackupService({
       appVersion: '0.1.0',
@@ -46,6 +50,10 @@ describe('backup-service', () => {
           ...settings,
           openAICompatible: {
             ...settings.openAICompatible,
+            apiKey: '',
+          },
+          anthropic: {
+            ...settings.anthropic,
             apiKey: '',
           },
         },
@@ -259,6 +267,45 @@ describe('backup-service', () => {
       openAICompatible: {
         ...payload.data.appSettings.openAICompatible,
         apiKey: 'local-secret',
+      },
+    });
+  });
+
+  it('keeps the current Anthropic api key when the backup key is empty', async () => {
+    const currentSettings = {
+      ...DEFAULT_APP_SETTINGS,
+      anthropic: {
+        ...DEFAULT_APP_SETTINGS.anthropic,
+        apiKey: 'anthropic-local-secret',
+      },
+    };
+    const payload = createBackupPayload({
+      appSettings: {
+        ...DEFAULT_APP_SETTINGS,
+        anthropic: {
+          ...DEFAULT_APP_SETTINGS.anthropic,
+          apiKey: '',
+        },
+      },
+    });
+    const appSettingsRepository = createAppSettingsRepository({ settings: currentSettings });
+    const service = createBackupService({
+      appVersion: '0.1.0',
+      now: () => new Date('2026-06-08T10:00:00.000Z'),
+      entryRepository: createEntryRepository(),
+      clarificationRepository: createClarificationRepository(),
+      threadRepository: createThreadRepository(),
+      reportRepository: createReportRepository(),
+      appSettingsRepository,
+    });
+
+    await service.restoreBackupPayload(payload);
+
+    expect(appSettingsRepository.saveSettings).toHaveBeenCalledWith({
+      ...payload.data.appSettings,
+      anthropic: {
+        ...payload.data.appSettings.anthropic,
+        apiKey: 'anthropic-local-secret',
       },
     });
   });
