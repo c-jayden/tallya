@@ -86,8 +86,10 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
     apiMode: 'chat-completions',
     parameters: DEFAULT_OPENAI_COMPATIBLE_PARAMETERS,
   },
+  // Disabled by default: probing localhost and silently routing work content to
+  // whatever answers on a common dev port is too aggressive for a privacy tool.
   localGateway: {
-    enabled: true,
+    enabled: false,
     baseUrl: 'http://localhost:8080',
     model: '',
     apiMode: 'chat-completions',
@@ -516,10 +518,17 @@ function normalizeOpenAICompatibleSettings(value: unknown): OpenAICompatibleSett
   return {
     baseUrl: getString(input.baseUrl, DEFAULT_APP_SETTINGS.openAICompatible.baseUrl),
     apiKey: getString(input.apiKey, DEFAULT_APP_SETTINGS.openAICompatible.apiKey),
-    model: getString(input.model, DEFAULT_APP_SETTINGS.openAICompatible.model),
+    // An intentionally cleared model must stay empty (volcengine-style presets
+    // expect the user to fill in an endpoint id); resurrecting the default here
+    // would silently send a foreign model name to the configured service.
+    model: getStringAllowEmpty(input.model, DEFAULT_APP_SETTINGS.openAICompatible.model),
     apiMode: getOpenAICompatibleApiMode(input.apiMode),
     parameters: normalizeOpenAICompatibleParameters(input.parameters),
   };
+}
+
+function getStringAllowEmpty(value: unknown, fallback: string) {
+  return typeof value === 'string' ? value.trim() : fallback;
 }
 
 function normalizeOpenAICompatibleParameters(value: unknown): OpenAICompatibleParameters {

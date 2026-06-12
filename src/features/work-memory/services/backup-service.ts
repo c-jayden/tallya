@@ -54,7 +54,16 @@ export function createBackupService(dependencies: BackupServiceDependencies) {
           dailyMemories,
           reports,
           reportSources,
-          appSettings,
+          // Backup files travel (cloud drives, chat apps), so the plaintext
+          // API key never leaves the local database. Users re-enter it after
+          // a restore.
+          appSettings: {
+            ...appSettings,
+            openAICompatible: {
+              ...appSettings.openAICompatible,
+              apiKey: '',
+            },
+          },
         },
       };
     },
@@ -107,7 +116,24 @@ export function createBackupService(dependencies: BackupServiceDependencies) {
         payload.data.reportSources,
       );
 
-      return dependencies.appSettingsRepository.saveSettings(payload.data.appSettings);
+      // Exports strip the API key, so an empty key in the backup must not wipe
+      // the key already configured on this machine.
+      const restoredSettings = payload.data.appSettings;
+      const incomingApiKey = restoredSettings.openAICompatible?.apiKey;
+
+      if (typeof incomingApiKey !== 'string' || !incomingApiKey.trim()) {
+        const currentSettings = await dependencies.appSettingsRepository.getSettings();
+
+        return dependencies.appSettingsRepository.saveSettings({
+          ...restoredSettings,
+          openAICompatible: {
+            ...restoredSettings.openAICompatible,
+            apiKey: currentSettings.openAICompatible.apiKey,
+          },
+        });
+      }
+
+      return dependencies.appSettingsRepository.saveSettings(restoredSettings);
     },
 
     async openDataDirectory() {

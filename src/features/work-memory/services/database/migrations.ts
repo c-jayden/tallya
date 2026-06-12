@@ -63,16 +63,48 @@ async function setupEntriesFts(database: DatabaseClient) {
   }
 }
 
+// One-time-migration markers live in their own table: putting them into
+// app_settings would make hasSavedSettings() misread a marker-only database as
+// "user already has settings" and skip the legacy localStorage migration.
+const createInternalFlagsTableSql = `
+  CREATE TABLE IF NOT EXISTS internal_flags (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  )
+`;
+
+// "entries is empty" alone is not a safe trigger for the daily-memory backfill:
+// a user who deletes every entry by hand would otherwise get the legacy daily
+// memories resurrected on the next startup.
+const DAILY_MEMORIES_MIGRATION_MARKER_KEY = 'dailyMemoriesMigratedToEntries.v1';
+
+type InternalFlagValueRow = {
+  value: string;
+};
+
 // One-time, best-effort backfill: each legacy daily memory becomes one entry so
 // existing history stays searchable. Early data is not critical, so any failure
 // is logged and swallowed instead of blocking startup. The old table is kept.
 async function migrateDailyMemoriesToEntries(database: DatabaseClient) {
   try {
+    await database.execute(createInternalFlagsTableSql);
+
+    const markerRows = await database.select<InternalFlagValueRow[]>(
+      'SELECT value FROM internal_flags WHERE key = $1',
+      [DAILY_MEMORIES_MIGRATION_MARKER_KEY],
+    );
+
+    if (markerRows[0]?.value === '1') {
+      return;
+    }
+
     const entryCountRows = await database.select<EntryCountRow[]>(
       'SELECT COUNT(*) AS count FROM entries',
     );
 
     if ((entryCountRows[0]?.count ?? 0) > 0) {
+      await writeDailyMemoriesMigrationMarker(database);
       return;
     }
 
@@ -105,12 +137,27 @@ async function migrateDailyMemoriesToEntries(database: DatabaseClient) {
         ],
       );
     }
+
+    await writeDailyMemoriesMigrationMarker(database);
   } catch (error) {
     logger.warn('sqlite', 'database.daily_memories_to_entries_failed', 'Failed to migrate legacy daily memories into entries', {
       table: 'entries',
       error,
     });
   }
+}
+
+async function writeDailyMemoriesMigrationMarker(database: DatabaseClient) {
+  await database.execute(
+    `
+      INSERT INTO internal_flags (key, value, updated_at)
+      VALUES ($1, '1', $2)
+      ON CONFLICT(key) DO UPDATE SET
+        value = excluded.value,
+        updated_at = excluded.updated_at
+    `,
+    [DAILY_MEMORIES_MIGRATION_MARKER_KEY, new Date().toISOString()],
+  );
 }
 
 type TableColumnRow = {

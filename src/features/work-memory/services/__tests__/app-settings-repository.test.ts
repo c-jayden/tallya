@@ -47,7 +47,7 @@ describe('LocalStorageAppSettingsRepository', () => {
       },
       diagnosticLoggingEnabled: false,
       localGateway: {
-        enabled: true,
+        enabled: false,
         baseUrl: 'http://localhost:8080',
         model: '',
         apiMode: 'chat-completions',

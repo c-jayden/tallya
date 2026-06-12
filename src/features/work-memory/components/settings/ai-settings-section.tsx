@@ -109,7 +109,10 @@ export function AISettingsSection({
         ...settings.openAICompatible,
         baseUrl: preset.baseUrl,
         apiMode: preset.apiMode,
-        model: preset.defaultModel || settings.openAICompatible.model,
+        // Presets with an empty defaultModel (volcengine endpoint ids etc.)
+        // clear the field: carrying another provider's model name over would
+        // send a guaranteed-invalid model to the new service.
+        model: preset.defaultModel,
         parameters: {
           ...DEFAULT_OPENAI_COMPATIBLE_PARAMETERS,
           ...preset.parameters,

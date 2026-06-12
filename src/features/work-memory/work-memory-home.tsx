@@ -1,4 +1,3 @@
-import { today } from './constants';
 import { useEffect, useRef, useState } from 'react';
 import { DailyReportDialog } from './components/daily-report-dialog';
 import { EntryComposer } from './components/entry-composer';
@@ -20,6 +19,7 @@ import { useEntriesController } from './hooks/use-entries-controller';
 import { useHomeWindowSizing } from './hooks/use-home-window-sizing';
 import { useMemorySearch } from './hooks/use-memory-search';
 import { useThreadsPanel } from './hooks/use-threads-panel';
+import { useTodayDate } from './hooks/use-today-date';
 import { useWeeklyReportFlow } from './hooks/use-weekly-report-flow';
 import { useTrayWindowEvents } from './hooks/use-tray-window-events';
 import { useWorkMemoryShortcuts } from './hooks/use-work-memory-shortcuts';
@@ -29,14 +29,26 @@ import {
   isFutureMemoryDate,
   isTodayDate,
 } from './memory-date-view-model';
-import { getEntryDate } from './services/entry-repository';
 import { dailyMemoryRepository } from './services/daily-memory-repository';
 import type { Entry } from './types';
 
 export function WorkMemoryHome() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const todayDate = getEntryDate(today);
+  const todayDate = useTodayDate();
   const [selectedDate, setSelectedDate] = useState(todayDate);
+  const previousTodayRef = useRef(todayDate);
+
+  // After a midnight rollover, keep a user who was viewing "today" on the new
+  // today instead of silently leaving them backfilling yesterday.
+  useEffect(() => {
+    if (previousTodayRef.current !== todayDate) {
+      if (selectedDate === previousTodayRef.current) {
+        setSelectedDate(todayDate);
+      }
+
+      previousTodayRef.current = todayDate;
+    }
+  }, [selectedDate, todayDate]);
   const commandKey = getCommandKeyLabel();
   const contentRef = useHomeWindowSizing();
   const entries = useEntriesController({ currentDate: selectedDate, todayDate });
