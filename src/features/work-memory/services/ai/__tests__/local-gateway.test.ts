@@ -1,94 +1,63 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
+import { tauriMocks } from '@/test/tauri-mocks';
 import { probeLocalGateway } from '../local-gateway';
 
 describe('probeLocalGateway', () => {
   it('checks the normalized OpenAI-compatible models endpoint', async () => {
-    const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(
-      jsonResponse({
-        data: [{ id: 'gpt-5' }],
-      }),
-    );
+    tauriMocks.invoke.mockResolvedValue({ reachable: true });
 
-    await expect(probeLocalGateway('http://localhost:8080', fetch)).resolves.toEqual({
+    await expect(probeLocalGateway('http://localhost:8080')).resolves.toEqual({
       reachable: true,
     });
 
-    expect(fetch).toHaveBeenCalledWith('http://localhost:8080/v1/models', {
-      method: 'GET',
-      headers: {
-        Accept: 'application/json',
-      },
-      signal: expect.any(AbortSignal),
+    expect(tauriMocks.invoke).toHaveBeenCalledWith('probe_openai_compatible_gateway', {
+      url: 'http://localhost:8080/v1/models',
+      timeoutMs: 1500,
     });
   });
 
   it('does not duplicate an existing version segment', async () => {
-    const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(jsonResponse({ data: [] }));
+    tauriMocks.invoke.mockResolvedValue({ reachable: true });
 
-    await probeLocalGateway('http://localhost:8787/v1/', fetch);
+    await probeLocalGateway('http://localhost:8787/v1/');
 
-    expect(fetch).toHaveBeenCalledWith('http://localhost:8787/v1/models', expect.any(Object));
+    expect(tauriMocks.invoke).toHaveBeenCalledWith('probe_openai_compatible_gateway', {
+      url: 'http://localhost:8787/v1/models',
+      timeoutMs: 1500,
+    });
   });
 
   it('treats non-2xx responses as unavailable', async () => {
-    const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(
-      jsonResponse({ error: 'missing' }, 404),
-    );
+    tauriMocks.invoke.mockResolvedValue({ reachable: false, detail: 'HTTP 404' });
 
-    await expect(probeLocalGateway('http://localhost:8080', fetch)).resolves.toMatchObject({
+    await expect(probeLocalGateway('http://localhost:8080')).resolves.toMatchObject({
       reachable: false,
       detail: 'HTTP 404',
     });
   });
 
   it('requires a JSON response body to avoid misdetecting unrelated services', async () => {
-    const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(
-      new Response('ok', {
-        status: 200,
-        headers: { 'Content-Type': 'text/plain' },
-      }),
-    );
+    tauriMocks.invoke.mockResolvedValue({ reachable: false, detail: '响应不是 JSON' });
 
-    await expect(probeLocalGateway('http://localhost:8080', fetch)).resolves.toMatchObject({
+    await expect(probeLocalGateway('http://localhost:8080')).resolves.toMatchObject({
       reachable: false,
     });
   });
 
   it('returns unavailable for network errors without throwing', async () => {
-    const fetch = vi.fn<typeof globalThis.fetch>().mockRejectedValue(new Error('network down'));
+    tauriMocks.invoke.mockRejectedValue(new Error('network down'));
 
-    await expect(probeLocalGateway('http://localhost:8080', fetch)).resolves.toMatchObject({
+    await expect(probeLocalGateway('http://localhost:8080')).resolves.toMatchObject({
       reachable: false,
     });
   });
 
-  it('times out slow probes without throwing', async () => {
-    vi.useFakeTimers();
-    try {
-      const fetch = vi.fn<typeof globalThis.fetch>(
-        (_input: Parameters<typeof globalThis.fetch>[0], init?: RequestInit) =>
-          new Promise<Response>((_resolve, reject) => {
-            init?.signal?.addEventListener('abort', () => {
-              reject(Object.assign(new Error('aborted'), { name: 'AbortError' }));
-            });
-          }),
-      );
+  it('returns unavailable for empty gateway addresses without invoking Rust', async () => {
+    await expect(probeLocalGateway('   ')).resolves.toMatchObject({
+      reachable: false,
+      detail: '网关地址为空',
+    });
 
-      const probe = expect(probeLocalGateway('http://localhost:8080', fetch)).resolves.toMatchObject({
-        reachable: false,
-      });
-
-      await vi.advanceTimersByTimeAsync(1500);
-      await probe;
-    } finally {
-      vi.useRealTimers();
-    }
+    expect(tauriMocks.invoke).not.toHaveBeenCalled();
   });
 });
-
-function jsonResponse(payload: unknown, status = 200) {
-  return new Response(JSON.stringify(payload), {
-    status,
-    headers: { 'Content-Type': 'application/json' },
-  });
-}
