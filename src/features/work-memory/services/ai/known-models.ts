@@ -1,7 +1,7 @@
 import type { AIProviderId } from './ai-provider';
 
 export const DEFAULT_CODEX_MODEL = 'gpt-5.4-mini';
-export const DEFAULT_OPENAI_COMPATIBLE_MODEL = 'gpt-5.4-mini';
+export const DEFAULT_OPENAI_COMPATIBLE_MODEL = 'gpt-4o-mini';
 export const DEFAULT_ANTHROPIC_MODEL = 'claude-haiku-4-5';
 
 export type AIModelOption = {
@@ -22,6 +22,10 @@ export const knownProviderModels: Record<AIProviderId, AIModelOption[]> = {
     {
       value: 'gpt-5.4-mini',
       label: 'GPT-5.4-Mini',
+    },
+    {
+      value: 'gpt-5.3-codex-spark',
+      label: 'GPT-5.3-Codex-Spark',
     },
   ],
   'openai-compatible': [],

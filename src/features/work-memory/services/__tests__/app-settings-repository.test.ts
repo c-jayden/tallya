@@ -170,7 +170,7 @@ describe('LocalStorageAppSettingsRepository', () => {
       openAICompatible: {
         baseUrl: 'https://api.openai.com/v1',
         apiKey: '',
-        model: 'gpt-5.4-mini',
+        model: 'gpt-4o-mini',
         apiMode: 'chat-completions',
         parameters: {
           temperature: '',

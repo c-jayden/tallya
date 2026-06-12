@@ -14,6 +14,9 @@ use std::{
 
 const CODEX_CLI_TIMEOUT: Duration = Duration::from_secs(60);
 const CODEX_CLI_CHECK_TIMEOUT: Duration = Duration::from_secs(8);
+const CODEX_CLI_EXEC_CHECK_TIMEOUT: Duration = Duration::from_secs(12);
+const CODEX_LOGIN_HINT: &str = "Codex 已安装但可能未登录，运行 codex login";
+const CODEX_HEALTH_CHECK_PROMPT: &str = r#"Output exactly {"ok":true} and nothing else."#;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -478,8 +481,58 @@ fn run_codex_prompt_generation<T>(
     output_kind: &str,
     parse_output: impl FnOnce(&str) -> Result<T, String>,
 ) -> Result<T, String> {
+    let raw_output =
+        run_codex_prompt_generation_raw(prompt, codex_command, codex_model, output_kind)?;
+
+    parse_output(&raw_output)
+}
+
+struct CodexRunError {
+    message: String,
+    retry_without_fast_config: bool,
+}
+
+fn run_codex_prompt_generation_raw(
+    prompt: String,
+    codex_command: String,
+    codex_model: String,
+    output_kind: &str,
+) -> Result<String, String> {
+    let mut last_error = None;
+
+    for use_fast_config in [true, false] {
+        match run_codex_prompt_generation_once(
+            &prompt,
+            &codex_command,
+            &codex_model,
+            output_kind,
+            use_fast_config,
+        ) {
+            Ok(raw_output) => return Ok(raw_output),
+            Err(error) if use_fast_config && error.retry_without_fast_config => {
+                eprintln!("Codex rejected fast config overrides; retrying without them.");
+                last_error = Some(error.message);
+            }
+            Err(error) => return Err(error.message),
+        }
+    }
+
+    Err(last_error.unwrap_or_else(|| "Codex 生成失败，请检查 Codex CLI 是否可用。".to_string()))
+}
+
+fn run_codex_prompt_generation_once(
+    prompt: &str,
+    codex_command: &str,
+    codex_model: &str,
+    output_kind: &str,
+    use_fast_config: bool,
+) -> Result<String, CodexRunError> {
     let output_path = create_codex_output_path(output_kind);
-    let mut child = spawn_codex_cli(&codex_command, &codex_model, &output_path)?;
+    let mut child = spawn_codex_cli(codex_command, codex_model, &output_path, use_fast_config)
+        .map_err(|message| CodexRunError {
+            message,
+            retry_without_fast_config: false,
+        })?;
     let output_readers = ChildOutputReaders::start(&mut child);
 
     if let Some(mut stdin) = child.stdin.take() {
@@ -489,7 +542,10 @@ fn run_codex_prompt_generation<T>(
             let _ = child.wait();
             let _ = output_readers.collect();
             let _ = fs::remove_file(&output_path);
-            return Err("Codex 生成失败，请检查 Codex CLI 是否可用。".to_string());
+            return Err(CodexRunError {
+                message: "Codex 生成失败，请检查 Codex CLI 是否可用。".to_string(),
+                retry_without_fast_config: false,
+            });
         }
     }
 
@@ -501,20 +557,20 @@ fn run_codex_prompt_generation<T>(
                 let output = output_readers.collect();
 
                 if !status.success() {
-                    eprintln!(
-                        "Codex CLI exited with {:?}: {}",
-                        status.code(),
-                        String::from_utf8_lossy(&output.stderr)
-                    );
+                    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+                    eprintln!("Codex CLI exited with {:?}: {}", status.code(), stderr);
                     let _ = fs::remove_file(&output_path);
-                    return Err("Codex 生成失败，请检查 Codex CLI 是否可用。".to_string());
+                    return Err(CodexRunError {
+                        message: "Codex 生成失败，请检查 Codex CLI 是否可用。".to_string(),
+                        retry_without_fast_config: is_codex_fast_config_error(&stderr),
+                    });
                 }
 
                 let raw_output = read_codex_last_message(&output_path)
                     .unwrap_or_else(|| String::from_utf8_lossy(&output.stdout).to_string());
                 let _ = fs::remove_file(&output_path);
 
-                return parse_output(&raw_output);
+                return Ok(raw_output);
             }
             Ok(None) => {
                 thread::sleep(Duration::from_millis(100));
@@ -525,7 +581,10 @@ fn run_codex_prompt_generation<T>(
                 let _ = child.wait();
                 let _ = output_readers.collect();
                 let _ = fs::remove_file(&output_path);
-                return Err("Codex 生成失败，请检查 Codex CLI 是否可用。".to_string());
+                return Err(CodexRunError {
+                    message: "Codex 生成失败，请检查 Codex CLI 是否可用。".to_string(),
+                    retry_without_fast_config: false,
+                });
             }
         }
     }
@@ -534,7 +593,35 @@ fn run_codex_prompt_generation<T>(
     let _ = child.wait();
     let _ = output_readers.collect();
     let _ = fs::remove_file(&output_path);
-    Err("生成超时，请稍后重试。".to_string())
+    Err(CodexRunError {
+        message: "生成超时，请稍后重试。".to_string(),
+        retry_without_fast_config: false,
+    })
+}
+
+fn is_codex_fast_config_error(stderr: &str) -> bool {
+    let stderr = stderr.to_ascii_lowercase();
+    let mentions_fast_config = [
+        "model_reasoning_effort",
+        "features.fast_mode",
+        "service_tier",
+    ]
+    .iter()
+    .any(|key| stderr.contains(key));
+    let looks_like_config_rejection = [
+        "failed",
+        "unknown",
+        "unrecognized",
+        "unexpected",
+        "invalid",
+        "parse",
+        "configuration",
+        "config",
+    ]
+    .iter()
+    .any(|word| stderr.contains(word));
+
+    (mentions_fast_config || stderr.contains("-c")) && looks_like_config_rejection
 }
 
 struct ChildOutputReaders {
@@ -589,27 +676,36 @@ fn spawn_codex_cli(
     command: &str,
     model: &str,
     output_path: &std::path::Path,
+    use_fast_config: bool,
 ) -> Result<std::process::Child, String> {
     let mut last_error = None;
     let codex_model = normalize_codex_model(model);
 
     for command in get_command_candidates(command)? {
         let mut child_command = Command::new(&command);
-        child_command
-            .args([
-                "exec",
-                "--ephemeral",
-                "--skip-git-repo-check",
-                "--color",
-                "never",
-                "-m",
-                codex_model.as_str(),
+        child_command.args([
+            "exec",
+            "--ephemeral",
+            "--skip-git-repo-check",
+            "--color",
+            "never",
+            "-m",
+            codex_model.as_str(),
+        ]);
+
+        if use_fast_config {
+            child_command.args([
                 "-c",
                 "model_reasoning_effort=\"low\"",
                 "-c",
                 "features.fast_mode=true",
                 "-c",
                 "service_tier=\"fast\"",
+            ]);
+        }
+
+        child_command
+            .args([
                 "--output-last-message",
                 output_path.to_string_lossy().as_ref(),
                 "-",
@@ -652,63 +748,13 @@ fn run_codex_cli_check(command: String) -> Result<String, String> {
     let mut last_error = None;
 
     for command in get_command_candidates(&command)? {
-        let mut child_command = Command::new(&command);
-        child_command
-            .arg("--version")
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
-        suppress_console_window(&mut child_command);
+        match run_codex_version_check(&command) {
+            Ok(version) => {
+                run_codex_exec_check(&command)?;
 
-        match child_command.spawn() {
-            Ok(mut child) => {
-                let started_at = Instant::now();
-
-                while started_at.elapsed() < CODEX_CLI_CHECK_TIMEOUT {
-                    match child.try_wait() {
-                        Ok(Some(_)) => {
-                            let output = child.wait_with_output().map_err(|error| {
-                                eprintln!("Failed to read Codex check output: {error}");
-                                "未检测到 Codex，请检查命令路径或登录状态。".to_string()
-                            })?;
-
-                            if !output.status.success() {
-                                eprintln!(
-                                    "Codex check exited with {:?}: {}",
-                                    output.status.code(),
-                                    String::from_utf8_lossy(&output.stderr)
-                                );
-                                return Err(
-                                    "未检测到 Codex，请检查命令路径或登录状态。".to_string()
-                                );
-                            }
-
-                            let version =
-                                String::from_utf8_lossy(&output.stdout).trim().to_string();
-                            let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-
-                            return Ok(if !version.is_empty() {
-                                version
-                            } else if !stderr.is_empty() {
-                                stderr
-                            } else {
-                                "Codex 可用".to_string()
-                            });
-                        }
-                        Ok(None) => thread::sleep(Duration::from_millis(100)),
-                        Err(error) => {
-                            eprintln!("Failed to poll Codex check: {error}");
-                            let _ = child.kill();
-                            return Err("未检测到 Codex，请检查命令路径或登录状态。".to_string());
-                        }
-                    }
-                }
-
-                let _ = child.kill();
-                return Err("检测 Codex 超时，请稍后重试。".to_string());
+                return Ok(version);
             }
             Err(error) => {
-                // Probing each candidate; a miss here is expected. Only log if
-                // every candidate fails (handled below).
                 last_error = Some(error);
             }
         }
@@ -719,6 +765,177 @@ fn run_codex_cli_check(command: String) -> Result<String, String> {
     }
 
     Err("未检测到 Codex，请检查命令路径或登录状态。".to_string())
+}
+
+fn run_codex_version_check(command: &str) -> Result<String, std::io::Error> {
+    let mut child_command = Command::new(command);
+    child_command
+        .arg("--version")
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    suppress_console_window(&mut child_command);
+
+    let output = run_child_command_with_timeout(
+        child_command,
+        CODEX_CLI_CHECK_TIMEOUT,
+        "检测 Codex 超时，请稍后重试。",
+    )
+    .map_err(|message| {
+        eprintln!("Codex version check failed: {message}");
+        std::io::Error::new(std::io::ErrorKind::Other, message)
+    })?;
+
+    if !output.status.success() {
+        eprintln!(
+            "Codex check exited with {:?}: {}",
+            output.status.code(),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            "Codex version check failed",
+        ));
+    }
+
+    let version = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+
+    Ok(if !version.is_empty() {
+        version
+    } else if !stderr.is_empty() {
+        stderr
+    } else {
+        "Codex 可用".to_string()
+    })
+}
+
+fn run_codex_exec_check(command: &str) -> Result<(), String> {
+    let output_path = create_codex_output_path("health-check");
+    let mut child_command = Command::new(command);
+    child_command
+        .args([
+            "exec",
+            "--ephemeral",
+            "--skip-git-repo-check",
+            "--color",
+            "never",
+            "-m",
+            normalize_codex_model("").as_str(),
+            "--output-last-message",
+            output_path.to_string_lossy().as_ref(),
+            "-",
+        ])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    suppress_console_window(&mut child_command);
+
+    let mut child = child_command.spawn().map_err(|error| {
+        eprintln!("Failed to start Codex exec health check: {error}");
+        "未检测到 Codex，请检查命令路径或登录状态。".to_string()
+    })?;
+    let output_readers = ChildOutputReaders::start(&mut child);
+
+    if let Some(mut stdin) = child.stdin.take() {
+        if let Err(error) = stdin.write_all(CODEX_HEALTH_CHECK_PROMPT.as_bytes()) {
+            eprintln!("Failed to write Codex health check prompt: {error}");
+            let _ = child.kill();
+            let _ = child.wait();
+            let _ = output_readers.collect();
+            let _ = fs::remove_file(&output_path);
+            return Err(CODEX_LOGIN_HINT.to_string());
+        }
+    }
+
+    let output = wait_for_child_with_timeout(
+        child,
+        output_readers,
+        CODEX_CLI_EXEC_CHECK_TIMEOUT,
+        CODEX_LOGIN_HINT,
+    )?;
+
+    if !output.status.success() {
+        eprintln!(
+            "Codex exec health check exited with {:?}: {}",
+            output.status.code(),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let _ = fs::remove_file(&output_path);
+        return Err(CODEX_LOGIN_HINT.to_string());
+    }
+
+    let raw_output = read_codex_last_message(&output_path)
+        .unwrap_or_else(|| String::from_utf8_lossy(&output.stdout).to_string());
+    let _ = fs::remove_file(&output_path);
+
+    if parse_codex_exec_health_response(&raw_output) {
+        Ok(())
+    } else {
+        eprintln!("Codex exec health check returned invalid payload: {raw_output}");
+        Err(CODEX_LOGIN_HINT.to_string())
+    }
+}
+
+struct ChildCommandOutput {
+    status: std::process::ExitStatus,
+    stdout: Vec<u8>,
+    stderr: Vec<u8>,
+}
+
+fn run_child_command_with_timeout(
+    mut command: Command,
+    timeout: Duration,
+    timeout_message: &str,
+) -> Result<ChildCommandOutput, String> {
+    let mut child = command.spawn().map_err(|error| {
+        eprintln!("Failed to start Codex check: {error}");
+        "未检测到 Codex，请检查命令路径或登录状态。".to_string()
+    })?;
+    let output_readers = ChildOutputReaders::start(&mut child);
+
+    wait_for_child_with_timeout(child, output_readers, timeout, timeout_message)
+}
+
+fn wait_for_child_with_timeout(
+    mut child: Child,
+    output_readers: ChildOutputReaders,
+    timeout: Duration,
+    timeout_message: &str,
+) -> Result<ChildCommandOutput, String> {
+    let started_at = Instant::now();
+
+    while started_at.elapsed() < timeout {
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                let output = output_readers.collect();
+                return Ok(ChildCommandOutput {
+                    status,
+                    stdout: output.stdout,
+                    stderr: output.stderr,
+                });
+            }
+            Ok(None) => thread::sleep(Duration::from_millis(100)),
+            Err(error) => {
+                eprintln!("Failed to poll Codex check: {error}");
+                let _ = child.kill();
+                let _ = child.wait();
+                let _ = output_readers.collect();
+                return Err("未检测到 Codex，请检查命令路径或登录状态。".to_string());
+            }
+        }
+    }
+
+    let _ = child.kill();
+    let _ = child.wait();
+    let _ = output_readers.collect();
+    Err(timeout_message.to_string())
+}
+
+fn parse_codex_exec_health_response(raw_output: &str) -> bool {
+    serde_json::from_str::<serde_json::Value>(raw_output.trim())
+        .ok()
+        .and_then(|value| value.get("ok").and_then(|ok| ok.as_bool()))
+        == Some(true)
 }
 
 fn get_command_candidates(command: &str) -> Result<Vec<String>, String> {
@@ -1145,6 +1362,45 @@ mod tests {
     }
 
     #[test]
+    fn prompt_generation_retries_without_fast_config_when_codex_rejects_config() {
+        let fake_codex = build_retrying_fake_codex_binary();
+
+        let raw_output = run_codex_prompt_generation(
+            "prompt".to_string(),
+            fake_codex.to_string_lossy().to_string(),
+            "gpt-test".to_string(),
+            "config-retry-test",
+            |raw_output| Ok(raw_output.to_string()),
+        )
+        .expect("fake codex should retry without fast config");
+
+        assert_eq!(raw_output, "retry-ok");
+    }
+
+    #[test]
+    fn codex_check_runs_minimal_exec_after_version() {
+        let (fake_codex, log_path) = build_fake_codex_check_binary(false);
+
+        let result = run_codex_cli_check(fake_codex.to_string_lossy().to_string())
+            .expect("fake codex should pass health check");
+
+        let log = fs::read_to_string(log_path).expect("read fake codex log");
+        assert_eq!(result, "codex-cli test");
+        assert!(log.contains("--version"));
+        assert!(log.contains("exec"));
+    }
+
+    #[test]
+    fn codex_check_reports_login_hint_when_minimal_exec_fails() {
+        let (fake_codex, _log_path) = build_fake_codex_check_binary(true);
+
+        let error = run_codex_cli_check(fake_codex.to_string_lossy().to_string())
+            .expect_err("exec failure should surface login hint");
+
+        assert!(error.contains("Codex 已安装但可能未登录，运行 codex login"));
+    }
+
+    #[test]
     fn parse_daily_memory_rejects_empty_and_invalid_json_without_running_codex() {
         let input = GenerateDailyMemoryInput {
             date: "2026-06-08".to_string(),
@@ -1370,6 +1626,143 @@ fn main() {
         assert!(status.success(), "fake codex compilation failed");
 
         binary_path
+    }
+
+    fn build_retrying_fake_codex_binary() -> std::path::PathBuf {
+        let (_test_dir, source_path, binary_path) = fake_codex_source_paths("retry");
+
+        fs::write(
+            &source_path,
+            r#"
+use std::{env, fs};
+
+fn main() {
+    let args = env::args().skip(1).collect::<Vec<_>>();
+    if args.iter().any(|arg| arg == "features.fast_mode=true") {
+        eprintln!("error: unknown config key `features.fast_mode`");
+        std::process::exit(2);
+    }
+
+    let mut output_path = None;
+    let mut args = args.into_iter();
+    while let Some(arg) = args.next() {
+        if arg == "--output-last-message" {
+            output_path = args.next();
+        }
+    }
+
+    if let Some(path) = output_path {
+        fs::write(path, "retry-ok").expect("write retry output");
+    }
+}
+"#,
+        )
+        .expect("write retry fake codex source");
+
+        compile_fake_codex(&source_path, &binary_path);
+
+        binary_path
+    }
+
+    fn build_fake_codex_check_binary(fail_exec: bool) -> (std::path::PathBuf, std::path::PathBuf) {
+        let (test_dir, source_path, binary_path) = fake_codex_source_paths("check");
+        let log_path = test_dir.join("invocations.log");
+        let fail_exec_literal = if fail_exec { "true" } else { "false" };
+
+        fs::write(
+            &source_path,
+            format!(
+                r#"
+use std::{{env, fs, io::{{Read, Write}}}};
+
+fn main() {{
+    let args = env::args().skip(1).collect::<Vec<_>>();
+    fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open({log_path:?})
+        .expect("open log")
+        .write_all(format!("{{}}\n", args.join(" ")).as_bytes())
+        .expect("write log");
+
+    if args == ["--version"] {{
+        println!("codex-cli test");
+        return;
+    }}
+
+    if args.first().map(String::as_str) == Some("exec") {{
+        let mut stdin = String::new();
+        let _ = std::io::stdin().read_to_string(&mut stdin);
+
+        if {fail_exec_literal} {{
+            eprintln!("not logged in");
+            std::process::exit(1);
+        }}
+
+        let mut output_path = None;
+        let mut iter = args.iter();
+        while let Some(arg) = iter.next() {{
+            if arg == "--output-last-message" {{
+                output_path = iter.next().cloned();
+            }}
+        }}
+
+        if let Some(path) = output_path {{
+            fs::write(path, "{{\"ok\":true}}").expect("write health output");
+        }} else {{
+            std::io::stdout()
+                .write_all(b"{{\"ok\":true}}\n")
+                .expect("write health output");
+        }}
+        return;
+    }}
+
+    std::process::exit(2);
+}}
+"#,
+                log_path = log_path.to_string_lossy(),
+                fail_exec_literal = fail_exec_literal,
+            ),
+        )
+        .expect("write health fake codex source");
+
+        compile_fake_codex(&source_path, &binary_path);
+
+        (binary_path, log_path)
+    }
+
+    fn fake_codex_source_paths(
+        kind: &str,
+    ) -> (std::path::PathBuf, std::path::PathBuf, std::path::PathBuf) {
+        let test_dir = std::env::temp_dir().join(format!(
+            "tallya-fake-codex-{kind}-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map(|duration| duration.as_nanos())
+                .unwrap_or_default()
+        ));
+        fs::create_dir_all(&test_dir).expect("create fake codex dir");
+        let source_path = test_dir.join("fake_codex.rs");
+        let binary_path = test_dir.join(if cfg!(target_os = "windows") {
+            "fake_codex.exe"
+        } else {
+            "fake_codex"
+        });
+
+        (test_dir, source_path, binary_path)
+    }
+
+    fn compile_fake_codex(source_path: &std::path::Path, binary_path: &std::path::Path) {
+        let rustc = std::env::var_os("RUSTC").unwrap_or_else(|| "rustc".into());
+        let status = Command::new(rustc)
+            .arg(source_path)
+            .arg("-o")
+            .arg(binary_path)
+            .status()
+            .expect("compile fake codex");
+
+        assert!(status.success(), "fake codex compilation failed");
     }
 }
 
