@@ -87,6 +87,29 @@ export class TestDatabaseClient implements DatabaseClient {
   threads = new Map<string, ThreadRow>();
   clearedReports = false;
   clearedReportSources = false;
+  transactionLog: string[] = [];
+  private transactionDepth = 0;
+
+  async transaction<T>(operation: (database: DatabaseClient) => Promise<T>): Promise<T> {
+    if (this.transactionDepth > 0) {
+      return operation(this);
+    }
+
+    this.transactionLog.push('BEGIN IMMEDIATE');
+    this.transactionDepth += 1;
+
+    try {
+      const result = await operation(this);
+      this.transactionLog.push('COMMIT');
+
+      return result;
+    } catch (error) {
+      this.transactionLog.push('ROLLBACK');
+      throw error;
+    } finally {
+      this.transactionDepth -= 1;
+    }
+  }
 
   async execute(query: string, bindValues: unknown[] = []) {
     const normalizedQuery = normalizeQuery(query);

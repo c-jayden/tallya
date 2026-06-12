@@ -130,6 +130,83 @@ describe('backup-service', () => {
     expect(appSettingsRepository.saveSettings).toHaveBeenCalledWith(payload.data.appSettings);
   });
 
+  it('restores backup data inside the provided transaction boundary', async () => {
+    const payload = createBackupPayload({
+      dailyMemories: [createDailyMemory('2026-06-08')],
+      entries: [createEntry()],
+      clarifications: [createClarification()],
+      threads: [createThread()],
+      reports: [createReport()],
+      reportSources: [createReportSource()],
+      appSettings: {
+        ...DEFAULT_APP_SETTINGS,
+        openAICompatible: {
+          ...DEFAULT_APP_SETTINGS.openAICompatible,
+          apiKey: 'backup-secret',
+        },
+      },
+    });
+    const events: string[] = [];
+    const dailyMemoryRepository = createDailyMemoryRepository();
+    dailyMemoryRepository.replaceAll.mockImplementation(async () => {
+      events.push('dailyMemories');
+    });
+    const entryRepository = createEntryRepository();
+    entryRepository.replaceAll.mockImplementation(async () => {
+      events.push('entries');
+    });
+    const clarificationRepository = createClarificationRepository();
+    clarificationRepository.replaceAll.mockImplementation(async () => {
+      events.push('clarifications');
+    });
+    const threadRepository = createThreadRepository();
+    threadRepository.replaceAll.mockImplementation(async () => {
+      events.push('threads');
+    });
+    const reportRepository = createReportRepository();
+    reportRepository.replaceAll.mockImplementation(async () => {
+      events.push('reports');
+    });
+    const appSettingsRepository = createAppSettingsRepository();
+    appSettingsRepository.saveSettings.mockImplementation(async (settings: AppSettings) => {
+      events.push('settings');
+      return settings;
+    });
+    let transactionCalls = 0;
+    const transaction = async <T,>(operation: () => Promise<T>): Promise<T> => {
+      transactionCalls += 1;
+      events.push('begin');
+      const result = await operation();
+      events.push('commit');
+      return result;
+    };
+    const service = createBackupService({
+      appVersion: '0.1.0',
+      now: () => new Date('2026-06-08T10:00:00.000Z'),
+      dailyMemoryRepository,
+      entryRepository,
+      clarificationRepository,
+      threadRepository,
+      reportRepository,
+      appSettingsRepository,
+      transaction,
+    });
+
+    await service.restoreBackupPayload(payload);
+
+    expect(transactionCalls).toBe(1);
+    expect(events).toEqual([
+      'begin',
+      'dailyMemories',
+      'threads',
+      'entries',
+      'clarifications',
+      'reports',
+      'settings',
+      'commit',
+    ]);
+  });
+
   it('restores a v1 backup by converting daily memories into readable entries', async () => {
     const legacyMemory = createDailyMemory('2026-06-08');
     const payload = validateBackupFile(

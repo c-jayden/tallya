@@ -85,6 +85,10 @@ class LegacyJsonAppSettingsDatabase implements DatabaseClient {
 
     return [] as T;
   }
+
+  async transaction<T>(operation: (database: DatabaseClient) => Promise<T>): Promise<T> {
+    return operation(this);
+  }
 }
 
 class ColumnAppSettingsDatabase extends LegacyJsonAppSettingsDatabase {

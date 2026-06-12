@@ -3,6 +3,7 @@ import { appSettingsRepository, type AppSettings } from './app-settings-reposito
 import { clarificationRepository } from './clarification-repository';
 import { dailyMemoryRepository } from './daily-memory-repository';
 import { buildEntriesFromDailyMemories } from './daily-memory-entry-migration';
+import { getDatabase } from './database/database';
 import { entryRepository } from './entry-repository';
 import { reportRepository } from './report-repository';
 import { threadRepository } from './thread-repository';
@@ -51,6 +52,7 @@ type BackupServiceDependencies = {
     getSettings(): Promise<AppSettings>;
     saveSettings(settings: AppSettings): Promise<AppSettings>;
   };
+  transaction?: <T>(operation: () => Promise<T>) => Promise<T>;
 };
 
 const backupFileFilters = [{ name: 'JSON', extensions: ['json'] }];
@@ -141,40 +143,40 @@ export function createBackupService(dependencies: BackupServiceDependencies) {
     },
 
     async restoreBackupPayload(payload: BackupPayload) {
-      // TODO: Move restore into one SQLite transaction once repositories expose
-      // a shared transaction boundary.
-      const entries =
-        payload.version === 1
-          ? buildEntriesFromDailyMemories(payload.data.dailyMemories)
-          : payload.data.entries;
+      return runBackupRestoreTransaction(dependencies, async () => {
+        const entries =
+          payload.version === 1
+            ? buildEntriesFromDailyMemories(payload.data.dailyMemories)
+            : payload.data.entries;
 
-      await dependencies.dailyMemoryRepository.replaceAll(payload.data.dailyMemories);
-      await dependencies.threadRepository.replaceAll(payload.data.threads);
-      await dependencies.entryRepository.replaceAll(entries);
-      await dependencies.clarificationRepository.replaceAll(payload.data.clarifications);
-      await dependencies.reportRepository.replaceAll(
-        payload.data.reports,
-        payload.data.reportSources,
-      );
+        await dependencies.dailyMemoryRepository.replaceAll(payload.data.dailyMemories);
+        await dependencies.threadRepository.replaceAll(payload.data.threads);
+        await dependencies.entryRepository.replaceAll(entries);
+        await dependencies.clarificationRepository.replaceAll(payload.data.clarifications);
+        await dependencies.reportRepository.replaceAll(
+          payload.data.reports,
+          payload.data.reportSources,
+        );
 
-      // Exports strip the API key, so an empty key in the backup must not wipe
-      // the key already configured on this machine.
-      const restoredSettings = payload.data.appSettings;
-      const incomingApiKey = restoredSettings.openAICompatible?.apiKey;
+        // Exports strip the API key, so an empty key in the backup must not wipe
+        // the key already configured on this machine.
+        const restoredSettings = payload.data.appSettings;
+        const incomingApiKey = restoredSettings.openAICompatible?.apiKey;
 
-      if (typeof incomingApiKey !== 'string' || !incomingApiKey.trim()) {
-        const currentSettings = await dependencies.appSettingsRepository.getSettings();
+        if (typeof incomingApiKey !== 'string' || !incomingApiKey.trim()) {
+          const currentSettings = await dependencies.appSettingsRepository.getSettings();
 
-        return dependencies.appSettingsRepository.saveSettings({
-          ...restoredSettings,
-          openAICompatible: {
-            ...restoredSettings.openAICompatible,
-            apiKey: currentSettings.openAICompatible.apiKey,
-          },
-        });
-      }
+          return dependencies.appSettingsRepository.saveSettings({
+            ...restoredSettings,
+            openAICompatible: {
+              ...restoredSettings.openAICompatible,
+              apiKey: currentSettings.openAICompatible.apiKey,
+            },
+          });
+        }
 
-      return dependencies.appSettingsRepository.saveSettings(restoredSettings);
+        return dependencies.appSettingsRepository.saveSettings(restoredSettings);
+      });
     },
 
     async openDataDirectory() {
@@ -196,6 +198,11 @@ export const backupService = createBackupService({
   threadRepository,
   reportRepository,
   appSettingsRepository,
+  transaction: async (operation) => {
+    const database = await getDatabase();
+
+    return database.transaction(operation);
+  },
 });
 
 export function buildBackupFileName(date: Date) {
@@ -219,6 +226,13 @@ export function validateBackupFile(text: string): BackupPayload {
   } catch {
     throw new Error('备份文件格式不正确');
   }
+}
+
+function runBackupRestoreTransaction<T>(
+  dependencies: BackupServiceDependencies,
+  operation: () => Promise<T>,
+) {
+  return dependencies.transaction ? dependencies.transaction(operation) : operation();
 }
 
 function normalizeBackupPayload(value: unknown): BackupPayload | null {

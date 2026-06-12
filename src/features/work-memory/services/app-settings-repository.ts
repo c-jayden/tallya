@@ -310,18 +310,20 @@ async function saveAppSettingsRow(
   settings: AppSettings,
   updatedAt: string,
 ) {
-  for (const [key, value] of Object.entries(appSettingsToRows(settings))) {
-    await database.execute(
-      `
-        INSERT INTO app_settings (key, value, updated_at)
-        VALUES ($1, $2, $3)
-        ON CONFLICT(key) DO UPDATE SET
-          value = excluded.value,
-          updated_at = excluded.updated_at
-      `,
-      [key, value, updatedAt],
-    );
-  }
+  await database.transaction(async (transactionDatabase) => {
+    for (const [key, value] of Object.entries(appSettingsToRows(settings))) {
+      await transactionDatabase.execute(
+        `
+          INSERT INTO app_settings (key, value, updated_at)
+          VALUES ($1, $2, $3)
+          ON CONFLICT(key) DO UPDATE SET
+            value = excluded.value,
+            updated_at = excluded.updated_at
+        `,
+        [key, value, updatedAt],
+      );
+    }
+  });
 }
 
 function appSettingsToRows(settings: AppSettings): Record<string, string> {

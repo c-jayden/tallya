@@ -1,5 +1,6 @@
 ﻿import { describe, expect, it } from 'vitest';
 import { DEFAULT_APP_SETTINGS, SQLiteAppSettingsRepository } from '../app-settings-repository';
+import type { DatabaseClient } from '../database/database';
 import { TestDatabaseClient } from '../database/test-database';
 
 class MemoryStorage implements Storage {
@@ -105,6 +106,18 @@ describe('SQLiteAppSettingsRepository', () => {
     expect(database.appSettings.has('app_settings')).toBe(false);
     expect(database.lastSettingsWrite?.query.toLowerCase()).toContain('key, value, updated_at');
     expect(database.lastSettingsWrite?.query.toLowerCase()).not.toContain('value_json');
+  });
+
+  it('saves all settings rows inside one transaction', async () => {
+    const database = new TransactionRecordingAppSettingsDatabase();
+    const repository = new SQLiteAppSettingsRepository(Promise.resolve(database));
+
+    await repository.saveSettings({
+      ...DEFAULT_APP_SETTINGS,
+      theme: 'dark',
+    });
+
+    expect(database.transactionCalls).toBe(1);
   });
 
   it('fills missing report preferences and style settings from defaults when reading older settings rows', async () => {
@@ -366,5 +379,14 @@ class RecordingAppSettingsDatabase extends TestDatabaseClient {
     }
 
     return super.execute(query, bindValues);
+  }
+}
+
+class TransactionRecordingAppSettingsDatabase extends RecordingAppSettingsDatabase {
+  transactionCalls = 0;
+
+  override async transaction<T>(operation: (database: DatabaseClient) => Promise<T>): Promise<T> {
+    this.transactionCalls += 1;
+    return operation(this);
   }
 }
