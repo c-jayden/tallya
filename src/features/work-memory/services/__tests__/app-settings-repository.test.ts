@@ -86,10 +86,6 @@ describe('LocalStorageAppSettingsRepository', () => {
           maxTokens: '4096',
         },
       },
-      ollama: {
-        baseUrl: 'http://localhost:11434',
-        model: 'llama3',
-      },
       localGateway: {
         enabled: false,
         baseUrl: 'http://localhost:8787',
@@ -126,10 +122,6 @@ describe('LocalStorageAppSettingsRepository', () => {
           topP: '',
           maxTokens: '4096',
         },
-      },
-      ollama: {
-        baseUrl: 'http://localhost:11434',
-        model: 'llama3',
       },
       localGateway: {
         enabled: false,
@@ -325,6 +317,26 @@ describe('LocalStorageAppSettingsRepository', () => {
         promptHint: '使用 3 条以内分点。',
         updatedAt: '2026-06-09T10:00:00.000Z',
       },
+    });
+  });
+
+  it('normalizes unfinished Ollama provider settings back to the default provider', async () => {
+    const storage = new MemoryStorage();
+    const repository = new LocalStorageAppSettingsRepository(storage);
+
+    storage.setItem(
+      'tallya.app-settings.v1',
+      JSON.stringify({
+        aiProviderId: 'ollama',
+        ollama: {
+          baseUrl: 'http://localhost:11434',
+          model: 'llama3',
+        },
+      }),
+    );
+
+    await expect(repository.getSettings()).resolves.toMatchObject({
+      aiProviderId: DEFAULT_APP_SETTINGS.aiProviderId,
     });
   });
 

@@ -78,10 +78,6 @@ const settings: AppSettings = {
       maxTokens: '',
     },
   },
-  ollama: {
-    baseUrl: 'http://localhost:11434',
-    model: '',
-  },
   localGateway: {
     enabled: false,
     baseUrl: 'http://localhost:8080',

@@ -13,7 +13,7 @@ import type {
   ThreadLinkSuggestion,
 } from '../../types';
 
-export type AIProviderId = 'ai-codex-cli' | 'openai-compatible' | 'anthropic' | 'ollama';
+export type AIProviderId = 'ai-codex-cli' | 'openai-compatible' | 'anthropic';
 export type OpenAICompatibleApiMode = 'chat-completions' | 'responses';
 
 export type OpenAICompatibleParameters = {

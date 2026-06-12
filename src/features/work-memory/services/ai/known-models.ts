@@ -30,7 +30,6 @@ export const knownProviderModels: Record<AIProviderId, AIModelOption[]> = {
   ],
   'openai-compatible': [],
   anthropic: [],
-  ollama: [],
 };
 
 export function getKnownProviderModels(providerId: AIProviderId) {
