@@ -15,6 +15,7 @@ import {
 } from '../../services/app-settings-repository';
 import type { AIProviderId, OpenAICompatibleApiMode } from '../../services/ai/ai-provider';
 import {
+  DEFAULT_ANTHROPIC_MODEL,
   DEFAULT_OPENAI_COMPATIBLE_MODEL,
   getDefaultProviderModel,
   getKnownProviderModels,
@@ -40,6 +41,11 @@ const visibleProviderOptions: { value: AIProviderId; label: string; description:
     value: 'openai-compatible',
     label: 'OpenAI 兼容服务',
     description: '接入 DeepSeek、通义、Kimi、OpenRouter、OpenAI 等兼容接口。',
+  },
+  {
+    value: 'anthropic',
+    label: 'Claude / Anthropic',
+    description: '使用 Claude 原生 Messages API 和 Structured Outputs。',
   },
 ];
 
@@ -87,6 +93,8 @@ export function AISettingsSection({
     visibleProviderOptions.find((option) => option.value === settings.aiProviderId) ??
     visibleProviderOptions[0];
   const isCodexProvider = selectedProvider.value === 'ai-codex-cli';
+  const isOpenAIProvider = selectedProvider.value === 'openai-compatible';
+  const isAnthropicProvider = selectedProvider.value === 'anthropic';
   const codexModelOptions = getKnownProviderModels('ai-codex-cli');
   const selectedCodexModel =
     normalizeProviderModel('ai-codex-cli', settings.codexModel) ||
@@ -130,6 +138,21 @@ export function AISettingsSection({
         ...settings.openAICompatible,
         parameters: {
           ...settings.openAICompatible.parameters,
+          [key]: value,
+        },
+      },
+    });
+  }
+
+  function updateAnthropicParameter(
+    key: keyof AppSettings['anthropic']['parameters'],
+    value: string,
+  ) {
+    onUpdateSettings({
+      anthropic: {
+        ...settings.anthropic,
+        parameters: {
+          ...settings.anthropic.parameters,
           [key]: value,
         },
       },
@@ -193,7 +216,7 @@ export function AISettingsSection({
             </SelectContent>
           </Select>
         </Field>
-      ) : (
+      ) : isOpenAIProvider ? (
         <div className="grid gap-5">
           <Field label="服务商" description="已内置 DeepSeek、通义、Kimi、OpenRouter、OpenAI 等常用接口。">
             <Select value={selectedPresetId} onValueChange={applyProviderPreset}>
@@ -256,7 +279,55 @@ export function AISettingsSection({
             <p className="text-[13px] leading-5 text-app-ink-subtle">{activePresetHint}</p>
           ) : null}
         </div>
-      )}
+      ) : isAnthropicProvider ? (
+        <div className="grid gap-5">
+          <Field label="服务地址" description="Claude API 原生 Messages 端点。">
+            <Input
+              className={openAIInputClassName}
+              value={settings.anthropic.baseUrl}
+              onChange={(event) =>
+                onUpdateSettings({
+                  anthropic: { ...settings.anthropic, baseUrl: event.target.value },
+                })
+              }
+              placeholder="https://api.anthropic.com/v1"
+            />
+          </Field>
+
+          <Field label="密钥">
+            <Input
+              className={openAIInputClassName}
+              type="password"
+              value={settings.anthropic.apiKey}
+              onChange={(event) =>
+                onUpdateSettings({
+                  anthropic: { ...settings.anthropic, apiKey: event.target.value },
+                })
+              }
+              placeholder="粘贴 Anthropic API Key"
+              autoComplete="off"
+            />
+          </Field>
+
+          <Field label="模型">
+            <Input
+              className={openAIInputClassName}
+              value={settings.anthropic.model}
+              onChange={(event) =>
+                onUpdateSettings({
+                  anthropic: { ...settings.anthropic, model: event.target.value },
+                })
+              }
+              placeholder={DEFAULT_ANTHROPIC_MODEL}
+            />
+          </Field>
+
+          <p className="text-[13px] leading-5 text-app-ink-subtle">
+            使用 /v1/messages、x-api-key 和 anthropic-version；Anthropic OpenAI
+            兼容层会忽略 response_format，所以这里使用 Structured Outputs 保证 JSON。
+          </p>
+        </div>
+      ) : null}
 
       <Field label="连接状态">
         <div className="space-y-2.5">
@@ -286,7 +357,7 @@ export function AISettingsSection({
         <div className="mt-4 grid gap-5">
           <LocalGatewaySettingsSection settings={settings} onUpdateSettings={onUpdateSettings} />
 
-          {isCodexProvider && !gatewayEnabled ? null : (
+          {isCodexProvider && !gatewayEnabled ? null : isOpenAIProvider ? (
             <div className="space-y-1.5">
               <div className="flex items-center justify-between gap-3 text-sm">
                 <span className="font-medium text-app-ink-muted">接口模式</span>
@@ -322,9 +393,9 @@ export function AISettingsSection({
                 兼容服务或本地网关遇到 “only /v1/responses” 时，切换到 Responses API。
               </p>
             </div>
-          )}
+          ) : null}
 
-          {isCodexProvider ? null : (
+          {isOpenAIProvider ? (
             <div className="space-y-3">
               <div className="space-y-1">
                 <div className="text-sm font-medium text-app-ink-muted">请求参数</div>
@@ -374,7 +445,39 @@ export function AISettingsSection({
                 />
               </div>
             </div>
-          )}
+          ) : isAnthropicProvider ? (
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <div className="text-sm font-medium text-app-ink-muted">请求参数</div>
+                <p className="text-[13px] leading-5 text-app-ink-subtle">
+                  留空时不发送 temperature / top_p；max_tokens 留空时使用默认值。
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Input
+                  className={openAIInputClassName}
+                  value={settings.anthropic.parameters.temperature}
+                  onChange={(event) => updateAnthropicParameter('temperature', event.target.value)}
+                  inputMode="decimal"
+                  placeholder="temperature"
+                />
+                <Input
+                  className={openAIInputClassName}
+                  value={settings.anthropic.parameters.topP}
+                  onChange={(event) => updateAnthropicParameter('topP', event.target.value)}
+                  inputMode="decimal"
+                  placeholder="top_p"
+                />
+                <Input
+                  className={openAIInputClassName}
+                  value={settings.anthropic.parameters.maxTokens}
+                  onChange={(event) => updateAnthropicParameter('maxTokens', event.target.value)}
+                  inputMode="numeric"
+                  placeholder="max_tokens"
+                />
+              </div>
+            </div>
+          ) : null}
         </div>
       </details>
     </section>

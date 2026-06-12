@@ -334,6 +334,7 @@ pub fn run() {
             codex::suggest_thread_link_with_codex,
             codex::suggest_report_gaps_with_codex,
             ai_http::probe_openai_compatible_gateway,
+            ai_http::send_ai_http_request,
             ai_http::send_openai_compatible_request,
             toggle_main_window
         ])

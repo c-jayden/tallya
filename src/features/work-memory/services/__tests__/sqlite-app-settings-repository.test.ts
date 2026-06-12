@@ -73,6 +73,15 @@ describe('SQLiteAppSettingsRepository', () => {
       frequencyPenalty: '',
       maxTokens: '',
     });
+    expect(database.appSettings.get('anthropicBaseUrl')?.value).toBe(
+      'https://api.anthropic.com/v1',
+    );
+    expect(database.appSettings.get('anthropicModel')?.value).toBe('claude-haiku-4-5');
+    expect(JSON.parse(database.appSettings.get('anthropicParameters')?.value ?? '{}')).toEqual({
+      temperature: '',
+      topP: '',
+      maxTokens: '',
+    });
     expect(database.appSettings.get('localGatewayEnabled')?.value).toBe('false');
     expect(database.appSettings.get('localGatewayBaseUrl')?.value).toBe(
       'http://localhost:8080',
@@ -149,6 +158,35 @@ describe('SQLiteAppSettingsRepository', () => {
           topP: '',
           presencePenalty: '',
           frequencyPenalty: '',
+          maxTokens: '',
+        },
+      },
+    });
+  });
+
+  it('fills missing Anthropic settings from defaults when reading older settings rows', async () => {
+    const database = new TestDatabaseClient();
+    database.appSettings.set('aiProviderId', {
+      key: 'aiProviderId',
+      value: 'anthropic',
+      updated_at: '2026-06-12T01:00:00.000Z',
+    });
+    database.appSettings.set('anthropicApiKey', {
+      key: 'anthropicApiKey',
+      value: 'anthropic-key',
+      updated_at: '2026-06-12T01:00:00.000Z',
+    });
+    const repository = new SQLiteAppSettingsRepository(Promise.resolve(database));
+
+    await expect(repository.getSettings()).resolves.toMatchObject({
+      aiProviderId: 'anthropic',
+      anthropic: {
+        baseUrl: 'https://api.anthropic.com/v1',
+        apiKey: 'anthropic-key',
+        model: 'claude-haiku-4-5',
+        parameters: {
+          temperature: '',
+          topP: '',
           maxTokens: '',
         },
       },

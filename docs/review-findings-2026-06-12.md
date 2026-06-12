@@ -109,6 +109,14 @@
 1. **优先验证**：Anthropic 是否提供官方 OpenAI 兼容端点（`https://api.anthropic.com/v1/chat/completions`，Bearer 鉴权）。若可用且支持 `response_format` 或至少能稳定输出 JSON，则只需在 `openAICompatibleProviderPresets` 加一个 `claude` 预设（含正确 baseUrl、默认模型如 `claude-haiku-4-5`、hint 说明限制），成本最低。
 2. 若兼容层限制太多（如不支持 json_object、忽略 system），再考虑原生 Anthropic provider：`/v1/messages`、`x-api-key` + `anthropic-version` 头、`content` 数组响应。架构上仿照 openai-compatible-provider 实现 `AIProvider` 接口即可，`ai_http.rs` 需支持自定义 header。
 
+**调研结论（2026-06-12，官方文档）**：
+- Anthropic 提供官方 OpenAI SDK 兼容层，OpenAI SDK 示例使用 `base_url="https://api.anthropic.com/v1/"`，因此 Chat Completions 请求路径是 `https://api.anthropic.com/v1/chat/completions`；header compatibility 表中 `authorization` 为 fully supported，可用 Bearer 鉴权。来源：https://platform.claude.com/docs/en/cli-sdks-libraries/libraries/openai-sdk
+- 兼容层定位是“测试和比较模型能力”，官方明确说明不建议作为大多数场景的长期/生产方案；要访问完整 Claude API 能力应使用原生 Claude API。来源同上。
+- `system` / `developer` 消息并非按 OpenAI 语义完整保留；兼容层会把所有 system/developer messages 用 `\n` 拼接后作为开头的单个 system message，因为 Anthropic 只支持一个初始 system message。来源同上。
+- 采样参数限制：`temperature` 支持 0-1，超过 1 会被 capped 到 1；`top_p` fully supported；`n` 必须为 1；`presence_penalty`、`frequency_penalty`、`logprobs`、`seed` 等字段 ignored，多数不支持字段会静默忽略。来源同上。
+- `response_format` 在兼容层中是 ignored；官方写明要做 JSON output 应使用原生 Claude API 的 Structured Outputs。Structured Outputs 文档说明 JSON 输出通过原生 `/v1/messages` 的 `output_config.format` 使用，并保证返回符合 schema 的有效 JSON。来源：https://platform.claude.com/docs/en/build-with-claude/structured-outputs
+- 结论：不适合只加 OpenAI-compatible `claude` 预设。Tallya 的整理链路依赖稳定 JSON；Anthropic 兼容层会忽略 `response_format`，只能靠 prompt 约束，不能满足“稳定输出 JSON”。应走原生 Anthropic provider 路线。
+
 ---
 
 ### 任务 9：AI 兼容架构建议（做完 5-8 后顺手重构）

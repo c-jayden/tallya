@@ -18,6 +18,7 @@ import {
   type AppSettings,
 } from '../app-settings-repository';
 import { type AIProvider, type AIProviderOptions, type ProviderHealth } from './ai-provider';
+import { anthropicProvider } from './anthropic-provider';
 import { codexCliProvider } from './codex-cli-provider';
 import { type GatewayProbeResult, probeLocalGateway } from './local-gateway';
 import { mockProvider } from './mock-provider';
@@ -33,6 +34,7 @@ type CreateAIServiceOptions = {
   settingsRepository?: SettingsRepository;
   codexProvider?: AIProvider;
   openAICompatibleProvider?: AIProvider;
+  anthropicProvider?: AIProvider;
   localGatewayProbe?: LocalGatewayProbe;
   now?: () => number;
   localGatewayCacheTtlMs?: number;
@@ -51,7 +53,7 @@ type ResolvedProvider = {
   settings: AppSettings;
 };
 
-const providers = [codexCliProvider, openAICompatibleProvider, mockProvider];
+const providers = [codexCliProvider, openAICompatibleProvider, anthropicProvider, mockProvider];
 const providersById = new Map<string, AIProvider>(
   providers.map((provider) => [provider.id, provider]),
 );
@@ -64,6 +66,7 @@ export function createAIService({
   settingsRepository = appSettingsRepository,
   codexProvider = codexCliProvider,
   openAICompatibleProvider: configuredOpenAICompatibleProvider = openAICompatibleProvider,
+  anthropicProvider: configuredAnthropicProvider = anthropicProvider,
   localGatewayProbe = probeLocalGateway,
   now = () => Date.now(),
   localGatewayCacheTtlMs = LOCAL_GATEWAY_CACHE_TTL_MS,
@@ -75,6 +78,7 @@ export function createAIService({
       provider: getProviderForSettings(settings, {
         codexProvider,
         openAICompatibleProvider: configuredOpenAICompatibleProvider,
+        anthropicProvider: configuredAnthropicProvider,
       }),
       options: getProviderOptions(settings),
       isLocalGateway: false,
@@ -298,6 +302,7 @@ function getProviderForSettings(
   providers: {
     codexProvider: AIProvider;
     openAICompatibleProvider: AIProvider;
+    anthropicProvider: AIProvider;
   },
 ) {
   if (settings.aiProviderId === currentProviderId) {
@@ -306,6 +311,10 @@ function getProviderForSettings(
 
   if (settings.aiProviderId === openAICompatibleProvider.id) {
     return providers.openAICompatibleProvider;
+  }
+
+  if (settings.aiProviderId === anthropicProvider.id) {
+    return providers.anthropicProvider;
   }
 
   const provider = providersById.get(settings.aiProviderId);
@@ -323,6 +332,7 @@ function getProviderOptions(settings: AppSettings) {
     codexCommand: settings.codexCommand,
     codexModel: settings.codexModel,
     openAICompatible: settings.openAICompatible,
+    anthropic: settings.anthropic,
   };
 }
 
@@ -336,5 +346,6 @@ function getLocalGatewayProviderOptions(settings: AppSettings): AIProviderOption
       model: settings.localGateway.model,
       apiMode: settings.localGateway.apiMode,
     },
+    anthropic: settings.anthropic,
   };
 }

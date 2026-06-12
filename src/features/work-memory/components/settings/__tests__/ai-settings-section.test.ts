@@ -7,6 +7,7 @@ describe('AISettingsSection', () => {
   it('offers Codex CLI and OpenAI-compatible services without exposing Mock', () => {
     expect(source).toContain("label: 'Codex CLI'");
     expect(source).toContain("label: 'OpenAI 兼容服务'");
+    expect(source).toContain("label: 'Claude / Anthropic'");
     expect(source).not.toContain("label: 'Mock'");
     expect(source).not.toContain("value: 'cc-switch'");
     expect(source).not.toContain("value: 'codex-proxy'");
@@ -21,9 +22,9 @@ describe('AISettingsSection', () => {
     expect(source).toContain('OpenAI');
   });
 
-  it('renders OpenAI-compatible presets without keeping a Claude literal in this UI', () => {
+  it('keeps Anthropic out of OpenAI-compatible presets', () => {
     expect(source).toContain('openAICompatibleProviderPresets.map');
-    expect(source).not.toContain('Claude');
+    expect(source).not.toContain('claude` 预设');
   });
 
   it('demotes the local gateway to an advanced switch, not a co-equal route', () => {
@@ -59,5 +60,14 @@ describe('AISettingsSection', () => {
     expect(source).toContain('frequencyPenalty');
     expect(source).toContain('maxTokens');
     expect(source).toContain('max_tokens');
+  });
+
+  it('shows Anthropic-specific settings without OpenAI interface mode controls', () => {
+    expect(source).toContain('isAnthropicProvider');
+    expect(source).toContain('settings.anthropic.baseUrl');
+    expect(source).toContain('settings.anthropic.apiKey');
+    expect(source).toContain('settings.anthropic.model');
+    expect(source).toContain('anthropic-version');
+    expect(source).toContain('response_format');
   });
 });

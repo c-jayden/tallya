@@ -2,6 +2,7 @@ import type { AIProviderId } from './ai-provider';
 
 export const DEFAULT_CODEX_MODEL = 'gpt-5.4-mini';
 export const DEFAULT_OPENAI_COMPATIBLE_MODEL = 'gpt-5.4-mini';
+export const DEFAULT_ANTHROPIC_MODEL = 'claude-haiku-4-5';
 
 export type AIModelOption = {
   value: string;
@@ -24,6 +25,7 @@ export const knownProviderModels: Record<AIProviderId, AIModelOption[]> = {
     },
   ],
   'openai-compatible': [],
+  anthropic: [],
   ollama: [],
 };
 
@@ -44,6 +46,10 @@ export function getDefaultProviderModel(providerId: AIProviderId) {
 
   if (providerId === 'openai-compatible') {
     return DEFAULT_OPENAI_COMPATIBLE_MODEL;
+  }
+
+  if (providerId === 'anthropic') {
+    return DEFAULT_ANTHROPIC_MODEL;
   }
 
   return getKnownProviderModels(providerId)[0]?.value ?? '';

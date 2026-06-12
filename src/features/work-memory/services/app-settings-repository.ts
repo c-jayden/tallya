@@ -1,9 +1,11 @@
 import type {
+  AnthropicParameters,
   AIProviderId,
   OpenAICompatibleApiMode,
   OpenAICompatibleParameters,
 } from './ai/ai-provider';
 import {
+  DEFAULT_ANTHROPIC_MODEL,
   DEFAULT_CODEX_MODEL,
   DEFAULT_OPENAI_COMPATIBLE_MODEL,
   normalizeProviderModel,
@@ -24,6 +26,13 @@ export type OpenAICompatibleSettings = {
   parameters: OpenAICompatibleParameters;
 };
 
+export type AnthropicSettings = {
+  baseUrl: string;
+  apiKey: string;
+  model: string;
+  parameters: AnthropicParameters;
+};
+
 export type LocalGatewaySettings = {
   enabled: boolean;
   baseUrl: string;
@@ -41,6 +50,7 @@ export type AppSettings = {
   codexCommand: string;
   codexModel: string;
   openAICompatible: OpenAICompatibleSettings;
+  anthropic: AnthropicSettings;
   localGateway: LocalGatewaySettings;
   ollama: OllamaSettings;
   dailyReminderEnabled: boolean;
@@ -74,6 +84,12 @@ export const DEFAULT_OPENAI_COMPATIBLE_PARAMETERS: OpenAICompatibleParameters = 
   maxTokens: '',
 };
 
+export const DEFAULT_ANTHROPIC_PARAMETERS: AnthropicParameters = {
+  temperature: '',
+  topP: '',
+  maxTokens: '',
+};
+
 // Defaults define the first-run and reset state. Components should go through
 // this repository instead of reading storage directly.
 export const DEFAULT_APP_SETTINGS: AppSettings = {
@@ -86,6 +102,12 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
     model: DEFAULT_OPENAI_COMPATIBLE_MODEL,
     apiMode: 'chat-completions',
     parameters: DEFAULT_OPENAI_COMPATIBLE_PARAMETERS,
+  },
+  anthropic: {
+    baseUrl: 'https://api.anthropic.com/v1',
+    apiKey: '',
+    model: DEFAULT_ANTHROPIC_MODEL,
+    parameters: DEFAULT_ANTHROPIC_PARAMETERS,
   },
   // Disabled by default: probing localhost and silently routing work content to
   // whatever answers on a common dev port is too aggressive for a privacy tool.
@@ -312,6 +334,10 @@ function appSettingsToRows(settings: AppSettings): Record<string, string> {
     openAICompatibleModel: settings.openAICompatible.model,
     openAICompatibleApiMode: settings.openAICompatible.apiMode,
     openAICompatibleParameters: JSON.stringify(settings.openAICompatible.parameters),
+    anthropicBaseUrl: settings.anthropic.baseUrl,
+    anthropicApiKey: settings.anthropic.apiKey,
+    anthropicModel: settings.anthropic.model,
+    anthropicParameters: JSON.stringify(settings.anthropic.parameters),
     localGatewayEnabled: String(settings.localGateway.enabled),
     localGatewayBaseUrl: settings.localGateway.baseUrl,
     localGatewayModel: settings.localGateway.model,
@@ -351,6 +377,12 @@ function rowsToAppSettingsInput(rows: AppSettingsRow[]) {
       model: values.openAICompatibleModel,
       apiMode: values.openAICompatibleApiMode,
       parameters: parseRowJSON(values.openAICompatibleParameters),
+    },
+    anthropic: {
+      baseUrl: values.anthropicBaseUrl,
+      apiKey: values.anthropicApiKey,
+      model: values.anthropicModel,
+      parameters: parseRowJSON(values.anthropicParameters),
     },
     localGateway: {
       enabled: getBooleanString(values.localGatewayEnabled),
@@ -413,6 +445,7 @@ function normalizeAppSettings(value: unknown): AppSettings {
       getString(input.codexModel, DEFAULT_APP_SETTINGS.codexModel),
     ),
     openAICompatible: normalizeOpenAICompatibleSettings(input.openAICompatible),
+    anthropic: normalizeAnthropicSettings(input.anthropic),
     localGateway: normalizeLocalGatewaySettings(input.localGateway),
     ollama: normalizeOllamaSettings(input.ollama),
     dailyReminderEnabled: getBoolean(
@@ -504,7 +537,10 @@ function normalizeReportStyleProfile(value: unknown): ReportStyleProfile {
 }
 
 function getAIProviderId(value: unknown): AIProviderId {
-  return value === 'ai-codex-cli' || value === 'openai-compatible' || value === 'ollama'
+  return value === 'ai-codex-cli' ||
+    value === 'openai-compatible' ||
+    value === 'anthropic' ||
+    value === 'ollama'
     ? value
     : DEFAULT_APP_SETTINGS.aiProviderId;
 }
@@ -544,6 +580,35 @@ function normalizeOpenAICompatibleParameters(value: unknown): OpenAICompatiblePa
     topP: getOptionalNumberString(input.topP),
     presencePenalty: getOptionalNumberString(input.presencePenalty),
     frequencyPenalty: getOptionalNumberString(input.frequencyPenalty),
+    maxTokens: getOptionalNumberString(input.maxTokens),
+  };
+}
+
+function normalizeAnthropicSettings(value: unknown): AnthropicSettings {
+  if (!value || typeof value !== 'object') {
+    return DEFAULT_APP_SETTINGS.anthropic;
+  }
+
+  const input = value as Record<string, unknown>;
+
+  return {
+    baseUrl: getString(input.baseUrl, DEFAULT_APP_SETTINGS.anthropic.baseUrl),
+    apiKey: getString(input.apiKey, DEFAULT_APP_SETTINGS.anthropic.apiKey),
+    model: getString(input.model, DEFAULT_APP_SETTINGS.anthropic.model),
+    parameters: normalizeAnthropicParameters(input.parameters),
+  };
+}
+
+function normalizeAnthropicParameters(value: unknown): AnthropicParameters {
+  if (!value || typeof value !== 'object') {
+    return DEFAULT_ANTHROPIC_PARAMETERS;
+  }
+
+  const input = value as Record<string, unknown>;
+
+  return {
+    temperature: getOptionalNumberString(input.temperature),
+    topP: getOptionalNumberString(input.topP),
     maxTokens: getOptionalNumberString(input.maxTokens),
   };
 }

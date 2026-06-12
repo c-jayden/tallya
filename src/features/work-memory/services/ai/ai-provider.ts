@@ -13,7 +13,7 @@ import type {
   ThreadLinkSuggestion,
 } from '../../types';
 
-export type AIProviderId = 'ai-codex-cli' | 'openai-compatible' | 'ollama';
+export type AIProviderId = 'ai-codex-cli' | 'openai-compatible' | 'anthropic' | 'ollama';
 export type OpenAICompatibleApiMode = 'chat-completions' | 'responses';
 
 export type OpenAICompatibleParameters = {
@@ -21,6 +21,12 @@ export type OpenAICompatibleParameters = {
   topP: string;
   presencePenalty: string;
   frequencyPenalty: string;
+  maxTokens: string;
+};
+
+export type AnthropicParameters = {
+  temperature: string;
+  topP: string;
   maxTokens: string;
 };
 
@@ -33,6 +39,12 @@ export type GenerateDailyMemoryOptions = {
     model: string;
     apiMode?: OpenAICompatibleApiMode;
     parameters?: OpenAICompatibleParameters;
+  };
+  anthropic?: {
+    baseUrl: string;
+    apiKey: string;
+    model: string;
+    parameters?: AnthropicParameters;
   };
 };
 

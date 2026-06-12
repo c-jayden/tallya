@@ -76,6 +76,16 @@ describe('LocalStorageAppSettingsRepository', () => {
           maxTokens: '4096',
         },
       },
+      anthropic: {
+        baseUrl: 'https://api.anthropic.com/v1',
+        apiKey: 'anthropic-key',
+        model: 'claude-haiku-4-5',
+        parameters: {
+          temperature: '0.7',
+          topP: '',
+          maxTokens: '4096',
+        },
+      },
       ollama: {
         baseUrl: 'http://localhost:11434',
         model: 'llama3',
@@ -104,6 +114,16 @@ describe('LocalStorageAppSettingsRepository', () => {
           topP: '0.95',
           presencePenalty: '',
           frequencyPenalty: '0',
+          maxTokens: '4096',
+        },
+      },
+      anthropic: {
+        baseUrl: 'https://api.anthropic.com/v1',
+        apiKey: 'anthropic-key',
+        model: 'claude-haiku-4-5',
+        parameters: {
+          temperature: '0.7',
+          topP: '',
           maxTokens: '4096',
         },
       },
@@ -217,6 +237,34 @@ describe('LocalStorageAppSettingsRepository', () => {
     await expect(repository.getSettings()).resolves.toEqual({
       ...DEFAULT_APP_SETTINGS,
       diagnosticLoggingEnabled: true,
+    });
+
+    storage.setItem(
+      'tallya.app-settings.v1',
+      JSON.stringify({
+        aiProviderId: 'anthropic',
+        anthropic: {
+          apiKey: 'legacy-anthropic-key',
+          parameters: {
+            maxTokens: '8192',
+          },
+        },
+      }),
+    );
+
+    await expect(repository.getSettings()).resolves.toEqual({
+      ...DEFAULT_APP_SETTINGS,
+      aiProviderId: 'anthropic',
+      anthropic: {
+        baseUrl: 'https://api.anthropic.com/v1',
+        apiKey: 'legacy-anthropic-key',
+        model: 'claude-haiku-4-5',
+        parameters: {
+          temperature: '',
+          topP: '',
+          maxTokens: '8192',
+        },
+      },
     });
 
     storage.setItem(

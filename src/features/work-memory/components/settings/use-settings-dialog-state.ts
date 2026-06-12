@@ -532,6 +532,15 @@ function normalizeProviderSettings(settings: AppSettings) {
         ...settings.openAICompatible.parameters,
       },
     },
+    anthropic: {
+      baseUrl: settings.anthropic.baseUrl.trim() || DEFAULT_APP_SETTINGS.anthropic.baseUrl,
+      apiKey: settings.anthropic.apiKey.trim(),
+      model: settings.anthropic.model.trim() || DEFAULT_APP_SETTINGS.anthropic.model,
+      parameters: {
+        ...DEFAULT_APP_SETTINGS.anthropic.parameters,
+        ...settings.anthropic.parameters,
+      },
+    },
     localGateway: {
       enabled: settings.localGateway.enabled,
       baseUrl:

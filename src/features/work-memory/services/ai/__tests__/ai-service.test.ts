@@ -68,6 +68,16 @@ const settings: AppSettings = {
       maxTokens: '',
     },
   },
+  anthropic: {
+    baseUrl: 'https://api.anthropic.com/v1',
+    apiKey: '',
+    model: 'claude-haiku-4-5',
+    parameters: {
+      temperature: '',
+      topP: '',
+      maxTokens: '',
+    },
+  },
   ollama: {
     baseUrl: 'http://localhost:11434',
     model: '',
@@ -133,6 +143,7 @@ describe('createAIService', () => {
       codexCommand: 'custom-codex',
       codexModel: 'gpt-5.4-mini',
       openAICompatible: settings.openAICompatible,
+      anthropic: settings.anthropic,
     });
   });
 
@@ -165,6 +176,7 @@ describe('createAIService', () => {
       codexCommand: 'custom-codex',
       codexModel: 'gpt-5.4-mini',
       openAICompatible: settings.openAICompatible,
+      anthropic: settings.anthropic,
     });
   });
 
@@ -200,6 +212,7 @@ describe('createAIService', () => {
         codexCommand: 'custom-codex',
         codexModel: 'gpt-5.4-mini',
         openAICompatible: settings.openAICompatible,
+        anthropic: settings.anthropic,
       },
     );
   });
@@ -235,6 +248,7 @@ describe('createAIService', () => {
         codexCommand: 'custom-codex',
         codexModel: 'gpt-5.4-mini',
         openAICompatible: settings.openAICompatible,
+        anthropic: settings.anthropic,
       },
     );
   });
@@ -255,13 +269,14 @@ describe('createAIService', () => {
         getSettings: vi.fn().mockResolvedValue({
           ...settings,
           aiProviderId: 'openai-compatible',
-          openAICompatible: {
-            baseUrl: 'https://api.example.com/v1',
-            apiKey: 'secret',
-            model: 'gpt-test',
-            apiMode: 'responses',
-          },
-        }),
+      openAICompatible: {
+        baseUrl: 'https://api.example.com/v1',
+        apiKey: 'secret',
+        model: 'gpt-test',
+        apiMode: 'responses',
+        parameters: settings.openAICompatible.parameters,
+      },
+    }),
       },
       codexProvider: {
         id: 'ai-codex-cli',
@@ -282,7 +297,57 @@ describe('createAIService', () => {
         apiKey: 'secret',
         model: 'gpt-test',
         apiMode: 'responses',
+        parameters: settings.openAICompatible.parameters,
       },
+      anthropic: settings.anthropic,
+    });
+  });
+
+  it('uses the Anthropic provider when selected in settings', async () => {
+    const generateDailyMemory = vi
+      .fn<AIProvider['generateDailyMemory']>()
+      .mockResolvedValue(generated);
+    const anthropicProvider: AIProvider = {
+      id: 'anthropic',
+      name: 'Claude / Anthropic',
+      generateDailyMemory,
+      generateWeeklyReport: vi.fn(),
+      generateRangeReport: vi.fn(),
+    };
+    const anthropicSettings: AppSettings = {
+      ...settings,
+      aiProviderId: 'anthropic',
+      anthropic: {
+        baseUrl: 'https://api.anthropic.com/v1',
+        apiKey: 'secret',
+        model: 'claude-haiku-4-5',
+        parameters: {
+          temperature: '0.7',
+          topP: '',
+          maxTokens: '4096',
+        },
+      },
+    };
+    const service = createAIService({
+      settingsRepository: {
+        getSettings: vi.fn().mockResolvedValue(anthropicSettings),
+      },
+      codexProvider: {
+        id: 'ai-codex-cli',
+        name: 'Codex CLI',
+        generateDailyMemory: vi.fn(),
+        generateWeeklyReport: vi.fn(),
+        generateRangeReport: vi.fn(),
+      },
+      anthropicProvider,
+    });
+
+    await expect(service.generateDailyMemory(input)).resolves.toEqual(generated);
+    expect(generateDailyMemory).toHaveBeenCalledWith(input, {
+      codexCommand: 'custom-codex',
+      codexModel: 'gpt-5.4-mini',
+      openAICompatible: settings.openAICompatible,
+      anthropic: anthropicSettings.anthropic,
     });
   });
 
@@ -325,6 +390,7 @@ describe('createAIService', () => {
         model: 'gpt-5',
         apiMode: 'chat-completions',
       },
+      anthropic: settings.anthropic,
     });
     expect(codexGenerateDailyMemory).not.toHaveBeenCalled();
   });
@@ -362,6 +428,7 @@ describe('createAIService', () => {
       codexCommand: 'custom-codex',
       codexModel: 'gpt-5.4-mini',
       openAICompatible: settings.openAICompatible,
+      anthropic: settings.anthropic,
     });
     expect(openAIGenerateDailyMemory).not.toHaveBeenCalled();
   });
@@ -499,6 +566,7 @@ describe('createAIService', () => {
         codexCommand: 'custom-codex',
         codexModel: 'gpt-5.4-mini',
         openAICompatible: settings.openAICompatible,
+        anthropic: settings.anthropic,
       },
     );
   });
