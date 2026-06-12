@@ -6,8 +6,8 @@ use crate::suppress_console_window;
 use serde::{Deserialize, Serialize};
 use std::{
     fs,
-    io::Write,
-    process::{Command, Stdio},
+    io::{Read, Write},
+    process::{Child, Command, Stdio},
     thread,
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
@@ -480,28 +480,30 @@ fn run_codex_prompt_generation<T>(
 ) -> Result<T, String> {
     let output_path = create_codex_output_path(output_kind);
     let mut child = spawn_codex_cli(&codex_command, &codex_model, &output_path)?;
+    let output_readers = ChildOutputReaders::start(&mut child);
 
     if let Some(mut stdin) = child.stdin.take() {
-        stdin.write_all(prompt.as_bytes()).map_err(|error| {
+        if let Err(error) = stdin.write_all(prompt.as_bytes()) {
             eprintln!("Failed to write Codex prompt: {error}");
-            "Codex 生成失败，请检查 Codex CLI 是否可用。".to_string()
-        })?;
+            let _ = child.kill();
+            let _ = child.wait();
+            let _ = output_readers.collect();
+            let _ = fs::remove_file(&output_path);
+            return Err("Codex 生成失败，请检查 Codex CLI 是否可用。".to_string());
+        }
     }
 
     let started_at = Instant::now();
 
     while started_at.elapsed() < CODEX_CLI_TIMEOUT {
         match child.try_wait() {
-            Ok(Some(_)) => {
-                let output = child.wait_with_output().map_err(|error| {
-                    eprintln!("Failed to read Codex output: {error}");
-                    "Codex 生成失败，请检查 Codex CLI 是否可用。".to_string()
-                })?;
+            Ok(Some(status)) => {
+                let output = output_readers.collect();
 
-                if !output.status.success() {
+                if !status.success() {
                     eprintln!(
                         "Codex CLI exited with {:?}: {}",
-                        output.status.code(),
+                        status.code(),
                         String::from_utf8_lossy(&output.stderr)
                     );
                     let _ = fs::remove_file(&output_path);
@@ -520,6 +522,8 @@ fn run_codex_prompt_generation<T>(
             Err(error) => {
                 eprintln!("Failed to poll Codex CLI: {error}");
                 let _ = child.kill();
+                let _ = child.wait();
+                let _ = output_readers.collect();
                 let _ = fs::remove_file(&output_path);
                 return Err("Codex 生成失败，请检查 Codex CLI 是否可用。".to_string());
             }
@@ -527,8 +531,57 @@ fn run_codex_prompt_generation<T>(
     }
 
     let _ = child.kill();
+    let _ = child.wait();
+    let _ = output_readers.collect();
     let _ = fs::remove_file(&output_path);
     Err("生成超时，请稍后重试。".to_string())
+}
+
+struct ChildOutputReaders {
+    stdout: Option<thread::JoinHandle<Vec<u8>>>,
+    stderr: Option<thread::JoinHandle<Vec<u8>>>,
+}
+
+struct DrainedChildOutput {
+    stdout: Vec<u8>,
+    stderr: Vec<u8>,
+}
+
+impl ChildOutputReaders {
+    fn start(child: &mut Child) -> Self {
+        Self {
+            stdout: child.stdout.take().map(spawn_pipe_reader),
+            stderr: child.stderr.take().map(spawn_pipe_reader),
+        }
+    }
+
+    fn collect(self) -> DrainedChildOutput {
+        DrainedChildOutput {
+            stdout: join_pipe_reader(self.stdout),
+            stderr: join_pipe_reader(self.stderr),
+        }
+    }
+}
+
+fn spawn_pipe_reader<T>(mut reader: T) -> thread::JoinHandle<Vec<u8>>
+where
+    T: Read + Send + 'static,
+{
+    thread::spawn(move || {
+        let mut output = Vec::new();
+
+        if let Err(error) = reader.read_to_end(&mut output) {
+            eprintln!("Failed to drain Codex output pipe: {error}");
+        }
+
+        output
+    })
+}
+
+fn join_pipe_reader(reader: Option<thread::JoinHandle<Vec<u8>>>) -> Vec<u8> {
+    reader
+        .and_then(|handle| handle.join().ok())
+        .unwrap_or_default()
 }
 
 // On Windows, spawning a console subprocess (the Codex CLI) flashes a terminal
@@ -687,6 +740,38 @@ fn get_command_candidates(command: &str) -> Result<Vec<String>, String> {
                 format!("{command}.cmd"),
                 format!("{command}.exe"),
             ]);
+        }
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        if !command.contains('/') && !command.contains('\\') {
+            let mut candidates = vec![
+                command.to_string(),
+                format!("/opt/homebrew/bin/{command}"),
+                format!("/usr/local/bin/{command}"),
+            ];
+
+            if let Some(home) = home_dir() {
+                for relative_path in [
+                    [".local", "bin", command],
+                    [".npm-global", "bin", command],
+                    [".volta", "bin", command],
+                    [".bun", "bin", command],
+                ] {
+                    candidates.push(
+                        relative_path
+                            .iter()
+                            .fold(home.clone(), |path, segment| path.join(segment))
+                            .to_string_lossy()
+                            .to_string(),
+                    );
+                }
+            }
+
+            candidates.dedup();
+
+            return Ok(candidates);
         }
     }
 
@@ -1001,7 +1086,62 @@ mod tests {
         assert_eq!(candidates, vec!["codex", "codex.cmd", "codex.exe"]);
 
         #[cfg(not(target_os = "windows"))]
-        assert_eq!(candidates, vec!["codex"]);
+        {
+            assert_eq!(candidates.first().map(String::as_str), Some("codex"));
+            assert!(candidates.contains(&"/opt/homebrew/bin/codex".to_string()));
+            assert!(candidates.contains(&"/usr/local/bin/codex".to_string()));
+
+            if let Some(home) = home_dir() {
+                assert!(candidates.contains(
+                    &home
+                        .join(".local")
+                        .join("bin")
+                        .join("codex")
+                        .to_string_lossy()
+                        .to_string()
+                ));
+                assert!(candidates.contains(
+                    &home
+                        .join(".npm-global")
+                        .join("bin")
+                        .join("codex")
+                        .to_string_lossy()
+                        .to_string()
+                ));
+                assert!(candidates.contains(
+                    &home
+                        .join(".volta")
+                        .join("bin")
+                        .join("codex")
+                        .to_string_lossy()
+                        .to_string()
+                ));
+                assert!(candidates.contains(
+                    &home
+                        .join(".bun")
+                        .join("bin")
+                        .join("codex")
+                        .to_string_lossy()
+                        .to_string()
+                ));
+            }
+        }
+    }
+
+    #[test]
+    fn prompt_generation_drains_piped_stdout_and_stderr_while_waiting() {
+        let fake_codex = build_fake_codex_binary();
+
+        let raw_output = run_codex_prompt_generation(
+            "prompt".to_string(),
+            fake_codex.to_string_lossy().to_string(),
+            "gpt-test".to_string(),
+            "pipe-drain-test",
+            |raw_output| Ok(raw_output.to_string()),
+        )
+        .expect("fake codex output should be drained");
+
+        assert_eq!(raw_output, "last-message-ok");
     }
 
     #[test]
@@ -1026,7 +1166,10 @@ mod tests {
 
     #[test]
     fn parse_suggested_clarifications_trims_caps_and_tolerates_empty() {
-        assert_eq!(parse_suggested_clarifications("").expect("empty"), Vec::<String>::new());
+        assert_eq!(
+            parse_suggested_clarifications("").expect("empty"),
+            Vec::<String>::new()
+        );
         assert!(parse_suggested_clarifications("not json").is_err());
         assert_eq!(
             parse_suggested_clarifications(
@@ -1113,7 +1256,10 @@ mod tests {
     fn parse_report_gaps_keeps_only_candidate_ids_caps_and_tolerates_empty() {
         let input = report_gaps_input();
 
-        assert_eq!(parse_report_gaps("", &input).expect("empty"), Vec::<ReportGap>::new());
+        assert_eq!(
+            parse_report_gaps("", &input).expect("empty"),
+            Vec::<ReportGap>::new()
+        );
         assert!(parse_report_gaps("not json", &input).is_err());
 
         let gaps = parse_report_gaps(
@@ -1167,6 +1313,63 @@ mod tests {
                 thread_title: None,
             }],
         }
+    }
+
+    fn build_fake_codex_binary() -> std::path::PathBuf {
+        let test_dir = std::env::temp_dir().join(format!(
+            "tallya-fake-codex-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map(|duration| duration.as_nanos())
+                .unwrap_or_default()
+        ));
+        fs::create_dir_all(&test_dir).expect("create fake codex dir");
+        let source_path = test_dir.join("fake_codex.rs");
+        let binary_path = test_dir.join(if cfg!(target_os = "windows") {
+            "fake_codex.exe"
+        } else {
+            "fake_codex"
+        });
+
+        fs::write(
+            &source_path,
+            r#"
+use std::{env, fs, io::{self, Write}};
+
+fn main() {
+    let mut output_path = None;
+    let mut args = env::args().skip(1);
+
+    while let Some(arg) = args.next() {
+        if arg == "--output-last-message" {
+            output_path = args.next();
+        }
+    }
+
+    if let Some(path) = output_path {
+        fs::write(path, "last-message-ok").expect("write last message");
+    }
+
+    let chunk = vec![b'x'; 8 * 1024 * 1024];
+    io::stdout().write_all(&chunk).expect("write stdout");
+    io::stderr().write_all(&chunk).expect("write stderr");
+}
+"#,
+        )
+        .expect("write fake codex source");
+
+        let rustc = std::env::var_os("RUSTC").unwrap_or_else(|| "rustc".into());
+        let status = Command::new(rustc)
+            .arg(&source_path)
+            .arg("-o")
+            .arg(&binary_path)
+            .status()
+            .expect("compile fake codex");
+
+        assert!(status.success(), "fake codex compilation failed");
+
+        binary_path
     }
 }
 
@@ -1365,8 +1568,11 @@ fn parse_report_gaps(
         "AI 返回内容不是合法 JSON，请重试。".to_string()
     })?;
 
-    let valid_ids: std::collections::HashSet<&str> =
-        input.entries.iter().map(|entry| entry.id.as_str()).collect();
+    let valid_ids: std::collections::HashSet<&str> = input
+        .entries
+        .iter()
+        .map(|entry| entry.id.as_str())
+        .collect();
     let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
     let mut gaps = Vec::new();
 

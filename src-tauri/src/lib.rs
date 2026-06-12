@@ -41,7 +41,6 @@ impl Default for AppWindowState {
     }
 }
 
-
 #[tauri::command]
 fn send_tallya_notification(app: tauri::AppHandle, body: String) -> Result<(), String> {
     send_system_notification(app, body).map_err(|error| {
@@ -185,7 +184,11 @@ fn open_app_directory(app: tauri::AppHandle, kind: String) -> Result<(), String>
         eprintln!("Failed to resolve app data dir: {error}");
         "无法定位应用数据目录。".to_string()
     })?;
-    let dir = if kind == "logs" { base.join("logs") } else { base };
+    let dir = if kind == "logs" {
+        base.join("logs")
+    } else {
+        base
+    };
 
     std::fs::create_dir_all(&dir).map_err(|error| {
         eprintln!("Failed to create directory {dir:?}: {error}");
@@ -214,7 +217,6 @@ fn reveal_directory(dir: &std::path::Path) -> Result<(), String> {
 
     Ok(())
 }
-
 
 fn setup_tray(app: &mut tauri::App, state: AppWindowState) -> tauri::Result<()> {
     let menu = MenuBuilder::new(app)
