@@ -182,7 +182,7 @@ export function createReportService({
       };
 
       // Reports are regenerable from entries on demand, so we no longer track
-      // per-source staleness (the old daily_memories report_sources mechanism).
+      // per-source staleness.
       await reportRepository.saveReport(report);
 
       return report;

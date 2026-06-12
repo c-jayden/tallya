@@ -14,7 +14,6 @@ describe('database migrations', () => {
       new Set([
         'daily_memories',
         'reports',
-        'report_sources',
         'app_settings',
         'entries',
         'entry_clarifications',
@@ -57,7 +56,7 @@ describe('database migrations', () => {
     await runMigrations(database);
 
     expect(database.userVersionReads).toBe(1);
-    expect(database.writtenUserVersions).toEqual([1, 2, 3, 4, 5, SCHEMA_VERSION]);
+    expect(database.writtenUserVersions).toEqual([1, 2, 3, 4, 5, 6, SCHEMA_VERSION]);
     expect(database.userVersion).toBe(SCHEMA_VERSION);
   });
 
@@ -68,6 +67,15 @@ describe('database migrations', () => {
 
     expect(database.userVersionReads).toBe(1);
     expect(database.writtenUserVersions).toEqual([]);
+  });
+
+  it('drops the legacy report_sources table when upgrading to schema version 7', async () => {
+    const database = new LockedLegacyCleanupDatabase();
+    database.userVersion = 6;
+
+    await runMigrations(database);
+
+    expect(database.executedQueries).toContain('DROP TABLE IF EXISTS report_sources');
   });
 });
 

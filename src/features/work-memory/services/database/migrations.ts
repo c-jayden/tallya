@@ -10,7 +10,6 @@ import {
   createEntriesThreadIndexSql,
   createEntryClarificationsIndexSql,
   createEntryClarificationsTableSql,
-  createReportSourcesTableSql,
   createReportsTableSql,
   createThreadsIndexSql,
   createThreadsTableSql,
@@ -46,7 +45,6 @@ const schemaMigrations: SchemaMigration[] = [
     async migrate(database) {
       await database.execute(createDailyMemoriesTableSql);
       await database.execute(createReportsTableSql);
-      await database.execute(createReportSourcesTableSql);
       await database.execute(createAppSettingsTableSql);
     },
   },
@@ -86,6 +84,12 @@ const schemaMigrations: SchemaMigration[] = [
       await database.execute(createEntriesThreadIndexSql);
       await setupEntriesFts(database);
       await dropLegacyAppSettingsJsonTable(database);
+    },
+  },
+  {
+    version: 7,
+    async migrate(database) {
+      await database.execute('DROP TABLE IF EXISTS report_sources');
     },
   },
 ];

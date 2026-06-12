@@ -275,10 +275,3 @@ export type Report = {
   updatedAt: string;
   generatedAt?: string;
 };
-
-export type ReportSource = {
-  id: string;
-  reportId: string;
-  dailyMemoryId: string;
-  dailyMemoryUpdatedAtSnapshot: string;
-};

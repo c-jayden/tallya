@@ -1,4 +1,4 @@
-import { getDailyMemoryDate } from './daily-memory-repository';
+import { getDailyMemoryDate } from './memory-date';
 
 const DAYS_IN_WEEK = 7;
 

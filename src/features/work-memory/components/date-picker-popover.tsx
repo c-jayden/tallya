@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { zhCN } from 'date-fns/locale';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { getDailyMemoryDate } from '../services/daily-memory-repository';
+import { getDailyMemoryDate } from '../services/memory-date';
 
 type DatePickerPopoverProps = {
   ariaLabel: string;

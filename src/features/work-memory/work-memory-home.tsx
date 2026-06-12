@@ -29,7 +29,6 @@ import {
   isFutureMemoryDate,
   isTodayDate,
 } from './memory-date-view-model';
-import { dailyMemoryRepository } from './services/daily-memory-repository';
 import type { Entry } from './types';
 
 export function WorkMemoryHome() {
@@ -155,9 +154,6 @@ export function WorkMemoryHome() {
 
   async function handleClearLocalData() {
     await entries.clearLocalData();
-    // Legacy daily-memory rows / reports are wiped too so "清除数据" stays a
-    // full reset during the entry-model transition.
-    await dailyMemoryRepository.clearLocalData();
   }
 
   return (

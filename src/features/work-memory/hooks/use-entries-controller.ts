@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 import { aiService } from '../services/ai/ai-service';
 import { clarificationRepository } from '../services/clarification-repository';
 import { entryRepository } from '../services/entry-repository';
+import { reportRepository } from '../services/report-repository';
 import { threadRepository } from '../services/thread-repository';
 import { threadService } from '../services/thread-service';
 import { usageStatsRepository } from '../services/usage-stats-repository';
@@ -385,6 +386,7 @@ export function useEntriesController({ currentDate, todayDate }: UseEntriesContr
     await entryRepository.clearLocalData();
     await clarificationRepository.clearLocalData();
     await threadRepository.clearLocalData();
+    await reportRepository.clearReports();
     setEntries([]);
     setClarificationsByEntry({});
     setThreadSuggestionByEntry({});

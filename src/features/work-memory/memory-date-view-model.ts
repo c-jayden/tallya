@@ -1,4 +1,4 @@
-import { getDailyMemoryDate } from './services/daily-memory-repository';
+import { getDailyMemoryDate } from './services/memory-date';
 
 export function isTodayDate(selectedDate: string, todayDate: string) {
   return selectedDate === todayDate;

@@ -1,5 +1,5 @@
 export const DATABASE_PATH = 'sqlite:tallya.db';
-export const SCHEMA_VERSION = 6;
+export const SCHEMA_VERSION = 7;
 
 export const createDailyMemoriesTableSql = `
   CREATE TABLE IF NOT EXISTS daily_memories (
@@ -113,15 +113,6 @@ export const createReportsTableSql = `
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     generated_at TEXT
-  )
-`;
-
-export const createReportSourcesTableSql = `
-  CREATE TABLE IF NOT EXISTS report_sources (
-    id TEXT PRIMARY KEY,
-    report_id TEXT NOT NULL,
-    daily_memory_id TEXT NOT NULL,
-    daily_memory_updated_at_snapshot TEXT NOT NULL
   )
 `;
 

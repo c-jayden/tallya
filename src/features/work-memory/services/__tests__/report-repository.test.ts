@@ -1,5 +1,5 @@
 ﻿import { describe, expect, it } from 'vitest';
-import type { DailyMemory, GeneratedReportContent, Report } from '../../types';
+import type { GeneratedReportContent, Report } from '../../types';
 import { TestDatabaseClient } from '../database/test-database';
 import { SQLiteReportRepository } from '../report-repository';
 
@@ -130,152 +130,18 @@ describe('SQLiteReportRepository', () => {
     );
   });
 
-  it('writes and replaces report sources for selected daily memories', async () => {
-    const repository = createRepository();
-    const report = createReport();
-    const firstMemory = createDailyMemory('2026-06-01');
-    const secondMemory = createDailyMemory('2026-06-02');
-
-    await repository.saveReport(report);
-    await repository.saveReportSources(report.id, [firstMemory]);
-    await repository.saveReportSources(report.id, [firstMemory, secondMemory]);
-
-    await expect(repository.getReportSources(report.id)).resolves.toEqual([
-      expect.objectContaining({
-        reportId: report.id,
-        dailyMemoryId: firstMemory.id,
-        dailyMemoryUpdatedAtSnapshot: firstMemory.updatedAt,
-      }),
-      expect.objectContaining({
-        reportId: report.id,
-        dailyMemoryId: secondMemory.id,
-        dailyMemoryUpdatedAtSnapshot: secondMemory.updatedAt,
-      }),
-    ]);
-  });
-
-  it('detects whether a daily memory is referenced by a report source', async () => {
-    const repository = createRepository();
-    const report = createReport();
-    const memory = createDailyMemory('2026-06-01');
-
-    await repository.saveReport(report);
-    await repository.saveReportSources(report.id, [memory]);
-
-    await expect(repository.hasReportSourceForDailyMemory(memory.id)).resolves.toBe(true);
-    await expect(repository.hasReportSourceForDailyMemory('daily-memory-2026-06-02')).resolves.toBe(
-      false,
-    );
-  });
-
-  it('reads reports and sources that use a daily memory', async () => {
-    const repository = createRepository();
-    const firstReport = createReport({ id: 'weekly-2026-06-01' });
-    const secondReport = createReport({
-      id: 'custom-2026-06-01-2026-06-03',
-      type: 'custom',
-      startDate: '2026-06-01',
-      endDate: '2026-06-03',
-      generatedAt: '2026-06-09T01:00:00.000Z',
-      createdAt: '2026-06-09T01:00:00.000Z',
-      updatedAt: '2026-06-09T01:00:00.000Z',
-    });
-    const memory = createDailyMemory('2026-06-01');
-
-    await repository.saveReport(firstReport);
-    await repository.saveReport(secondReport);
-    await repository.saveReportSources(firstReport.id, [memory]);
-    await repository.saveReportSources(secondReport.id, [memory]);
-
-    await expect(repository.getReportSourcesByDailyMemoryId(memory.id)).resolves.toEqual([
-      expect.objectContaining({ reportId: secondReport.id, dailyMemoryId: memory.id }),
-      expect.objectContaining({ reportId: firstReport.id, dailyMemoryId: memory.id }),
-    ]);
-    await expect(repository.hasReportsUsingDailyMemory(memory.id)).resolves.toBe(true);
-    await expect(repository.getReportsUsingDailyMemory(memory.id)).resolves.toEqual([
-      expect.objectContaining({ id: secondReport.id }),
-      expect.objectContaining({ id: firstReport.id }),
-    ]);
-  });
-
-  it('marks every report using a daily memory as stale without deleting sources', async () => {
-    const repository = createRepository();
-    const firstReport = createReport({ id: 'weekly-2026-06-01' });
-    const secondReport = createReport({
-      id: 'custom-2026-06-01-2026-06-03',
-      type: 'custom',
-      startDate: '2026-06-01',
-      endDate: '2026-06-03',
-    });
-    const unrelatedReport = createReport({ id: 'weekly-2026-06-08' });
-    const memory = createDailyMemory('2026-06-01');
-    const unrelatedMemory = createDailyMemory('2026-06-08');
-
-    await repository.saveReport(firstReport);
-    await repository.saveReport(secondReport);
-    await repository.saveReport(unrelatedReport);
-    await repository.saveReportSources(firstReport.id, [memory]);
-    await repository.saveReportSources(secondReport.id, [memory]);
-    await repository.saveReportSources(unrelatedReport.id, [unrelatedMemory]);
-
-    await repository.markReportsStaleByDailyMemoryId(memory.id);
-
-    await expect(repository.getReportById(firstReport.id)).resolves.toEqual(
-      expect.objectContaining({ status: 'stale' }),
-    );
-    await expect(repository.getReportById(secondReport.id)).resolves.toEqual(
-      expect.objectContaining({ status: 'stale' }),
-    );
-    await expect(repository.getReportById(unrelatedReport.id)).resolves.toEqual(
-      expect.objectContaining({ status: 'generated' }),
-    );
-    await expect(repository.getReportSources(firstReport.id)).resolves.toHaveLength(1);
-    await expect(repository.getReportSources(secondReport.id)).resolves.toHaveLength(1);
-  });
-
-  it('reads every report source for backups', async () => {
-    const repository = createRepository();
-    const firstReport = createReport({ id: 'weekly-2026-06-01' });
-    const secondReport = createReport({ id: 'weekly-2026-06-08' });
-    const firstMemory = createDailyMemory('2026-06-01');
-    const secondMemory = createDailyMemory('2026-06-08');
-
-    await repository.saveReport(firstReport);
-    await repository.saveReport(secondReport);
-    await repository.saveReportSources(firstReport.id, [firstMemory]);
-    await repository.saveReportSources(secondReport.id, [secondMemory]);
-
-    await expect(repository.getAllReportSources()).resolves.toEqual([
-      expect.objectContaining({ reportId: firstReport.id, dailyMemoryId: firstMemory.id }),
-      expect.objectContaining({ reportId: secondReport.id, dailyMemoryId: secondMemory.id }),
-    ]);
-  });
-
-  it('replaces all reports and report sources during backup restore', async () => {
+  it('replaces all reports during backup restore', async () => {
     const repository = createRepository();
     const oldReport = createReport({ id: 'weekly-2026-05-25' });
     const nextReport = createReport({ id: 'weekly-2026-06-01' });
-    const nextMemory = createDailyMemory('2026-06-01');
 
     await repository.saveReport(oldReport);
-    await repository.saveReportSources(oldReport.id, [createDailyMemory('2026-05-25')]);
-
-    await repository.replaceAll([nextReport], [
-      {
-        id: 'report-source-weekly-2026-06-01-daily-memory-2026-06-01',
-        reportId: nextReport.id,
-        dailyMemoryId: nextMemory.id,
-        dailyMemoryUpdatedAtSnapshot: nextMemory.updatedAt,
-      },
-    ]);
+    await repository.replaceAll([nextReport]);
 
     await expect(repository.getAllReports()).resolves.toEqual([
       expect.objectContaining({ id: nextReport.id }),
     ]);
     await expect(repository.getReportById(oldReport.id)).resolves.toBeNull();
-    await expect(repository.getAllReportSources()).resolves.toEqual([
-      expect.objectContaining({ reportId: nextReport.id, dailyMemoryId: nextMemory.id }),
-    ]);
   });
 });
 
@@ -296,21 +162,5 @@ function createReport(overrides: Partial<Report> = {}): Report {
     updatedAt: '2026-06-08T01:00:00.000Z',
     generatedAt: '2026-06-08T01:00:00.000Z',
     ...overrides,
-  };
-}
-
-function createDailyMemory(date: string): DailyMemory {
-  return {
-    id: `daily-memory-${date}`,
-    date,
-    rawContent: `${date} finished work.`,
-    supplements: {},
-    generated: {
-      summary: `${date} summary`,
-      completedItems: [`${date} completed item`],
-    },
-    status: 'generated',
-    createdAt: `${date}T01:00:00.000Z`,
-    updatedAt: `${date}T02:00:00.000Z`,
   };
 }

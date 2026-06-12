@@ -31,13 +31,6 @@ type ReportRow = {
   generated_at: string | null;
 };
 
-type ReportSourceRow = {
-  id: string;
-  report_id: string;
-  daily_memory_id: string;
-  daily_memory_updated_at_snapshot: string;
-};
-
 type EntryRow = {
   id: string;
   content: string;
@@ -70,7 +63,6 @@ type ThreadRow = {
 type TableName =
   | 'daily_memories'
   | 'reports'
-  | 'report_sources'
   | 'app_settings'
   | 'entries'
   | 'entry_clarifications'
@@ -81,13 +73,12 @@ export class TestDatabaseClient implements DatabaseClient {
   dailyMemories = new Map<string, DailyMemoryRow>();
   appSettings = new Map<string, AppSettingsRow>();
   reports = new Map<string, ReportRow>();
-  reportSources = new Map<string, ReportSourceRow>();
   entries = new Map<string, EntryRow>();
   clarifications = new Map<string, EntryClarificationRow>();
   threads = new Map<string, ThreadRow>();
   clearedReports = false;
-  clearedReportSources = false;
   transactionLog: string[] = [];
+  userVersion = 0;
   private transactionDepth = 0;
 
   async transaction<T>(operation: (database: DatabaseClient) => Promise<T>): Promise<T> {
@@ -113,6 +104,12 @@ export class TestDatabaseClient implements DatabaseClient {
 
   async execute(query: string, bindValues: unknown[] = []) {
     const normalizedQuery = normalizeQuery(query);
+    const userVersionMatch = normalizedQuery.match(/^pragma user_version = (\d+)$/);
+
+    if (userVersionMatch) {
+      this.userVersion = Number(userVersionMatch[1]);
+      return;
+    }
 
     if (normalizedQuery.startsWith('create table if not exists')) {
       this.markCreatedTable(normalizedQuery);
@@ -313,68 +310,14 @@ export class TestDatabaseClient implements DatabaseClient {
       return;
     }
 
-    if (normalizedQuery.startsWith('insert into report_sources')) {
-      const row: ReportSourceRow = {
-        id: String(bindValues[0]),
-        report_id: String(bindValues[1]),
-        daily_memory_id: String(bindValues[2]),
-        daily_memory_updated_at_snapshot: String(bindValues[3]),
-      };
-
-      this.reportSources.set(row.id, row);
-      return;
-    }
-
-    if (normalizedQuery.startsWith('update reports set status =')) {
-      const dailyMemoryId = String(bindValues[0]);
-      const updatedAt = String(bindValues[1]);
-      const reportIds = new Set(
-        Array.from(this.reportSources.values())
-          .filter((source) => source.daily_memory_id === dailyMemoryId)
-          .map((source) => source.report_id),
-      );
-
-      for (const reportId of reportIds) {
-        const report = this.reports.get(reportId);
-
-        if (report) {
-          this.reports.set(reportId, {
-            ...report,
-            status: 'stale',
-            updated_at: updatedAt,
-          });
-        }
-      }
-
-      return;
-    }
-
     if (normalizedQuery.startsWith('delete from daily_memories')) {
       this.dailyMemories.clear();
-      return;
-    }
-
-    if (normalizedQuery.startsWith('delete from report_sources where report_id =')) {
-      const reportId = String(bindValues[0]);
-
-      for (const [id, source] of this.reportSources) {
-        if (source.report_id === reportId) {
-          this.reportSources.delete(id);
-        }
-      }
-
       return;
     }
 
     if (normalizedQuery.startsWith('delete from reports')) {
       this.reports.clear();
       this.clearedReports = true;
-      return;
-    }
-
-    if (normalizedQuery.startsWith('delete from report_sources')) {
-      this.reportSources.clear();
-      this.clearedReportSources = true;
       return;
     }
 
@@ -392,16 +335,16 @@ export class TestDatabaseClient implements DatabaseClient {
   async select<T>(query: string, bindValues: unknown[] = []) {
     const normalizedQuery = normalizeQuery(query);
 
+    if (normalizedQuery === 'pragma user_version') {
+      return [{ user_version: this.userVersion }] as T;
+    }
+
     if (normalizedQuery.includes("name = 'daily_memories'")) {
       return this.getTableRows('daily_memories') as T;
     }
 
     if (normalizedQuery.includes("name = 'reports'")) {
       return this.getTableRows('reports') as T;
-    }
-
-    if (normalizedQuery.includes("name = 'report_sources'")) {
-      return this.getTableRows('report_sources') as T;
     }
 
     if (normalizedQuery.includes("name = 'app_settings'")) {
@@ -529,24 +472,6 @@ export class TestDatabaseClient implements DatabaseClient {
         .sort((first, second) => second.created_at.localeCompare(first.created_at)) as T;
     }
 
-    if (normalizedQuery.startsWith('select * from daily_memories where date =')) {
-      const row = this.dailyMemories.get(String(bindValues[0]));
-      return (row ? [row] : []) as T;
-    }
-
-    if (normalizedQuery.startsWith('select * from daily_memories order by date desc')) {
-      return Array.from(this.dailyMemories.values()).sort((first, second) =>
-        second.date.localeCompare(first.date),
-      ) as T;
-    }
-
-    if (normalizedQuery.startsWith("select * from daily_memories where status in")) {
-      return Array.from(this.dailyMemories.values())
-        .filter((row) => row.status === 'generated' || row.status === 'locked')
-        .filter((row) => row.generated_json !== null)
-        .sort((first, second) => second.date.localeCompare(first.date)) as T;
-    }
-
     if (normalizedQuery.startsWith('select key, value from app_settings')) {
       return Array.from(this.appSettings.values()).map(({ key, value }) => ({ key, value })) as T;
     }
@@ -577,37 +502,6 @@ export class TestDatabaseClient implements DatabaseClient {
       return (row ? [row] : []) as T;
     }
 
-    if (normalizedQuery.startsWith('select * from report_sources where report_id =')) {
-      return Array.from(this.reportSources.values())
-        .filter((row) => row.report_id === String(bindValues[0]))
-        .sort((first, second) => first.id.localeCompare(second.id)) as T;
-    }
-
-    if (normalizedQuery.startsWith('select * from report_sources order by')) {
-      return Array.from(this.reportSources.values()).sort((first, second) =>
-        first.report_id.localeCompare(second.report_id) || first.id.localeCompare(second.id),
-      ) as T;
-    }
-
-    if (normalizedQuery.startsWith('select * from report_sources where daily_memory_id =')) {
-      const rows = Array.from(this.reportSources.values())
-        .filter((row) => row.daily_memory_id === String(bindValues[0]))
-        .sort((first, second) => first.id.localeCompare(second.id));
-
-      return (normalizedQuery.includes('limit 1') ? rows.slice(0, 1) : rows) as T;
-    }
-
-    if (normalizedQuery.startsWith('select reports.* from reports inner join report_sources')) {
-      const reportIds = Array.from(this.reportSources.values())
-        .filter((row) => row.daily_memory_id === String(bindValues[0]))
-        .map((row) => row.report_id);
-
-      return reportIds
-        .map((reportId) => this.reports.get(reportId))
-        .filter((row): row is ReportRow => Boolean(row))
-        .sort(compareReportRowsByGeneratedTimeDesc) as T;
-    }
-
     return [] as T;
   }
 
@@ -618,10 +512,6 @@ export class TestDatabaseClient implements DatabaseClient {
 
     if (query.includes('reports')) {
       this.createdTables.add('reports');
-    }
-
-    if (query.includes('report_sources')) {
-      this.createdTables.add('report_sources');
     }
 
     if (query.includes('app_settings')) {

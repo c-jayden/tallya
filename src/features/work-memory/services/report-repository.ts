@@ -1,4 +1,4 @@
-import type { DailyMemory, Report, ReportSource, ReportStatus, ReportType } from '../types';
+import type { Report, ReportStatus, ReportType } from '../types';
 import type { DatabaseClient } from './database/database';
 import { getDatabase } from './database/database';
 import { logger } from './logger/logger';
@@ -15,13 +15,6 @@ type ReportRow = {
   created_at: string;
   updated_at: string;
   generated_at: string | null;
-};
-
-type ReportSourceRow = {
-  id: string;
-  report_id: string;
-  daily_memory_id: string;
-  daily_memory_updated_at_snapshot: string;
 };
 
 export class SQLiteReportRepository {
@@ -94,96 +87,6 @@ export class SQLiteReportRepository {
     }, null);
   }
 
-  async getReportSources(reportId: string) {
-    return this.read(async (database) => {
-      const rows = await database.select<ReportSourceRow[]>(
-        'SELECT * FROM report_sources WHERE report_id = $1 ORDER BY id ASC',
-        [reportId],
-      );
-
-      return rows
-        .map(normalizeReportSourceRow)
-        .filter((source): source is ReportSource => source !== null);
-    }, []);
-  }
-
-  async getAllReportSources() {
-    return this.read(async (database) => {
-      const rows = await database.select<ReportSourceRow[]>(
-        'SELECT * FROM report_sources ORDER BY report_id ASC, id ASC',
-      );
-
-      return rows
-        .map(normalizeReportSourceRow)
-        .filter((source): source is ReportSource => source !== null);
-    }, []);
-  }
-
-  async getReportSourcesByDailyMemoryId(dailyMemoryId: string) {
-    return this.read(async (database) => {
-      const rows = await database.select<ReportSourceRow[]>(
-        'SELECT * FROM report_sources WHERE daily_memory_id = $1 ORDER BY id ASC',
-        [dailyMemoryId],
-      );
-
-      return rows
-        .map(normalizeReportSourceRow)
-        .filter((source): source is ReportSource => source !== null);
-    }, []);
-  }
-
-  async hasReportSourceForDailyMemory(dailyMemoryId: string) {
-    return this.hasReportsUsingDailyMemory(dailyMemoryId);
-  }
-
-  async hasReportsUsingDailyMemory(dailyMemoryId: string) {
-    return this.read(async (database) => {
-      const rows = await database.select<ReportSourceRow[]>(
-        'SELECT * FROM report_sources WHERE daily_memory_id = $1 LIMIT 1',
-        [dailyMemoryId],
-      );
-
-      return rows.length > 0;
-    }, false);
-  }
-
-  async getReportsUsingDailyMemory(dailyMemoryId: string) {
-    return this.read(async (database) => {
-      const rows = await database.select<ReportRow[]>(
-        `
-          SELECT reports.*
-          FROM reports
-          INNER JOIN report_sources ON report_sources.report_id = reports.id
-          WHERE report_sources.daily_memory_id = $1
-          ORDER BY COALESCE(reports.generated_at, reports.created_at) DESC, reports.created_at DESC
-        `,
-        [dailyMemoryId],
-      );
-
-      return rows
-        .map(normalizeReportRow)
-        .filter((report): report is Report => report !== null);
-    }, []);
-  }
-
-  async markReportsStaleByDailyMemoryId(dailyMemoryId: string) {
-    await this.write(async (database) => {
-      await database.execute(
-        `
-          UPDATE reports
-          SET status = 'stale',
-              updated_at = $2
-          WHERE id IN (
-            SELECT report_id
-            FROM report_sources
-            WHERE daily_memory_id = $1
-          )
-        `,
-        [dailyMemoryId, new Date().toISOString()],
-      );
-    });
-  }
-
   async saveReport(report: Report) {
     await this.write(async (database) => {
       await saveReportRow(database, report);
@@ -194,48 +97,18 @@ export class SQLiteReportRepository {
     await this.saveReport(report);
   }
 
-  async deleteReportSources(reportId: string) {
-    await this.write(async (database) => {
-      await database.execute('DELETE FROM report_sources WHERE report_id = $1', [reportId]);
-    });
-  }
-
-  async saveReportSources(reportId: string, dailyMemories: DailyMemory[]) {
-    await this.deleteReportSources(reportId);
-    await this.write(async (database) => {
-      for (const memory of dailyMemories) {
-        await saveReportSourceRow(database, {
-          id: getReportSourceId(reportId, memory.id),
-          reportId,
-          dailyMemoryId: memory.id,
-          dailyMemoryUpdatedAtSnapshot: memory.updatedAt,
-        });
-      }
-    });
-  }
-
   async clearReports() {
     await this.write(async (database) => {
-      await database.execute('DELETE FROM report_sources');
       await database.execute('DELETE FROM reports');
     });
   }
 
-  async replaceAll(reports: Report[], reportSources: ReportSource[]) {
+  async replaceAll(reports: Report[]) {
     await this.write(async (database) => {
-      await database.execute('DELETE FROM report_sources');
       await database.execute('DELETE FROM reports');
 
       for (const report of reports) {
         await saveReportRow(database, report);
-      }
-
-      for (const source of reportSources) {
-        const normalizedSource = normalizeReportSource(source);
-
-        if (normalizedSource) {
-          await saveReportSourceRow(database, normalizedSource);
-        }
       }
     });
   }
@@ -280,10 +153,6 @@ export class SQLiteReportRepository {
 
 export const reportRepository = new SQLiteReportRepository();
 
-function getReportSourceId(reportId: string, dailyMemoryId: string) {
-  return `report-source-${reportId}-${dailyMemoryId}`;
-}
-
 async function saveReportRow(database: DatabaseClient, report: Report) {
   await database.execute(
     `
@@ -325,26 +194,6 @@ async function saveReportRow(database: DatabaseClient, report: Report) {
   );
 }
 
-async function saveReportSourceRow(database: DatabaseClient, source: ReportSource) {
-  await database.execute(
-    `
-      INSERT INTO report_sources (
-        id,
-        report_id,
-        daily_memory_id,
-        daily_memory_updated_at_snapshot
-      )
-      VALUES ($1, $2, $3, $4)
-    `,
-    [
-      source.id,
-      source.reportId,
-      source.dailyMemoryId,
-      source.dailyMemoryUpdatedAtSnapshot,
-    ],
-  );
-}
-
 function normalizeReportRow(row: ReportRow | undefined): Report | null {
   if (
     !row ||
@@ -372,49 +221,6 @@ function normalizeReportRow(row: ReportRow | undefined): Report | null {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     generatedAt: row.generated_at ?? undefined,
-  };
-}
-
-function normalizeReportSourceRow(row: ReportSourceRow | undefined): ReportSource | null {
-  if (
-    !row ||
-    typeof row.id !== 'string' ||
-    typeof row.report_id !== 'string' ||
-    typeof row.daily_memory_id !== 'string' ||
-    typeof row.daily_memory_updated_at_snapshot !== 'string'
-  ) {
-    return null;
-  }
-
-  return {
-    id: row.id,
-    reportId: row.report_id,
-    dailyMemoryId: row.daily_memory_id,
-    dailyMemoryUpdatedAtSnapshot: row.daily_memory_updated_at_snapshot,
-  };
-}
-
-function normalizeReportSource(value: unknown): ReportSource | null {
-  if (!value || typeof value !== 'object') {
-    return null;
-  }
-
-  const source = value as Partial<ReportSource>;
-
-  if (
-    typeof source.id !== 'string' ||
-    typeof source.reportId !== 'string' ||
-    typeof source.dailyMemoryId !== 'string' ||
-    typeof source.dailyMemoryUpdatedAtSnapshot !== 'string'
-  ) {
-    return null;
-  }
-
-  return {
-    id: source.id,
-    reportId: source.reportId,
-    dailyMemoryId: source.dailyMemoryId,
-    dailyMemoryUpdatedAtSnapshot: source.dailyMemoryUpdatedAtSnapshot,
   };
 }
 
