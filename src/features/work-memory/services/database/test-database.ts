@@ -439,6 +439,10 @@ export class TestDatabaseClient implements DatabaseClient {
         .slice(0, Number.isFinite(limit) ? limit : undefined) as T;
     }
 
+    if (normalizedQuery.startsWith('select * from entries order by occurred_at desc')) {
+      return Array.from(this.entries.values()).sort(compareEntriesByOccurredAtDesc) as T;
+    }
+
     // FTS search path: the mock has no real FTS index, so it approximates the
     // MATCH query with a case-insensitive substring scan over content. The
     // trigram tokenizer only indexes 3+ character runs, so a shorter query
@@ -478,6 +482,10 @@ export class TestDatabaseClient implements DatabaseClient {
       return Array.from(this.clarifications.values())
         .filter((row) => ids.has(row.entry_id))
         .sort(compareClarificationsByCreatedAtAsc) as T;
+    }
+
+    if (normalizedQuery.startsWith('select * from entry_clarifications order by created_at asc')) {
+      return Array.from(this.clarifications.values()).sort(compareClarificationsByCreatedAtAsc) as T;
     }
 
     if (normalizedQuery.startsWith('select * from entry_clarifications where entry_id =')) {

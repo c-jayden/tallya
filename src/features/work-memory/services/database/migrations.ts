@@ -15,6 +15,7 @@ import {
   createThreadsIndexSql,
   createThreadsTableSql,
 } from './schema';
+import { buildEntryFromDailyMemory } from '../daily-memory-entry-migration';
 import { logger } from '../logger/logger';
 
 export async function runMigrations(database: DatabaseClient) {
@@ -113,27 +114,31 @@ async function migrateDailyMemoriesToEntries(database: DatabaseClient) {
     );
 
     for (const memory of memories) {
-      const content = memory.raw_content?.trim();
+      const entry = buildEntryFromDailyMemory({
+        id: memory.id,
+        date: memory.date,
+        rawContent: memory.raw_content,
+        createdAt: memory.created_at,
+        updatedAt: memory.updated_at,
+      });
 
-      if (!content) {
+      if (!entry) {
         continue;
       }
-
-      const occurredAt = memory.created_at || `${memory.date}T00:00:00.000Z`;
 
       await database.execute(
         `INSERT INTO entries (id, content, occurred_at, occurred_on, thread_id, difficulty, effort, created_at, updated_at)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
         [
-          `entry-migrated-${memory.id}`,
-          content,
-          occurredAt,
-          memory.date,
-          null,
-          null,
-          null,
-          memory.created_at || occurredAt,
-          memory.updated_at || occurredAt,
+          entry.id,
+          entry.content,
+          entry.occurredAt,
+          entry.occurredOn,
+          entry.threadId,
+          entry.difficulty,
+          entry.effort,
+          entry.createdAt,
+          entry.updatedAt,
         ],
       );
     }

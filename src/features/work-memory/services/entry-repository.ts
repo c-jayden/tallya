@@ -21,6 +21,8 @@ export type EntryRepository = {
   listRange(startDate: string, endDate: string): Promise<Entry[]>;
   listByThread(threadId: string): Promise<Entry[]>;
   listRecent(limit: number): Promise<Entry[]>;
+  listAll(): Promise<Entry[]>;
+  replaceAll(entries: Entry[]): Promise<void>;
   setThread(id: string, threadId: string | null): Promise<Entry | null>;
   search(keyword: string): Promise<Entry[]>;
   clearLocalData(): Promise<void>;
@@ -151,6 +153,14 @@ export class LocalStorageEntryRepository implements EntryRepository {
     return this.readAll().sort(compareByOccurredAtDesc).slice(0, Math.max(0, limit));
   }
 
+  async listAll() {
+    return this.readAll().sort(compareByOccurredAtDesc);
+  }
+
+  async replaceAll(entries: Entry[]) {
+    this.writeAll(entries.map(normalizeEntry).filter((entry): entry is Entry => entry !== null));
+  }
+
   async setThread(id: string, threadId: string | null) {
     const entries = this.readAll();
     const index = entries.findIndex((entry) => entry.id === id);
@@ -202,7 +212,7 @@ export class LocalStorageEntryRepository implements EntryRepository {
       const parsed = JSON.parse(raw) as unknown;
 
       return Array.isArray(parsed)
-        ? parsed.filter((entry): entry is Entry => isEntryLike(entry))
+        ? parsed.map(normalizeEntry).filter((entry): entry is Entry => entry !== null)
         : [];
     } catch {
       return [];
@@ -350,6 +360,30 @@ export class SQLiteEntryRepository implements EntryRepository {
     }, []);
   }
 
+  async listAll() {
+    return this.safeRead(async (database) => {
+      const rows = await database.select<EntryRow[]>(
+        'SELECT * FROM entries ORDER BY occurred_at DESC, id DESC',
+      );
+
+      return rows.map(mapRowToEntry);
+    }, []);
+  }
+
+  async replaceAll(entries: Entry[]) {
+    await this.write(async (database) => {
+      await database.execute('DELETE FROM entries');
+
+      for (const entry of entries) {
+        const normalizedEntry = normalizeEntry(entry);
+
+        if (normalizedEntry) {
+          await insertEntryRow(database, normalizedEntry);
+        }
+      }
+    });
+  }
+
   async setThread(id: string, threadId: string | null) {
     const existing = await this.getById(id);
 
@@ -481,19 +515,38 @@ async function insertEntryRow(database: DatabaseClient, entry: Entry) {
   );
 }
 
-function isEntryLike(value: unknown): value is Entry {
+function normalizeEntry(value: unknown): Entry | null {
   if (!value || typeof value !== 'object') {
-    return false;
+    return null;
   }
 
   const candidate = value as Record<string, unknown>;
 
-  return (
-    typeof candidate.id === 'string' &&
-    typeof candidate.content === 'string' &&
-    typeof candidate.occurredAt === 'string' &&
-    typeof candidate.occurredOn === 'string'
-  );
+  if (
+    typeof candidate.id !== 'string' ||
+    typeof candidate.content !== 'string' ||
+    typeof candidate.occurredAt !== 'string' ||
+    typeof candidate.occurredOn !== 'string'
+  ) {
+    return null;
+  }
+
+  return {
+    id: candidate.id,
+    content: candidate.content,
+    occurredAt: candidate.occurredAt,
+    occurredOn: candidate.occurredOn,
+    threadId: typeof candidate.threadId === 'string' ? candidate.threadId : null,
+    difficulty: typeof candidate.difficulty === 'number' ? candidate.difficulty : null,
+    effort: typeof candidate.effort === 'string' ? candidate.effort : null,
+    createdAt: typeof candidate.createdAt === 'string' ? candidate.createdAt : candidate.occurredAt,
+    updatedAt:
+      typeof candidate.updatedAt === 'string'
+        ? candidate.updatedAt
+        : typeof candidate.createdAt === 'string'
+          ? candidate.createdAt
+          : candidate.occurredAt,
+  };
 }
 
 export const entryRepository: EntryRepository = new SQLiteEntryRepository();

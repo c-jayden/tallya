@@ -7,32 +7,53 @@ import {
   validateBackupFile,
   type BackupPayload,
 } from '../backup-service';
-import type { DailyMemory, Report, ReportSource } from '../../types';
+import type { Clarification, DailyMemory, Entry, Report, ReportSource, Thread } from '../../types';
 
 describe('backup-service', () => {
-  it('builds a backup payload with memories, reports, report sources, settings, and app version', async () => {
+  it('builds a v2 backup payload with entries, clarifications, threads, settings, and app version', async () => {
     const dailyMemories = [createDailyMemory('2026-06-08')];
+    const entries = [createEntry()];
+    const clarifications = [createClarification()];
+    const threads = [createThread()];
     const reports = [createReport()];
     const reportSources = [createReportSource()];
+    const settings = {
+      ...DEFAULT_APP_SETTINGS,
+      theme: 'dark' as const,
+      openAICompatible: {
+        ...DEFAULT_APP_SETTINGS.openAICompatible,
+        apiKey: 'secret-key',
+      },
+    };
     const service = createBackupService({
       appVersion: '0.1.0',
       now: () => new Date('2026-06-08T10:00:00.000Z'),
       dailyMemoryRepository: createDailyMemoryRepository({ dailyMemories }),
+      entryRepository: createEntryRepository({ entries }),
+      clarificationRepository: createClarificationRepository({ clarifications }),
+      threadRepository: createThreadRepository({ threads }),
       reportRepository: createReportRepository({ reports, reportSources }),
-      appSettingsRepository: createAppSettingsRepository({
-        settings: { ...DEFAULT_APP_SETTINGS, theme: 'dark' },
-      }),
+      appSettingsRepository: createAppSettingsRepository({ settings }),
     });
 
     await expect(service.buildBackupPayload()).resolves.toEqual({
-      version: 1,
+      version: 2,
       exportedAt: '2026-06-08T10:00:00.000Z',
       appVersion: '0.1.0',
       data: {
         dailyMemories,
+        entries,
+        clarifications,
+        threads,
         reports,
         reportSources,
-        appSettings: { ...DEFAULT_APP_SETTINGS, theme: 'dark' },
+        appSettings: {
+          ...settings,
+          openAICompatible: {
+            ...settings.openAICompatible,
+            apiKey: '',
+          },
+        },
       },
     });
   });
@@ -41,6 +62,22 @@ describe('backup-service', () => {
     const payload = createBackupPayload();
 
     expect(validateBackupFile(JSON.stringify(payload))).toEqual(payload);
+  });
+
+  it('validates a v1 backup file and fills current-model collections with empty arrays', () => {
+    const payload = createLegacyBackupPayload({
+      dailyMemories: [createDailyMemory('2026-06-08')],
+    });
+
+    expect(validateBackupFile(JSON.stringify(payload))).toEqual({
+      ...payload,
+      data: {
+        ...payload.data,
+        entries: [],
+        clarifications: [],
+        threads: [],
+      },
+    });
   });
 
   it('rejects invalid JSON backup files', () => {
@@ -56,17 +93,26 @@ describe('backup-service', () => {
   it('restores a valid backup by overwriting existing local data', async () => {
     const payload = createBackupPayload({
       dailyMemories: [createDailyMemory('2026-06-08')],
+      entries: [createEntry()],
+      clarifications: [createClarification()],
+      threads: [createThread()],
       reports: [createReport()],
       reportSources: [createReportSource()],
       appSettings: { ...DEFAULT_APP_SETTINGS, closeToTray: false },
     });
     const dailyMemoryRepository = createDailyMemoryRepository();
+    const entryRepository = createEntryRepository();
+    const clarificationRepository = createClarificationRepository();
+    const threadRepository = createThreadRepository();
     const reportRepository = createReportRepository();
     const appSettingsRepository = createAppSettingsRepository();
     const service = createBackupService({
       appVersion: '0.1.0',
       now: () => new Date('2026-06-08T10:00:00.000Z'),
       dailyMemoryRepository,
+      entryRepository,
+      clarificationRepository,
+      threadRepository,
       reportRepository,
       appSettingsRepository,
     });
@@ -74,6 +120,9 @@ describe('backup-service', () => {
     await service.restoreBackupPayload(payload);
 
     expect(dailyMemoryRepository.replaceAll).toHaveBeenCalledWith(payload.data.dailyMemories);
+    expect(entryRepository.replaceAll).toHaveBeenCalledWith(payload.data.entries);
+    expect(clarificationRepository.replaceAll).toHaveBeenCalledWith(payload.data.clarifications);
+    expect(threadRepository.replaceAll).toHaveBeenCalledWith(payload.data.threads);
     expect(reportRepository.replaceAll).toHaveBeenCalledWith(
       payload.data.reports,
       payload.data.reportSources,
@@ -81,14 +130,99 @@ describe('backup-service', () => {
     expect(appSettingsRepository.saveSettings).toHaveBeenCalledWith(payload.data.appSettings);
   });
 
+  it('restores a v1 backup by converting daily memories into readable entries', async () => {
+    const legacyMemory = createDailyMemory('2026-06-08');
+    const payload = validateBackupFile(
+      JSON.stringify(
+        createLegacyBackupPayload({
+          dailyMemories: [legacyMemory],
+        }),
+      ),
+    );
+    const entryRepository = createEntryRepository();
+    const service = createBackupService({
+      appVersion: '0.1.0',
+      now: () => new Date('2026-06-08T10:00:00.000Z'),
+      dailyMemoryRepository: createDailyMemoryRepository(),
+      entryRepository,
+      clarificationRepository: createClarificationRepository(),
+      threadRepository: createThreadRepository(),
+      reportRepository: createReportRepository(),
+      appSettingsRepository: createAppSettingsRepository(),
+    });
+
+    await service.restoreBackupPayload(payload);
+
+    await expect(entryRepository.listAll()).resolves.toEqual([
+      {
+        id: `entry-migrated-${legacyMemory.id}`,
+        content: legacyMemory.rawContent,
+        occurredAt: legacyMemory.createdAt,
+        occurredOn: legacyMemory.date,
+        threadId: null,
+        difficulty: null,
+        effort: null,
+        createdAt: legacyMemory.createdAt,
+        updatedAt: legacyMemory.updatedAt,
+      },
+    ]);
+  });
+
+  it('keeps the current OpenAI-compatible api key when the backup key is empty', async () => {
+    const currentSettings = {
+      ...DEFAULT_APP_SETTINGS,
+      openAICompatible: {
+        ...DEFAULT_APP_SETTINGS.openAICompatible,
+        apiKey: 'local-secret',
+      },
+    };
+    const payload = createBackupPayload({
+      appSettings: {
+        ...DEFAULT_APP_SETTINGS,
+        theme: 'dark',
+        openAICompatible: {
+          ...DEFAULT_APP_SETTINGS.openAICompatible,
+          apiKey: '',
+        },
+      },
+    });
+    const appSettingsRepository = createAppSettingsRepository({ settings: currentSettings });
+    const service = createBackupService({
+      appVersion: '0.1.0',
+      now: () => new Date('2026-06-08T10:00:00.000Z'),
+      dailyMemoryRepository: createDailyMemoryRepository(),
+      entryRepository: createEntryRepository(),
+      clarificationRepository: createClarificationRepository(),
+      threadRepository: createThreadRepository(),
+      reportRepository: createReportRepository(),
+      appSettingsRepository,
+    });
+
+    await service.restoreBackupPayload(payload);
+
+    expect(appSettingsRepository.saveSettings).toHaveBeenCalledWith({
+      ...payload.data.appSettings,
+      openAICompatible: {
+        ...payload.data.appSettings.openAICompatible,
+        apiKey: 'local-secret',
+      },
+    });
+  });
+
   it('does not clear current data when backup validation fails', async () => {
     const dailyMemoryRepository = createDailyMemoryRepository();
+    const entryRepository = createEntryRepository();
+    const clarificationRepository = createClarificationRepository();
+    const threadRepository = createThreadRepository();
     const reportRepository = createReportRepository();
     const appSettingsRepository = createAppSettingsRepository();
     const service = createBackupService({
       appVersion: '0.1.0',
       now: () => new Date('2026-06-08T10:00:00.000Z'),
       dailyMemoryRepository,
+      entryRepository,
+      clarificationRepository,
+      threadRepository,
       reportRepository,
       appSettingsRepository,
     });
@@ -98,6 +232,9 @@ describe('backup-service', () => {
     );
 
     expect(dailyMemoryRepository.replaceAll).not.toHaveBeenCalled();
+    expect(entryRepository.replaceAll).not.toHaveBeenCalled();
+    expect(clarificationRepository.replaceAll).not.toHaveBeenCalled();
+    expect(threadRepository.replaceAll).not.toHaveBeenCalled();
     expect(reportRepository.replaceAll).not.toHaveBeenCalled();
     expect(appSettingsRepository.saveSettings).not.toHaveBeenCalled();
   });
@@ -115,6 +252,9 @@ describe('backup-service', () => {
       dailyMemoryRepository: createDailyMemoryRepository({
         dailyMemories: [createDailyMemory('2026-06-08')],
       }),
+      entryRepository: createEntryRepository(),
+      clarificationRepository: createClarificationRepository(),
+      threadRepository: createThreadRepository(),
       reportRepository: createReportRepository(),
       appSettingsRepository: createAppSettingsRepository(),
     });
@@ -139,6 +279,9 @@ describe('backup-service', () => {
       appVersion: '0.1.0',
       now: () => new Date('2026-06-08T10:00:00.000Z'),
       dailyMemoryRepository: createDailyMemoryRepository(),
+      entryRepository: createEntryRepository(),
+      clarificationRepository: createClarificationRepository(),
+      threadRepository: createThreadRepository(),
       reportRepository: createReportRepository(),
       appSettingsRepository: createAppSettingsRepository(),
     });
@@ -154,6 +297,9 @@ describe('backup-service', () => {
       appVersion: '0.1.0',
       now: () => new Date('2026-06-08T10:00:00.000Z'),
       dailyMemoryRepository: createDailyMemoryRepository(),
+      entryRepository: createEntryRepository(),
+      clarificationRepository: createClarificationRepository(),
+      threadRepository: createThreadRepository(),
       reportRepository: createReportRepository(),
       appSettingsRepository: createAppSettingsRepository(),
     });
@@ -168,6 +314,9 @@ describe('backup-service', () => {
       appVersion: '0.1.0',
       now: () => new Date('2026-06-08T10:00:00.000Z'),
       dailyMemoryRepository: createDailyMemoryRepository(),
+      entryRepository: createEntryRepository(),
+      clarificationRepository: createClarificationRepository(),
+      threadRepository: createThreadRepository(),
       reportRepository: createReportRepository(),
       appSettingsRepository: createAppSettingsRepository(),
     });
@@ -180,6 +329,31 @@ describe('backup-service', () => {
 });
 
 function createBackupPayload(overrides: Partial<BackupPayload['data']> = {}): BackupPayload {
+  return {
+    version: 2,
+    exportedAt: '2026-06-08T10:00:00.000Z',
+    appVersion: '0.1.0',
+    data: {
+      dailyMemories: [],
+      entries: [],
+      clarifications: [],
+      threads: [],
+      reports: [],
+      reportSources: [],
+      appSettings: DEFAULT_APP_SETTINGS,
+      ...overrides,
+    },
+  };
+}
+
+function createLegacyBackupPayload(
+  overrides: Partial<{
+    dailyMemories: DailyMemory[];
+    reports: Report[];
+    reportSources: ReportSource[];
+    appSettings: AppSettings;
+  }> = {},
+) {
   return {
     version: 1,
     exportedAt: '2026-06-08T10:00:00.000Z',
@@ -240,10 +414,82 @@ function createReportSource(): ReportSource {
   };
 }
 
+function createEntry(): Entry {
+  return {
+    id: 'entry_2026_06_08',
+    content: '2026-06-08 work memory.',
+    occurredAt: '2026-06-08T01:00:00.000Z',
+    occurredOn: '2026-06-08',
+    threadId: 'thread_2026_06_08',
+    difficulty: null,
+    effort: null,
+    createdAt: '2026-06-08T01:00:00.000Z',
+    updatedAt: '2026-06-08T02:00:00.000Z',
+  };
+}
+
+function createClarification(): Clarification {
+  return {
+    id: 'clar_2026_06_08',
+    entryId: 'entry_2026_06_08',
+    question: '补充？',
+    answer: '补充了上下文。',
+    createdAt: '2026-06-08T01:30:00.000Z',
+    updatedAt: '2026-06-08T01:30:00.000Z',
+  };
+}
+
+function createThread(): Thread {
+  return {
+    id: 'thread_2026_06_08',
+    title: '订单接口',
+    status: 'open',
+    createdAt: '2026-06-08T01:00:00.000Z',
+    updatedAt: '2026-06-08T02:00:00.000Z',
+  };
+}
+
 function createDailyMemoryRepository({ dailyMemories = [] }: { dailyMemories?: DailyMemory[] } = {}) {
   return {
     getAllMemories: vi.fn(async () => dailyMemories),
     replaceAll: vi.fn(async () => undefined),
+  };
+}
+
+function createEntryRepository({ entries = [] }: { entries?: Entry[] } = {}) {
+  let currentEntries = entries;
+
+  return {
+    listAll: vi.fn(async () => currentEntries),
+    replaceAll: vi.fn(async (nextEntries: Entry[]) => {
+      currentEntries = nextEntries;
+    }),
+  };
+}
+
+function createClarificationRepository({
+  clarifications = [],
+}: {
+  clarifications?: Clarification[];
+} = {}) {
+  let currentClarifications = clarifications;
+
+  return {
+    listAll: vi.fn(async () => currentClarifications),
+    replaceAll: vi.fn(async (nextClarifications: Clarification[]) => {
+      currentClarifications = nextClarifications;
+    }),
+  };
+}
+
+function createThreadRepository({ threads = [] }: { threads?: Thread[] } = {}) {
+  let currentThreads = threads;
+
+  return {
+    listAll: vi.fn(async () => currentThreads),
+    replaceAll: vi.fn(async (nextThreads: Thread[]) => {
+      currentThreads = nextThreads;
+    }),
   };
 }
 

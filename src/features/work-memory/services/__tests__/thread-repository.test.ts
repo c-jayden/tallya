@@ -77,6 +77,22 @@ describe('LocalStorageThreadRepository', () => {
     await repository.remove(thread.id);
     expect(await repository.getById(thread.id)).toBeNull();
   });
+
+  it('lists and replaces all threads for backup restore', async () => {
+    const repository = createRepository();
+    const oldThread = await repository.create({ title: 'old thread' });
+    const restoredThread = {
+      ...oldThread,
+      id: 'thread_restored',
+      title: 'restored thread',
+      status: 'archived' as const,
+    };
+
+    await repository.replaceAll([restoredThread]);
+
+    await expect(repository.listAll()).resolves.toEqual([restoredThread]);
+    await expect(repository.getById(oldThread.id)).resolves.toBeNull();
+  });
 });
 
 describe('SQLiteThreadRepository', () => {
@@ -103,5 +119,21 @@ describe('SQLiteThreadRepository', () => {
 
     await repository.remove(thread.id);
     expect(await repository.getById(thread.id)).toBeNull();
+  });
+
+  it('lists and replaces all threads through SQL for backup restore', async () => {
+    const { repository } = createRepository();
+    const oldThread = await repository.create({ title: 'old thread' });
+    const restoredThread = {
+      ...oldThread,
+      id: 'thread_restored',
+      title: 'restored thread',
+      status: 'archived' as const,
+    };
+
+    await repository.replaceAll([restoredThread]);
+
+    await expect(repository.listAll()).resolves.toEqual([restoredThread]);
+    await expect(repository.getById(oldThread.id)).resolves.toBeNull();
   });
 });

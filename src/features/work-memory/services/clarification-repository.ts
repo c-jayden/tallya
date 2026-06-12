@@ -16,6 +16,8 @@ export type ClarificationRepository = {
   create(input: CreateClarificationInput): Promise<Clarification>;
   listByEntry(entryId: string): Promise<Clarification[]>;
   listByEntryIds(entryIds: string[]): Promise<Clarification[]>;
+  listAll(): Promise<Clarification[]>;
+  replaceAll(clarifications: Clarification[]): Promise<void>;
   update(id: string, answer: string): Promise<Clarification | null>;
   remove(id: string): Promise<void>;
   removeByEntry(entryId: string): Promise<void>;
@@ -98,6 +100,18 @@ export class LocalStorageClarificationRepository implements ClarificationReposit
       .sort(compareByCreatedAtAsc);
   }
 
+  async listAll() {
+    return this.readAll().sort(compareByCreatedAtAsc);
+  }
+
+  async replaceAll(clarifications: Clarification[]) {
+    this.writeAll(
+      clarifications
+        .map(normalizeClarification)
+        .filter((item): item is Clarification => item !== null),
+    );
+  }
+
   async update(id: string, answer: string) {
     const items = this.readAll();
     const index = items.findIndex((item) => item.id === id);
@@ -159,7 +173,7 @@ export class LocalStorageClarificationRepository implements ClarificationReposit
       const parsed = JSON.parse(raw) as unknown;
 
       return Array.isArray(parsed)
-        ? parsed.filter((item): item is Clarification => isClarificationLike(item))
+        ? parsed.map(normalizeClarification).filter((item): item is Clarification => item !== null)
         : [];
     } catch {
       return [];
@@ -254,6 +268,30 @@ export class SQLiteClarificationRepository implements ClarificationRepository {
 
       return rows.map(mapRow);
     }, []);
+  }
+
+  async listAll() {
+    return this.safeRead(async (database) => {
+      const rows = await database.select<ClarificationRow[]>(
+        'SELECT * FROM entry_clarifications ORDER BY created_at ASC, rowid ASC',
+      );
+
+      return rows.map(mapRow);
+    }, []);
+  }
+
+  async replaceAll(clarifications: Clarification[]) {
+    await this.write(async (database) => {
+      await database.execute('DELETE FROM entry_clarifications');
+
+      for (const clarification of clarifications) {
+        const normalizedClarification = normalizeClarification(clarification);
+
+        if (normalizedClarification) {
+          await insertClarificationRow(database, normalizedClarification);
+        }
+      }
+    });
   }
 
   async update(id: string, answer: string) {
@@ -359,6 +397,43 @@ function isClarificationLike(value: unknown): value is Clarification {
     typeof candidate.id === 'string' &&
     typeof candidate.entryId === 'string' &&
     typeof candidate.answer === 'string'
+  );
+}
+
+function normalizeClarification(value: unknown): Clarification | null {
+  if (!isClarificationLike(value)) {
+    return null;
+  }
+
+  const candidate = value as Record<string, unknown>;
+
+  return {
+    id: value.id,
+    entryId: value.entryId,
+    question: typeof candidate.question === 'string' ? candidate.question : null,
+    answer: value.answer,
+    createdAt: typeof candidate.createdAt === 'string' ? candidate.createdAt : new Date(0).toISOString(),
+    updatedAt:
+      typeof candidate.updatedAt === 'string'
+        ? candidate.updatedAt
+        : typeof candidate.createdAt === 'string'
+          ? candidate.createdAt
+          : new Date(0).toISOString(),
+  };
+}
+
+async function insertClarificationRow(database: DatabaseClient, clarification: Clarification) {
+  await database.execute(
+    `INSERT INTO entry_clarifications (id, entry_id, question, answer, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
+    [
+      clarification.id,
+      clarification.entryId,
+      clarification.question,
+      clarification.answer,
+      clarification.createdAt,
+      clarification.updatedAt,
+    ],
   );
 }
 

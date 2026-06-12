@@ -72,7 +72,7 @@ describe('SQLiteAppSettingsRepository', () => {
       presencePenalty: '',
       frequencyPenalty: '',
     });
-    expect(database.appSettings.get('localGatewayEnabled')?.value).toBe('true');
+    expect(database.appSettings.get('localGatewayEnabled')?.value).toBe('false');
     expect(database.appSettings.get('localGatewayBaseUrl')?.value).toBe(
       'http://localhost:8080',
     );

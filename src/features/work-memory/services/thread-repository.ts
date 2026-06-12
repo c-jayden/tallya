@@ -16,6 +16,8 @@ export type ThreadRepository = {
   create(input: CreateThreadInput): Promise<Thread>;
   getById(id: string): Promise<Thread | null>;
   list(): Promise<Thread[]>;
+  listAll(): Promise<Thread[]>;
+  replaceAll(threads: Thread[]): Promise<void>;
   update(id: string, input: UpdateThreadInput): Promise<Thread | null>;
   remove(id: string): Promise<void>;
   clearLocalData(): Promise<void>;
@@ -87,6 +89,16 @@ export class LocalStorageThreadRepository implements ThreadRepository {
     return this.readAll().sort(compareByUpdatedAtDesc);
   }
 
+  async listAll() {
+    return this.list();
+  }
+
+  async replaceAll(threads: Thread[]) {
+    this.writeAll(
+      threads.map(normalizeThread).filter((thread): thread is Thread => thread !== null),
+    );
+  }
+
   async update(id: string, input: UpdateThreadInput) {
     const threads = this.readAll();
     const index = threads.findIndex((thread) => thread.id === id);
@@ -132,7 +144,7 @@ export class LocalStorageThreadRepository implements ThreadRepository {
       const parsed = JSON.parse(raw) as unknown;
 
       return Array.isArray(parsed)
-        ? parsed.filter((thread): thread is Thread => isThreadLike(thread))
+        ? parsed.map(normalizeThread).filter((thread): thread is Thread => thread !== null)
         : [];
     } catch {
       return [];
@@ -208,6 +220,24 @@ export class SQLiteThreadRepository implements ThreadRepository {
 
       return rows.map(mapRow);
     }, []);
+  }
+
+  async listAll() {
+    return this.list();
+  }
+
+  async replaceAll(threads: Thread[]) {
+    await this.write(async (database) => {
+      await database.execute('DELETE FROM threads');
+
+      for (const thread of threads) {
+        const normalizedThread = normalizeThread(thread);
+
+        if (normalizedThread) {
+          await insertThreadRow(database, normalizedThread);
+        }
+      }
+    });
   }
 
   async update(id: string, input: UpdateThreadInput) {
@@ -290,6 +320,36 @@ function isThreadLike(value: unknown): value is Thread {
   const candidate = value as Record<string, unknown>;
 
   return typeof candidate.id === 'string' && typeof candidate.title === 'string';
+}
+
+function normalizeThread(value: unknown): Thread | null {
+  if (!isThreadLike(value)) {
+    return null;
+  }
+
+  const candidate = value as Record<string, unknown>;
+  const timestamp =
+    typeof candidate.createdAt === 'string'
+      ? candidate.createdAt
+      : typeof candidate.updatedAt === 'string'
+        ? candidate.updatedAt
+        : new Date(0).toISOString();
+
+  return {
+    id: value.id,
+    title: value.title,
+    status: normalizeStatus(value.status),
+    createdAt: typeof candidate.createdAt === 'string' ? candidate.createdAt : timestamp,
+    updatedAt: typeof candidate.updatedAt === 'string' ? candidate.updatedAt : timestamp,
+  };
+}
+
+async function insertThreadRow(database: DatabaseClient, thread: Thread) {
+  await database.execute(
+    `INSERT INTO threads (id, title, status, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5)`,
+    [thread.id, thread.title, thread.status, thread.createdAt, thread.updatedAt],
+  );
 }
 
 export const threadRepository: ThreadRepository = new SQLiteThreadRepository();

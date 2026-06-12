@@ -150,6 +150,23 @@ describe('LocalStorageEntryRepository', () => {
 
     expect(recent.map((entry) => entry.content)).toEqual(['newest', 'middle']);
   });
+
+  it('lists and replaces all entries for backup restore', async () => {
+    const repository = createLocalRepository();
+    const oldEntry = await repository.create({ content: 'old entry' });
+    const restoredEntry = {
+      ...oldEntry,
+      id: 'entry_restored',
+      content: 'restored entry',
+      occurredAt: '2026-06-11T03:00:00.000Z',
+      occurredOn: '2026-06-11',
+    };
+
+    await repository.replaceAll([restoredEntry]);
+
+    await expect(repository.listAll()).resolves.toEqual([restoredEntry]);
+    await expect(repository.getById(oldEntry.id)).resolves.toBeNull();
+  });
 });
 
 describe('SQLiteEntryRepository', () => {
@@ -226,6 +243,23 @@ describe('SQLiteEntryRepository', () => {
       'follow up',
     ]);
     expect((await repository.listRecent(1)).map((entry) => entry.content)).toEqual(['follow up']);
+  });
+
+  it('lists and replaces all entries through SQL for backup restore', async () => {
+    const { repository } = createSqliteRepository();
+    const oldEntry = await repository.create({ content: 'old entry' });
+    const restoredEntry = {
+      ...oldEntry,
+      id: 'entry_restored',
+      content: 'restored entry',
+      occurredAt: '2026-06-11T03:00:00.000Z',
+      occurredOn: '2026-06-11',
+    };
+
+    await repository.replaceAll([restoredEntry]);
+
+    await expect(repository.listAll()).resolves.toEqual([restoredEntry]);
+    await expect(repository.getById(oldEntry.id)).resolves.toBeNull();
   });
 });
 

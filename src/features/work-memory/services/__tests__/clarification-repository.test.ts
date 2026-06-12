@@ -106,6 +106,23 @@ describe('LocalStorageClarificationRepository', () => {
     expect((await repository.search('难点')).map((item) => item.entryId)).toEqual(['e1']);
     expect(await repository.search('  ')).toEqual([]);
   });
+
+  it('lists and replaces all clarifications for backup restore', async () => {
+    const repository = createLocalRepository();
+    const oldClarification = await repository.create({ entryId: 'entry_old', answer: 'old' });
+    const restoredClarification = {
+      ...oldClarification,
+      id: 'clar_restored',
+      entryId: 'entry_restored',
+      question: '补充？',
+      answer: 'restored',
+    };
+
+    await repository.replaceAll([restoredClarification]);
+
+    await expect(repository.listAll()).resolves.toEqual([restoredClarification]);
+    await expect(repository.listByEntry('entry_old')).resolves.toEqual([]);
+  });
 });
 
 describe('SQLiteClarificationRepository', () => {
@@ -150,5 +167,22 @@ describe('SQLiteClarificationRepository', () => {
       'e2',
     ]);
     expect(await repository.listByEntryIds([])).toEqual([]);
+  });
+
+  it('lists and replaces all clarifications through SQL for backup restore', async () => {
+    const { repository } = createSqliteRepository();
+    const oldClarification = await repository.create({ entryId: 'entry_old', answer: 'old' });
+    const restoredClarification = {
+      ...oldClarification,
+      id: 'clar_restored',
+      entryId: 'entry_restored',
+      question: '补充？',
+      answer: 'restored',
+    };
+
+    await repository.replaceAll([restoredClarification]);
+
+    await expect(repository.listAll()).resolves.toEqual([restoredClarification]);
+    await expect(repository.listByEntry('entry_old')).resolves.toEqual([]);
   });
 });
