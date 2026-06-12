@@ -107,7 +107,7 @@ export function createOpenAICompatibleProvider(fetchImpl?: FetchLike): AIProvide
       throw new AIProviderError(
         error instanceof Error
           ? error.message
-          : '服务返回内容不是有效 JSON，请尝试更换模型或关闭严格 JSON 模式。',
+          : '服务返回内容不是有效 JSON，可能是输出被截断；可尝试设置 max_tokens 或缩小报告范围。',
         OPENAI_COMPATIBLE_PROVIDER_ID,
         error,
       );
@@ -173,7 +173,7 @@ export function createOpenAICompatibleProvider(fetchImpl?: FetchLike): AIProvide
           content: prompt,
         },
       ],
-      ...buildOpenAICompatibleRequestParameters(config.parameters),
+      ...buildChatCompletionsRequestParameters(config.parameters),
     };
 
     if (requestOptions.strictJsonMode) {
@@ -248,7 +248,7 @@ export function createOpenAICompatibleProvider(fetchImpl?: FetchLike): AIProvide
       model: config.model,
       input: buildResponsesInput(prompt),
       stream: true,
-      ...buildOpenAICompatibleRequestParameters(config.parameters),
+      ...buildResponsesRequestParameters(config.parameters),
     };
 
     let response: OpenAICompatibleTransportResponse;
@@ -679,13 +679,27 @@ function buildResponsesInput(prompt: string) {
   ];
 }
 
-function buildOpenAICompatibleRequestParameters(parameters?: OpenAICompatibleParameters) {
+function buildChatCompletionsRequestParameters(parameters?: OpenAICompatibleParameters) {
   const requestParameters: Record<string, number> = {};
 
   setOptionalNumber(requestParameters, 'temperature', parameters?.temperature);
   setOptionalNumber(requestParameters, 'top_p', parameters?.topP);
   setOptionalNumber(requestParameters, 'presence_penalty', parameters?.presencePenalty);
   setOptionalNumber(requestParameters, 'frequency_penalty', parameters?.frequencyPenalty);
+  setOptionalNumber(requestParameters, 'max_tokens', parameters?.maxTokens);
+
+  return requestParameters;
+}
+
+function buildResponsesRequestParameters(parameters?: OpenAICompatibleParameters) {
+  const requestParameters: Record<string, number> = {};
+
+  // OpenAI Responses create docs list temperature, top_p, and max_output_tokens;
+  // presence_penalty/frequency_penalty are absent from that endpoint.
+  // Source: https://developers.openai.com/api/reference/resources/responses/methods/create
+  setOptionalNumber(requestParameters, 'temperature', parameters?.temperature);
+  setOptionalNumber(requestParameters, 'top_p', parameters?.topP);
+  setOptionalNumber(requestParameters, 'max_output_tokens', parameters?.maxTokens);
 
   return requestParameters;
 }
@@ -1081,7 +1095,11 @@ function shouldFallbackResponseFormat(message: string | undefined) {
     return false;
   }
 
-  return /response_format|json_object|unsupported|invalid parameter|not supported|不支持|无效参数/i.test(
+  // Provider docs differ on JSON mode availability and error wording; keep this
+  // broad enough for OpenAI-compatible gateways that reject response_format.
+  // Sources: DashScope JSON mode docs, Z.AI structured output docs, Volcengine
+  // structured output docs, SiliconFlow JSON mode docs.
+  return /response_format|json_object|json mode|structured output|unsupported|unsupported_value|invalid parameter|invalid_request_error|not supported|does not support|不支持|无效参数|结构化输出|JSON\s*模式/i.test(
     message,
   );
 }

@@ -322,7 +322,7 @@ export function parseAnalyzedReportStyle(rawOutput: string): AnalyzedReportStyle
 
 export function parseStrictJSON<T>(
   rawOutput: string,
-  invalidJSONMessage = '服务返回内容不是有效 JSON，请尝试更换模型或关闭严格 JSON 模式。',
+  invalidJSONMessage = '服务返回内容不是有效 JSON，可能是输出被截断；可尝试设置 max_tokens 或缩小报告范围。',
 ): T {
   const normalized = stripMarkdownFence(rawOutput.trim());
 

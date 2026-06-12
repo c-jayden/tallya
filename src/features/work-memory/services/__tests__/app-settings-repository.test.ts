@@ -73,6 +73,7 @@ describe('LocalStorageAppSettingsRepository', () => {
           topP: '0.95',
           presencePenalty: '',
           frequencyPenalty: '0',
+          maxTokens: '4096',
         },
       },
       ollama: {
@@ -103,6 +104,7 @@ describe('LocalStorageAppSettingsRepository', () => {
           topP: '0.95',
           presencePenalty: '',
           frequencyPenalty: '0',
+          maxTokens: '4096',
         },
       },
       ollama: {
@@ -155,6 +157,7 @@ describe('LocalStorageAppSettingsRepository', () => {
           topP: '',
           presencePenalty: '',
           frequencyPenalty: '',
+          maxTokens: '',
         },
       },
     });
@@ -184,6 +187,7 @@ describe('LocalStorageAppSettingsRepository', () => {
           topP: '',
           presencePenalty: '',
           frequencyPenalty: '',
+          maxTokens: '',
         },
       },
     });

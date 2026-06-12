@@ -365,6 +365,13 @@ export function AISettingsSection({
                   inputMode="decimal"
                   placeholder="frequency_penalty"
                 />
+                <Input
+                  className={openAIInputClassName}
+                  value={settings.openAICompatible.parameters.maxTokens}
+                  onChange={(event) => updateOpenAIParameter('maxTokens', event.target.value)}
+                  inputMode="numeric"
+                  placeholder="max_tokens"
+                />
               </div>
             </div>
           )}

@@ -126,6 +126,7 @@ describe('OpenAI Compatible Provider', () => {
     expect(body).not.toHaveProperty('top_p');
     expect(body).not.toHaveProperty('presence_penalty');
     expect(body).not.toHaveProperty('frequency_penalty');
+    expect(body).not.toHaveProperty('max_tokens');
   });
 
   it('uses the Tauri HTTP command by default so provider calls are not blocked by browser CORS', async () => {
@@ -168,10 +169,11 @@ describe('OpenAI Compatible Provider', () => {
       top_p: 0.95,
       presence_penalty: 0.2,
       frequency_penalty: 0,
+      max_tokens: 4096,
     });
   });
 
-  it('sends configured OpenAI-compatible request parameters in responses mode', async () => {
+  it('sends only Responses API allowlisted request parameters in responses mode', async () => {
     const fetch = vi.fn().mockResolvedValue(responsesOutputTextResponse(dailyMemoryPayload()));
     const provider = createOpenAICompatibleProvider(fetch);
 
@@ -182,9 +184,11 @@ describe('OpenAI Compatible Provider', () => {
       stream: true,
       temperature: 1,
       top_p: 0.95,
-      presence_penalty: 0.2,
-      frequency_penalty: 0,
+      max_output_tokens: 4096,
     });
+    expect(body).not.toHaveProperty('presence_penalty');
+    expect(body).not.toHaveProperty('frequency_penalty');
+    expect(body).not.toHaveProperty('max_tokens');
   });
 
   it('reassembles streamed Responses SSE into model output', async () => {
@@ -402,6 +406,25 @@ describe('OpenAI Compatible Provider', () => {
     );
   });
 
+  it('retries without response_format for localized structured-output rejection messages', async () => {
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResponse({ error: { message: '当前模型不支持结构化输出 json_object' } }, 400),
+      )
+      .mockResolvedValueOnce(chatResponse(dailyMemoryPayload()));
+    const provider = createOpenAICompatibleProvider(fetch);
+
+    await expect(provider.generateDailyMemory(dailyInput, options)).resolves.toMatchObject({
+      summary: '整理需求并同步计划。',
+    });
+
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(JSON.parse(String(fetch.mock.calls[1]?.[1]?.body))).not.toHaveProperty(
+      'response_format',
+    );
+  });
+
   it('uses response_format fallback at most once', async () => {
     const fetch = vi
       .fn()
@@ -450,7 +473,8 @@ describe('OpenAI Compatible Provider', () => {
     const provider = createOpenAICompatibleProvider(fetch);
 
     await expect(provider.generateDailyMemory(dailyInput, options)).rejects.toMatchObject({
-      message: '服务返回内容不是有效 JSON，请尝试更换模型或关闭严格 JSON 模式。',
+      message:
+        '服务返回内容不是有效 JSON，可能是输出被截断；可尝试设置 max_tokens 或缩小报告范围。',
     } satisfies Partial<AIProviderError>);
   });
 
@@ -717,6 +741,7 @@ function withOpenAIParameters(options: AIProviderOptions): AIProviderOptions {
         topP: '0.95',
         presencePenalty: '0.2',
         frequencyPenalty: '0',
+        maxTokens: '4096',
       },
     },
   };

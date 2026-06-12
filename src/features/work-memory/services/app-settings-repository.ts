@@ -71,6 +71,7 @@ export const DEFAULT_OPENAI_COMPATIBLE_PARAMETERS: OpenAICompatibleParameters = 
   topP: '',
   presencePenalty: '',
   frequencyPenalty: '',
+  maxTokens: '',
 };
 
 // Defaults define the first-run and reset state. Components should go through
@@ -543,6 +544,7 @@ function normalizeOpenAICompatibleParameters(value: unknown): OpenAICompatiblePa
     topP: getOptionalNumberString(input.topP),
     presencePenalty: getOptionalNumberString(input.presencePenalty),
     frequencyPenalty: getOptionalNumberString(input.frequencyPenalty),
+    maxTokens: getOptionalNumberString(input.maxTokens),
   };
 }
 

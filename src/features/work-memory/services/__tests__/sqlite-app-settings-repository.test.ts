@@ -71,6 +71,7 @@ describe('SQLiteAppSettingsRepository', () => {
       topP: '',
       presencePenalty: '',
       frequencyPenalty: '',
+      maxTokens: '',
     });
     expect(database.appSettings.get('localGatewayEnabled')?.value).toBe('false');
     expect(database.appSettings.get('localGatewayBaseUrl')?.value).toBe(
@@ -148,6 +149,7 @@ describe('SQLiteAppSettingsRepository', () => {
           topP: '',
           presencePenalty: '',
           frequencyPenalty: '',
+          maxTokens: '',
         },
       },
     });

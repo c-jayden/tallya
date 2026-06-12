@@ -21,6 +21,7 @@ export type OpenAICompatibleParameters = {
   topP: string;
   presencePenalty: string;
   frequencyPenalty: string;
+  maxTokens: string;
 };
 
 export type GenerateDailyMemoryOptions = {

@@ -30,6 +30,8 @@ describe('known OpenAI-compatible providers', () => {
       parameters: {
         temperature: '1',
         topP: '0.95',
+        presencePenalty: '0',
+        frequencyPenalty: '0',
       },
     });
     expect(getOpenAIProviderPreset('moonshot')).toMatchObject({
@@ -44,9 +46,20 @@ describe('known OpenAI-compatible providers', () => {
       parameters: {
         temperature: '1',
         topP: '0.95',
+        presencePenalty: '0',
+        frequencyPenalty: '0',
       },
     });
     expect(getOpenAIProviderPreset('deepseek')?.parameters).toBeUndefined();
+  });
+
+  it('documents provider JSON mode and token-limit source notes in preset hints', () => {
+    expect(getOpenAIProviderPreset('qwen')?.hint).toContain('来源');
+    expect(getOpenAIProviderPreset('moonshot')?.hint).toContain('fixed value 1.0');
+    expect(getOpenAIProviderPreset('zhipu')?.hint).toContain('glm-4.5');
+    expect(getOpenAIProviderPreset('volcengine')?.hint).toContain('默认 4k');
+    expect(getOpenAIProviderPreset('siliconflow')?.hint).toContain('max_tokens');
+    expect(getOpenAIProviderPreset('openai')?.hint).toContain('/v1/responses');
   });
 
   it('matches a saved Base URL back to its preset, normalizing /v1', () => {

@@ -57,5 +57,7 @@ describe('AISettingsSection', () => {
     expect(source).toContain('topP');
     expect(source).toContain('presencePenalty');
     expect(source).toContain('frequencyPenalty');
+    expect(source).toContain('maxTokens');
+    expect(source).toContain('max_tokens');
   });
 });

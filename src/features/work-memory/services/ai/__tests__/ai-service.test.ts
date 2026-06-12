@@ -65,6 +65,7 @@ const settings: AppSettings = {
       topP: '',
       presencePenalty: '',
       frequencyPenalty: '',
+      maxTokens: '',
     },
   },
   ollama: {
