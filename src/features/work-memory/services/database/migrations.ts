@@ -19,20 +19,86 @@ import { buildEntryFromDailyMemory } from '../daily-memory-entry-migration';
 import { logger } from '../logger/logger';
 
 export async function runMigrations(database: DatabaseClient) {
-  await database.execute(createDailyMemoriesTableSql);
-  await database.execute(createReportsTableSql);
-  await database.execute(createReportSourcesTableSql);
-  await database.execute(createEntriesTableSql);
-  await database.execute(createEntriesIndexSql);
-  await database.execute(createEntriesThreadIndexSql);
-  await database.execute(createThreadsTableSql);
-  await database.execute(createThreadsIndexSql);
-  await database.execute(createEntryClarificationsTableSql);
-  await database.execute(createEntryClarificationsIndexSql);
-  await setupEntriesFts(database);
-  await migrateAppSettingsTable(database);
-  await migrateDailyMemoriesToEntries(database);
-  await database.execute(`PRAGMA user_version = ${SCHEMA_VERSION}`);
+  const currentVersion = await readUserVersion(database);
+
+  for (const migration of schemaMigrations) {
+    if (migration.version <= currentVersion || migration.version > SCHEMA_VERSION) {
+      continue;
+    }
+
+    await migration.migrate(database);
+    await writeUserVersion(database, migration.version);
+  }
+}
+
+type UserVersionRow = {
+  user_version: number;
+};
+
+type SchemaMigration = {
+  version: number;
+  migrate(database: DatabaseClient): Promise<void>;
+};
+
+const schemaMigrations: SchemaMigration[] = [
+  {
+    version: 1,
+    async migrate(database) {
+      await database.execute(createDailyMemoriesTableSql);
+      await database.execute(createReportsTableSql);
+      await database.execute(createReportSourcesTableSql);
+      await database.execute(createAppSettingsTableSql);
+    },
+  },
+  {
+    version: 2,
+    async migrate(database) {
+      await database.execute(createEntriesTableSql);
+      await database.execute(createEntriesIndexSql);
+      await setupEntriesFts(database);
+      await migrateDailyMemoriesToEntries(database);
+    },
+  },
+  {
+    version: 3,
+    async migrate(database) {
+      await database.execute(createThreadsTableSql);
+      await database.execute(createThreadsIndexSql);
+      await database.execute(createEntriesThreadIndexSql);
+    },
+  },
+  {
+    version: 4,
+    async migrate(database) {
+      await database.execute(createEntryClarificationsTableSql);
+      await database.execute(createEntryClarificationsIndexSql);
+    },
+  },
+  {
+    version: 5,
+    async migrate(database) {
+      await migrateAppSettingsTable(database);
+    },
+  },
+  {
+    version: 6,
+    async migrate(database) {
+      await database.execute(createEntriesThreadIndexSql);
+      await setupEntriesFts(database);
+      await dropLegacyAppSettingsJsonTable(database);
+    },
+  },
+];
+
+async function readUserVersion(database: DatabaseClient) {
+  const rows = await database.select<UserVersionRow[]>('PRAGMA user_version');
+  const userVersion = Number(rows[0]?.user_version ?? 0);
+
+  return Number.isSafeInteger(userVersion) && userVersion > 0 ? userVersion : 0;
+}
+
+async function writeUserVersion(database: DatabaseClient, version: number) {
+  await database.execute(`PRAGMA user_version = ${version}`);
 }
 
 type EntryCountRow = {
