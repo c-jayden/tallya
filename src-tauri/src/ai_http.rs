@@ -248,11 +248,8 @@ mod tests {
 
     #[test]
     fn send_ai_http_request_forwards_custom_headers() {
-        let (url, received_request) = serve_once_with_capture(
-            "HTTP/1.1 200 OK",
-            "application/json",
-            r#"{"ok":true}"#,
-        );
+        let (url, received_request) =
+            serve_once_with_capture("HTTP/1.1 200 OK", "application/json", r#"{"ok":true}"#);
 
         let result = tauri::async_runtime::block_on(send_ai_http_request(
             url,

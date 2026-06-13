@@ -1209,6 +1209,9 @@ fn report_focus_instruction(value: &str) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    static FAKE_CODEX_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
 
     #[test]
     fn weekly_report_prompt_includes_brief_length_rules() {
@@ -1572,22 +1575,7 @@ mod tests {
     }
 
     fn build_fake_codex_binary() -> std::path::PathBuf {
-        let test_dir = std::env::temp_dir().join(format!(
-            "tallya-fake-codex-{}-{}",
-            std::process::id(),
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .map(|duration| duration.as_nanos())
-                .unwrap_or_default()
-        ));
-        fs::create_dir_all(&test_dir).expect("create fake codex dir");
-        let source_path = test_dir.join("fake_codex.rs");
-        let binary_path = test_dir.join(if cfg!(target_os = "windows") {
-            "fake_codex.exe"
-        } else {
-            "fake_codex"
-        });
-
+        let (_test_dir, source_path, binary_path) = fake_codex_source_paths("pipe");
         fs::write(
             &source_path,
             r#"
@@ -1615,15 +1603,7 @@ fn main() {
         )
         .expect("write fake codex source");
 
-        let rustc = std::env::var_os("RUSTC").unwrap_or_else(|| "rustc".into());
-        let status = Command::new(rustc)
-            .arg(&source_path)
-            .arg("-o")
-            .arg(&binary_path)
-            .status()
-            .expect("compile fake codex");
-
-        assert!(status.success(), "fake codex compilation failed");
+        compile_fake_codex(&source_path, &binary_path);
 
         binary_path
     }
@@ -1734,15 +1714,7 @@ fn main() {{
     fn fake_codex_source_paths(
         kind: &str,
     ) -> (std::path::PathBuf, std::path::PathBuf, std::path::PathBuf) {
-        let test_dir = std::env::temp_dir().join(format!(
-            "tallya-fake-codex-{kind}-{}-{}",
-            std::process::id(),
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .map(|duration| duration.as_nanos())
-                .unwrap_or_default()
-        ));
-        fs::create_dir_all(&test_dir).expect("create fake codex dir");
+        let test_dir = fake_codex_test_dir(kind);
         let source_path = test_dir.join("fake_codex.rs");
         let binary_path = test_dir.join(if cfg!(target_os = "windows") {
             "fake_codex.exe"
@@ -1751,6 +1723,30 @@ fn main() {{
         });
 
         (test_dir, source_path, binary_path)
+    }
+
+    fn fake_codex_test_dir(kind: &str) -> std::path::PathBuf {
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|duration| duration.as_nanos())
+            .unwrap_or_default();
+        let sequence = FAKE_CODEX_DIR_COUNTER.fetch_add(1, Ordering::Relaxed);
+        let base = std::env::temp_dir();
+
+        for attempt in 0..10 {
+            let test_dir = base.join(format!(
+                "tallya-fake-codex-{kind}-{}-{timestamp}-{sequence}-{attempt}",
+                std::process::id(),
+            ));
+
+            match fs::create_dir(&test_dir) {
+                Ok(()) => return test_dir,
+                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+                Err(error) => panic!("create fake codex dir: {error}"),
+            }
+        }
+
+        panic!("failed to create a unique fake codex dir");
     }
 
     fn compile_fake_codex(source_path: &std::path::Path, binary_path: &std::path::Path) {
