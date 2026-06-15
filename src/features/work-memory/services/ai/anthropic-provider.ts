@@ -87,9 +87,8 @@ const rangeReportSchema = objectSchema(
     completedItems: stringArraySchema,
     problems: { type: 'string' },
     nextWeekPlan: { type: 'string' },
-    markdown: { type: 'string' },
   },
-  ['title', 'summary', 'highlights', 'completedItems', 'markdown'],
+  ['title', 'summary', 'highlights', 'completedItems'],
 );
 
 const reportStyleSchema = objectSchema(

@@ -24,7 +24,10 @@ import {
 } from './ai-provider';
 
 const OPENAI_COMPATIBLE_PROVIDER_ID = 'openai-compatible';
-const OPENAI_COMPATIBLE_REQUEST_TIMEOUT_MS = 45_000;
+// Range reports are the heaviest call (largest output) and run non-streamed, so
+// 45s was too tight for slower models/gateways and surfaced as "响应超时" even
+// when the connection check (a tiny request) passed.
+const OPENAI_COMPATIBLE_REQUEST_TIMEOUT_MS = 90_000;
 const API_VERSION_PATH = '/v1';
 const CHAT_COMPLETIONS_PATH = '/chat/completions';
 const RESPONSES_PATH = '/responses';

@@ -49,14 +49,14 @@ export function buildRangeReportPrompt(input: GenerateRangeReportInput) {
   return [
     `请根据输入中的 entries（工作记录）整理一份中文${reportName}。`,
     '只输出合法 JSON，不要 markdown code fence、解释、代码块或工具调用。',
-    'JSON keys: title:string, summary:string, highlights:string[], completedItems:string[], problems?:string, nextWeekPlan?:string, markdown:string.',
+    'JSON keys: title:string, summary:string, highlights:string[], completedItems:string[], problems?:string, nextWeekPlan?:string.',
     '不要编造 entries 中不存在的事实；可以做归纳、合并和润色。',
     '按线索聚合脉络：threadTitle 相同的 entries 归为同一条线索（跨天进展串起来讲），threadTitle 为 null 的各自独立；clarifications 是对该条记录的补充细节，可用来展开。',
     reportLengthInstruction(input.reportLength, input.entries.length),
     reportToneInstruction(input.reportTone),
     reportFocusInstruction(input.reportFocus),
     reportStyleInstruction(input),
-    'markdown 是可直接复制的整理文本；不要包含多余空行，section 之间最多一个空行，不要输出空 section。',
+    '只输出上述结构化字段，不要再附带整段 markdown 正文（复制用的文本由客户端拼装）。内容不要互相重复：highlights、completedItems 不要逐字重述 summary。',
     `输入：${JSON.stringify(promptInput)}`,
   ].join('\n');
 }
@@ -221,7 +221,7 @@ function reportLengthInstruction(reportLength: string, memoryCount: number) {
   if (reportLength === 'brief') {
     return [
       '整理详略：精简。',
-      'summary 1 句话；highlights 2-3 条；completedItems 2-3 条；problems 最多 1 句话；nextWeekPlan 最多 1 句话；markdown 控制在 250-450 字。',
+      'summary 1 句话；highlights 2-3 条；completedItems 2-3 条；problems 最多 1 句话；nextWeekPlan 最多 1 句话。',
       memoryCount === 1
         ? '当前只有 1 条工作记忆，整体进一步压缩：highlights 最多 2 条，completedItems 最多 2 条，不要把同一条记忆拆成过多项目。'
         : '合并相近事项，不要为了凑结构强行扩写。',
@@ -229,10 +229,10 @@ function reportLengthInstruction(reportLength: string, memoryCount: number) {
   }
 
   if (reportLength === 'detailed') {
-    return '整理详略：详细。summary 2-3 句话；highlights 4-6 条；completedItems 5-8 条；markdown 控制在 800-1200 字。';
+    return '整理详略：详细。summary 2-3 句话；highlights 4-6 条；completedItems 5-8 条。';
   }
 
-  return '整理详略：标准。summary 1-2 句话；highlights 3-5 条；completedItems 3-6 条；markdown 控制在 500-800 字。';
+  return '整理详略：标准。summary 1-2 句话；highlights 3-5 条；completedItems 3-6 条。';
 }
 
 function reportToneInstruction(reportTone: string) {
