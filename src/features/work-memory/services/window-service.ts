@@ -8,6 +8,12 @@ export const trayEvents = {
   windowHidden: 'tray://window-hidden',
 } as const;
 
+export type MainWindowState = {
+  visible: boolean;
+  minimized: boolean;
+  focused: boolean;
+};
+
 type TrayEventHandlers = {
   onFocusEntry: () => void;
   onOpenSearch: () => void;
@@ -33,6 +39,30 @@ export async function toggleMainWindow() {
 
 export async function quitApp() {
   await invokeWindowCommand('quit_app');
+}
+
+export async function getMainWindowState(): Promise<MainWindowState> {
+  try {
+    const { invoke } = await import('@tauri-apps/api/core');
+
+    return await invoke<MainWindowState>('get_main_window_state');
+  } catch (error) {
+    logger.warn('tray', 'window.state_failed', 'Failed to read window state', {
+      error,
+    });
+
+    return { visible: false, minimized: false, focused: false };
+  }
+}
+
+export function isMainWindowForeground(state: MainWindowState) {
+  return state.visible && !state.minimized && state.focused;
+}
+
+export async function sendTallyaNotification(body: string) {
+  const { invoke } = await import('@tauri-apps/api/core');
+
+  await invoke('send_tallya_notification', { body });
 }
 
 export async function syncWindowBehaviorSettings(settings: AppSettings) {

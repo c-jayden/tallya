@@ -32,6 +32,14 @@ struct AppWindowState {
     is_quitting: Arc<AtomicBool>,
 }
 
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct MainWindowStateSnapshot {
+    visible: bool,
+    minimized: bool,
+    focused: bool,
+}
+
 impl Default for AppWindowState {
     fn default() -> Self {
         Self {
@@ -73,6 +81,19 @@ fn hide_main_window(app: tauri::AppHandle) -> Result<(), String> {
     window.hide().map_err(|error| {
         eprintln!("Failed to hide main window: {error}");
         "隐藏主窗口失败，请稍后重试。".to_string()
+    })
+}
+
+#[tauri::command]
+fn get_main_window_state(app: tauri::AppHandle) -> Result<MainWindowStateSnapshot, String> {
+    let window = app
+        .get_webview_window(MAIN_WINDOW_LABEL)
+        .ok_or_else(|| "未找到主窗口。".to_string())?;
+
+    Ok(MainWindowStateSnapshot {
+        visible: window.is_visible().unwrap_or(false),
+        minimized: window.is_minimized().unwrap_or(false),
+        focused: window.is_focused().unwrap_or(false),
     })
 }
 
@@ -324,6 +345,7 @@ pub fn run() {
             codex::generate_daily_memory_with_codex,
             codex::generate_range_report_with_codex,
             codex::generate_weekly_report_with_codex,
+            get_main_window_state,
             hide_main_window,
             open_app_directory,
             quit_app,
