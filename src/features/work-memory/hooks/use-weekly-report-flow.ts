@@ -7,6 +7,7 @@ import {
   getDefaultCustomReportRange,
   isValidReportDateRange,
 } from '../services/report-date';
+import { reportDraftRepository } from '../services/report-draft-repository';
 import { reportService } from '../services/report-service';
 import type { GapAnswer, ReportContext, ReportDraft } from '../services/report-service';
 import { normalizeReportContent } from '../report-view-model';
@@ -31,6 +32,10 @@ export function useWeeklyReportFlow() {
   const [reportGaps, setReportGaps] = useState<ReportGap[]>([]);
   const [isGapDialogOpen, setIsGapDialogOpen] = useState(false);
   const [isDetectingGaps, setIsDetectingGaps] = useState(false);
+  // A generated-but-unsaved report recovered from a previous session; surfaced
+  // as a restore prompt the next time the user clicks 整理.
+  const [restoreDraft, setRestoreDraft] = useState<ReportDraft | null>(null);
+  const [isRestorePromptOpen, setIsRestorePromptOpen] = useState(false);
   const currentWeekRange = getCurrentWeekRange();
   const hasCurrentWeekReport = reportListItems.some(
     (report) =>
@@ -106,7 +111,7 @@ export function useWeeklyReportFlow() {
     };
   }, []);
 
-  function openGenerateDialog() {
+  function openGenerateDialogFresh() {
     const range = getDefaultCustomReportRange();
 
     setReportType('weekly');
@@ -115,6 +120,41 @@ export function useWeeklyReportFlow() {
     setReportContext(null);
     setIsGenerateDialogOpen(true);
     void loadContext('weekly', range.startDate, range.endDate);
+  }
+
+  function openGenerateDialog() {
+    // If a previous session generated a report that was never saved, offer to
+    // pick it back up instead of silently starting over.
+    const pending = reportDraftRepository.get();
+
+    if (pending) {
+      setRestoreDraft(pending);
+      setIsRestorePromptOpen(true);
+      return;
+    }
+
+    openGenerateDialogFresh();
+  }
+
+  function restoreLastReport() {
+    if (!restoreDraft) {
+      return;
+    }
+
+    setReportDraft(restoreDraft);
+    setReportType(restoreDraft.reportType);
+    setCustomStartDate(restoreDraft.startDate);
+    setCustomEndDate(restoreDraft.endDate);
+    setIsRestorePromptOpen(false);
+    setRestoreDraft(null);
+    setIsPreviewDialogOpen(true);
+  }
+
+  function discardLastReport() {
+    reportDraftRepository.clear();
+    setRestoreDraft(null);
+    setIsRestorePromptOpen(false);
+    openGenerateDialogFresh();
   }
 
   function updateReportType(nextReportType: ReportGenerationType) {
@@ -172,6 +212,9 @@ export function useWeeklyReportFlow() {
           : await reportService.generateCurrentWeeklyReport();
 
       setReportDraft(draft as ReportDraft);
+      // Persist immediately so a crash/refresh between here and save can be
+      // recovered on the next 整理.
+      reportDraftRepository.save(draft as ReportDraft);
       setIsGapDialogOpen(false);
       setIsGenerateDialogOpen(false);
       setIsPreviewDialogOpen(true);
@@ -282,6 +325,7 @@ export function useWeeklyReportFlow() {
 
     try {
       await reportService.saveReport(reportDraft);
+      reportDraftRepository.clear();
       toast.success(reportDraft.reportType === 'custom' ? '总结已保存' : '本周回顾已保存');
       setIsPreviewDialogOpen(false);
       setReportDraft(null);
@@ -342,6 +386,7 @@ export function useWeeklyReportFlow() {
       const draft = await reportService.generateReportForRange(selectedReport);
 
       setReportDraft(draft);
+      reportDraftRepository.save(draft);
       setIsReportDetailOpen(false);
       setIsPreviewDialogOpen(true);
     } catch (error) {
@@ -379,6 +424,10 @@ export function useWeeklyReportFlow() {
     hasSavedReports: reportListItems.length > 0,
     hasCurrentWeekReport,
     openGenerateDialog,
+    isRestorePromptOpen,
+    setIsRestorePromptOpen,
+    restoreLastReport,
+    discardLastReport,
     openReportDetail,
     openReportList,
     reloadReports: loadReports,

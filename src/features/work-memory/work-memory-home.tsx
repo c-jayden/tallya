@@ -9,6 +9,7 @@ import { ReportGapDialog } from './components/report-gap-dialog';
 import { ReportGenerateDialog } from './components/report-generate-dialog';
 import { ReportListDialog } from './components/report-list-dialog';
 import { ReportPreviewDialog } from './components/report-preview-dialog';
+import { ReportRestoreConfirmDialog } from './components/report-restore-confirm-dialog';
 import { SettingsDialog } from './components/settings-dialog';
 import { SpotlightSearchPanel } from './components/spotlight-search-panel';
 import { ThreadsPanel } from './components/threads-panel';
@@ -298,6 +299,13 @@ export function WorkMemoryHome() {
         onCopyText={weeklyReport.copyPlainText}
         onCopyMarkdown={weeklyReport.copyMarkdown}
         onSave={weeklyReport.saveReportPreview}
+      />
+
+      <ReportRestoreConfirmDialog
+        open={weeklyReport.isRestorePromptOpen}
+        onOpenChange={weeklyReport.setIsRestorePromptOpen}
+        onRestore={weeklyReport.restoreLastReport}
+        onDiscard={weeklyReport.discardLastReport}
       />
 
       <ReportListDialog
