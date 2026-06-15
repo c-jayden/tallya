@@ -46,11 +46,15 @@ export function createDatabaseClient(database: Pick<DatabaseClient, 'execute' | 
   const execute = (query: string, bindValues?: unknown[]) => database.execute(query, bindValues);
   const select = <T>(query: string, bindValues?: unknown[]) => database.select<T>(query, bindValues);
 
-  // Tauri's SQL plugin runs over a connection pool, and BEGIN/COMMIT are issued
-  // as separate statements. Two overlapping transactions therefore race on
-  // BEGIN ("cannot start a transaction within a transaction") and on the write
-  // lock ("database is locked"). Chain every transaction onto the previous one
-  // so they run strictly one at a time.
+  // CAUTION: this is NOT a reliable atomicity boundary. tauri-plugin-sql runs
+  // every execute on a connection from a pool that is not pinned across calls,
+  // so BEGIN, the body's statements, and COMMIT can land on different
+  // connections and self-lock ("database is locked" / "cannot start a
+  // transaction within a transaction"). Prefer a single multi-row statement for
+  // atomic multi-key writes (see app-settings-repository). The serialization
+  // below only stops *concurrent* transactions from racing each other; it does
+  // not make a single transaction span connections. No production code relies on
+  // this today.
   let tail: Promise<unknown> = Promise.resolve();
 
   // Passed to a transaction's operation: a nested transaction() call reuses the

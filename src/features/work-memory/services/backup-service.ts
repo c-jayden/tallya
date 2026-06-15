@@ -2,7 +2,6 @@ import { appVersion as currentAppVersion } from '@/lib/app-version';
 import { appSettingsRepository, type AppSettings } from './app-settings-repository';
 import { clarificationRepository } from './clarification-repository';
 import { buildEntriesFromDailyMemories } from './daily-memory-entry-migration';
-import { getDatabase } from './database/database';
 import { entryRepository } from './entry-repository';
 import { reportRepository } from './report-repository';
 import { threadRepository } from './thread-repository';
@@ -195,11 +194,11 @@ export const backupService = createBackupService({
   threadRepository,
   reportRepository,
   appSettingsRepository,
-  transaction: async (operation) => {
-    const database = await getDatabase();
-
-    return database.transaction(operation);
-  },
+  // No DB transaction wrapper on purpose: tauri-plugin-sql does not pin a
+  // connection across calls, so a multi-call BEGIN/COMMIT around the restore
+  // self-locks ("database is locked") — the same failure that broke settings
+  // save. replaceAll already runs as individual statements (never truly atomic
+  // here anyway), so the restore runs sequentially instead.
 });
 
 export function buildBackupFileName(date: Date) {
