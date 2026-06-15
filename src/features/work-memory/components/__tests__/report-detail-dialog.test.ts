@@ -25,7 +25,10 @@ describe('ReportDetailDialog copy', () => {
     expect(previewSource).not.toContain('h-9 min-w-24');
     expect(previewSource).not.toContain('rounded-xl');
     expect(previewSource).not.toContain('px-3.5');
-    expect(detailSource).toContain('bg-app-accent text-app-accent-ink');
-    expect(previewSource).toContain('bg-app-accent text-app-accent-ink');
+    // Accent primary buttons go through the shared Button variant (default size)
+    // rather than an inline accent class, so they stay aligned with their ghost
+    // siblings.
+    expect(detailSource).toContain('variant="accent"');
+    expect(previewSource).toContain('variant="accent"');
   });
 });

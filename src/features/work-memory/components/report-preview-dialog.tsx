@@ -94,7 +94,7 @@ export function ReportPreviewDialog({
           </Button>
           <Button
             type="button"
-            className="cursor-pointer bg-app-accent text-app-accent-ink hover:bg-[color-mix(in_srgb,var(--app-accent)_86%,var(--app-surface-muted))] disabled:cursor-not-allowed disabled:bg-app-surface-muted disabled:text-app-ink-muted disabled:opacity-100 disabled:hover:bg-app-surface-muted"
+            variant="accent"
             onClick={onSave}
             disabled={isSaving || !content}
             aria-busy={isSaving}
