@@ -12,11 +12,7 @@ import type {
   ThreadLinkSuggestion,
   WeeklyReportSourceInput,
 } from '../../types';
-import {
-  DEFAULT_APP_SETTINGS,
-  appSettingsRepository,
-  type AppSettings,
-} from '../app-settings-repository';
+import { appSettingsRepository, type AppSettings } from '../app-settings-repository';
 import { type AIProvider, type AIProviderOptions, type ProviderHealth } from './ai-provider';
 import { anthropicProvider } from './anthropic-provider';
 import { codexCliProvider } from './codex-cli-provider';
@@ -169,7 +165,6 @@ export function createAIService({
           reportTone: settings.reportTone,
           reportFocus: settings.reportFocus,
           reportStyleHint: settings.reportStyleHint,
-          reportStyleProfile: DEFAULT_APP_SETTINGS.reportStyleProfile,
         },
         options,
       ),

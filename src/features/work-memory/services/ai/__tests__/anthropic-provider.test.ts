@@ -18,12 +18,6 @@ const reportInput: GenerateRangeReportInput = {
   reportTone: 'formal',
   reportFocus: 'risks',
   reportStyleHint: '请保持简洁，用 3 条分点。',
-  reportStyleProfile: {
-    enabled: true,
-    summary: '偏简洁，常用分点。',
-    promptHint: '整理时使用 3-5 条分点，最后一句说明计划。',
-    updatedAt: '2026-06-09T10:00:00.000Z',
-  },
   entries: [
     {
       occurredOn: '2026-06-01',

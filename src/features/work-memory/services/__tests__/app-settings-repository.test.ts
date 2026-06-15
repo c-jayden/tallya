@@ -39,12 +39,6 @@ describe('LocalStorageAppSettingsRepository', () => {
       reportTone: 'natural',
       reportFocus: 'outcomes',
       reportStyleHint: '',
-      reportStyleProfile: {
-        enabled: false,
-        summary: '',
-        promptHint: '',
-        updatedAt: '',
-      },
       diagnosticLoggingEnabled: false,
       localGateway: {
         enabled: false,
@@ -299,24 +293,12 @@ describe('LocalStorageAppSettingsRepository', () => {
       'tallya.app-settings.v1',
       JSON.stringify({
         reportStyleHint: '请保持简洁。',
-        reportStyleProfile: {
-          enabled: true,
-          summary: '偏简洁。',
-          promptHint: '使用 3 条以内分点。',
-          updatedAt: '2026-06-09T10:00:00.000Z',
-        },
       }),
     );
 
     await expect(repository.getSettings()).resolves.toEqual({
       ...DEFAULT_APP_SETTINGS,
       reportStyleHint: '请保持简洁。',
-      reportStyleProfile: {
-        enabled: true,
-        summary: '偏简洁。',
-        promptHint: '使用 3 条以内分点。',
-        updatedAt: '2026-06-09T10:00:00.000Z',
-      },
     });
   });
 

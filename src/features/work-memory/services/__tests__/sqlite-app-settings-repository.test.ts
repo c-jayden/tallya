@@ -97,12 +97,6 @@ describe('SQLiteAppSettingsRepository', () => {
     expect(database.appSettings.get('reportTone')?.value).toBe('natural');
     expect(database.appSettings.get('reportFocus')?.value).toBe('outcomes');
     expect(database.appSettings.get('reportStyleHint')?.value).toBe('');
-    expect(JSON.parse(database.appSettings.get('reportStyleProfile')?.value ?? '{}')).toEqual({
-      enabled: false,
-      summary: '',
-      promptHint: '',
-      updatedAt: '',
-    });
     expect(database.appSettings.has('app_settings')).toBe(false);
     expect(database.lastSettingsWrite?.query.toLowerCase()).toContain('key, value, updated_at');
     expect(database.lastSettingsWrite?.query.toLowerCase()).not.toContain('value_json');

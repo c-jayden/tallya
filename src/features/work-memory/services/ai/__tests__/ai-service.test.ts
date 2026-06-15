@@ -1,5 +1,5 @@
 ﻿import { describe, expect, it, vi } from 'vitest';
-import { DEFAULT_APP_SETTINGS, type AppSettings } from '../../app-settings-repository';
+import { type AppSettings } from '../../app-settings-repository';
 import type {
   GeneratedDailyMemory,
   GeneratedReportContent,
@@ -95,12 +95,6 @@ const settings: AppSettings = {
   reportTone: 'retrospective',
   reportFocus: 'risks',
   reportStyleHint: '请尽量用 3 条分点，最后一句说明计划。',
-  reportStyleProfile: {
-    enabled: true,
-    summary: '偏简洁，常用分点。',
-    promptHint: '保持简洁自然，使用 3-5 条分点。',
-    updatedAt: '2026-06-09T10:00:00.000Z',
-  },
   theme: 'system',
   launchAtStartup: false,
   closeToTray: true,
@@ -202,7 +196,6 @@ describe('createAIService', () => {
         reportTone: 'retrospective',
         reportFocus: 'risks',
         reportStyleHint: '请尽量用 3 条分点，最后一句说明计划。',
-        reportStyleProfile: DEFAULT_APP_SETTINGS.reportStyleProfile,
       },
       {
         codexCommand: 'custom-codex',
@@ -238,7 +231,6 @@ describe('createAIService', () => {
         reportTone: 'retrospective',
         reportFocus: 'risks',
         reportStyleHint: '请尽量用 3 条分点，最后一句说明计划。',
-        reportStyleProfile: DEFAULT_APP_SETTINGS.reportStyleProfile,
       },
       {
         codexCommand: 'custom-codex',

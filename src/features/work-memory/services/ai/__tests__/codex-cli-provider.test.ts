@@ -27,12 +27,6 @@ const weeklyInput: GenerateWeeklyReportInput = {
   reportTone: 'natural',
   reportFocus: 'outcomes',
   reportStyleHint: '',
-  reportStyleProfile: {
-    enabled: false,
-    summary: '',
-    promptHint: '',
-    updatedAt: '',
-  },
   entries: [
     {
       occurredOn: '2026-06-01',

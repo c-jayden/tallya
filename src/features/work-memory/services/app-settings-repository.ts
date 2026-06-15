@@ -14,7 +14,7 @@ import type { DatabaseClient } from './database/database';
 import { getDatabase } from './database/database';
 import { logger } from './logger/logger';
 import { createFriendlyError } from './service-error';
-import type { ReportFocus, ReportLength, ReportStyleProfile, ReportTone } from '../types';
+import type { ReportFocus, ReportLength, ReportTone } from '../types';
 
 export type AppTheme = 'system' | 'light' | 'dark';
 
@@ -58,7 +58,6 @@ export type AppSettings = {
   reportTone: ReportTone;
   reportFocus: ReportFocus;
   reportStyleHint: string;
-  reportStyleProfile: ReportStyleProfile;
   theme: AppTheme;
   launchAtStartup: boolean;
   closeToTray: boolean;
@@ -122,12 +121,6 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   reportTone: 'natural',
   reportFocus: 'outcomes',
   reportStyleHint: '',
-  reportStyleProfile: {
-    enabled: false,
-    summary: '',
-    promptHint: '',
-    updatedAt: '',
-  },
   theme: 'system',
   launchAtStartup: false,
   closeToTray: true,
@@ -351,7 +344,6 @@ function appSettingsToRows(settings: AppSettings): Record<string, string> {
     reportTone: settings.reportTone,
     reportFocus: settings.reportFocus,
     reportStyleHint: settings.reportStyleHint,
-    reportStyleProfile: JSON.stringify(settings.reportStyleProfile),
     theme: settings.theme,
     launchAtStartup: String(settings.launchAtStartup),
     closeToTray: String(settings.closeToTray),
@@ -397,7 +389,6 @@ function rowsToAppSettingsInput(rows: AppSettingsRow[]) {
     reportTone: values.reportTone,
     reportFocus: values.reportFocus,
     reportStyleHint: values.reportStyleHint,
-    reportStyleProfile: parseRowJSON(values.reportStyleProfile),
     theme: values.theme,
     launchAtStartup: getBooleanString(values.launchAtStartup),
     closeToTray: getBooleanString(values.closeToTray),
@@ -468,7 +459,6 @@ function normalizeAppSettings(value: unknown): AppSettings {
     reportTone: getReportTone(input.reportTone),
     reportFocus: getReportFocus(input.reportFocus),
     reportStyleHint: getString(input.reportStyleHint, DEFAULT_APP_SETTINGS.reportStyleHint),
-    reportStyleProfile: normalizeReportStyleProfile(input.reportStyleProfile),
     theme: getTheme(input.theme),
     launchAtStartup: getBoolean(input.launchAtStartup, DEFAULT_APP_SETTINGS.launchAtStartup),
     closeToTray: getBoolean(input.closeToTray, DEFAULT_APP_SETTINGS.closeToTray),
@@ -510,21 +500,6 @@ function getReportFocus(value: unknown): ReportFocus {
   return value === 'outcomes' || value === 'completed-items' || value === 'risks'
     ? value
     : DEFAULT_APP_SETTINGS.reportFocus;
-}
-
-function normalizeReportStyleProfile(value: unknown): ReportStyleProfile {
-  if (!value || typeof value !== 'object') {
-    return DEFAULT_APP_SETTINGS.reportStyleProfile;
-  }
-
-  const input = value as Record<string, unknown>;
-
-  return {
-    enabled: getBoolean(input.enabled, DEFAULT_APP_SETTINGS.reportStyleProfile.enabled),
-    summary: getString(input.summary, DEFAULT_APP_SETTINGS.reportStyleProfile.summary),
-    promptHint: getString(input.promptHint, DEFAULT_APP_SETTINGS.reportStyleProfile.promptHint),
-    updatedAt: getString(input.updatedAt, DEFAULT_APP_SETTINGS.reportStyleProfile.updatedAt),
-  };
 }
 
 function getAIProviderId(value: unknown): AIProviderId {
