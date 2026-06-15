@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -16,12 +16,15 @@ import {
   preventReportDialogDismissWhenBusy,
   shouldAllowReportDialogOpenChange,
 } from './report-dialog-state';
+import { AiBusyCloseConfirmDialog } from './ai-busy-close-confirm-dialog';
 import { TallyaDialogFooter } from './tallya-dialog-footer';
 
 type ReportGapDialogProps = {
   open: boolean;
   gaps: ReportGap[];
   isGenerating: boolean;
+  closeRequestId?: number;
+  onAfterForceClose?: () => void;
   onOpenChange: (open: boolean) => void;
   onBack: () => void;
   onSubmit: (answers: GapAnswer[]) => void;
@@ -35,12 +38,18 @@ export function ReportGapDialog({
   open,
   gaps,
   isGenerating,
+  closeRequestId = 0,
+  onAfterForceClose,
   onOpenChange,
   onBack,
   onSubmit,
   onSkip,
 }: ReportGapDialogProps) {
   const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [isCloseConfirmOpen, setIsCloseConfirmOpen] = useState(false);
+  const [isAppCloseRequest, setIsAppCloseRequest] = useState(false);
+  const handledCloseRequestIdRef = useRef(closeRequestId);
+  const afterForceCloseRef = useRef<(() => void) | null>(null);
 
   function handleOpenChange(nextOpen: boolean) {
     if (shouldAllowReportDialogOpenChange(nextOpen, isGenerating)) {
@@ -51,6 +60,41 @@ export function ReportGapDialog({
       onOpenChange(nextOpen);
     }
   }
+
+  function resetPendingCloseRequest() {
+    afterForceCloseRef.current = null;
+    setIsAppCloseRequest(false);
+  }
+
+  const requestClose = useCallback((afterForceClose?: () => void) => {
+    afterForceCloseRef.current = afterForceClose ?? null;
+    setIsAppCloseRequest(Boolean(afterForceClose));
+
+    if (isGenerating) {
+      setIsCloseConfirmOpen(true);
+      return;
+    }
+
+    setAnswers({});
+    onOpenChange(false);
+    afterForceClose?.();
+  }, [isGenerating, onOpenChange]);
+
+  useEffect(() => {
+    if (closeRequestId === handledCloseRequestIdRef.current) {
+      return;
+    }
+
+    handledCloseRequestIdRef.current = closeRequestId;
+
+    if (!open) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => requestClose(onAfterForceClose), 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [closeRequestId, onAfterForceClose, open, requestClose]);
 
   function handleSubmit() {
     const collected: GapAnswer[] = gaps
@@ -70,15 +114,26 @@ export function ReportGapDialog({
     onSkip();
   }
 
+  function handleForceClose() {
+    const afterForceClose = afterForceCloseRef.current;
+
+    resetPendingCloseRequest();
+    setIsCloseConfirmOpen(false);
+    setAnswers({});
+    onOpenChange(false);
+    afterForceClose?.();
+  }
+
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent
-        overlayClassName="tallya-memory-overlay"
-        closeButtonDisabled={isGenerating}
-        onEscapeKeyDown={(event) => preventReportDialogDismissWhenBusy(isGenerating, event)}
-        onPointerDownOutside={(event) => preventReportDialogDismissWhenBusy(isGenerating, event)}
-        className="tallya-dialog-content flex max-h-[calc(100vh-72px)] w-[min(540px,calc(100vw-48px))] max-w-none flex-col gap-0 overflow-hidden p-0 shadow-[0_24px_70px_rgb(15_23_42/0.18)] dark:shadow-[0_28px_80px_rgb(0_0_0/0.5)] sm:max-w-[min(540px,calc(100vw-48px))]"
-      >
+    <>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
+        <DialogContent
+          overlayClassName="tallya-memory-overlay"
+          closeButtonDisabled={isGenerating}
+          onEscapeKeyDown={(event) => preventReportDialogDismissWhenBusy(isGenerating, event)}
+          onPointerDownOutside={(event) => preventReportDialogDismissWhenBusy(isGenerating, event)}
+          className="tallya-dialog-content flex max-h-[calc(100vh-72px)] w-[min(540px,calc(100vw-48px))] max-w-none flex-col gap-0 overflow-hidden p-0 shadow-[0_24px_70px_rgb(15_23_42/0.18)] dark:shadow-[0_28px_80px_rgb(0_0_0/0.5)] sm:max-w-[min(540px,calc(100vw-48px))]"
+        >
         <DialogHeader className="shrink-0 gap-1.5 px-6 pt-5 pb-4">
           <DialogTitle className="text-lg leading-6 font-semibold tracking-normal text-app-ink">
             补充几句，让整理更完整
@@ -144,7 +199,20 @@ export function ReportGapDialog({
             </Button>
           </div>
         </TallyaDialogFooter>
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
+      <AiBusyCloseConfirmDialog
+        open={isCloseConfirmOpen}
+        isAppCloseRequest={isAppCloseRequest}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) {
+            resetPendingCloseRequest();
+          }
+
+          setIsCloseConfirmOpen(nextOpen);
+        }}
+        onConfirm={handleForceClose}
+      />
+    </>
   );
 }

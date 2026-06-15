@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { TallyaScrollArea } from '@/components/tallya-scroll-area';
@@ -19,6 +19,7 @@ import {
   preventReportDialogDismissWhenBusy,
   shouldAllowReportDialogOpenChange,
 } from './report-dialog-state';
+import { AiBusyCloseConfirmDialog } from './ai-busy-close-confirm-dialog';
 import { ReportDocument } from './report-document';
 import { TallyaDialogFooter } from './tallya-dialog-footer';
 
@@ -26,6 +27,8 @@ type ReportDetailDialogProps = {
   open: boolean;
   report: Report | null;
   isRegenerating: boolean;
+  closeRequestId?: number;
+  onAfterForceClose?: () => void;
   onOpenChange: (open: boolean) => void;
   onCopyText: () => void;
   onCopyMarkdown: () => void;
@@ -36,12 +39,18 @@ export function ReportDetailDialog({
   open,
   report,
   isRegenerating,
+  closeRequestId = 0,
+  onAfterForceClose,
   onOpenChange,
   onCopyText,
   onCopyMarkdown,
   onRegenerate,
 }: ReportDetailDialogProps) {
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [isCloseConfirmOpen, setIsCloseConfirmOpen] = useState(false);
+  const [isAppCloseRequest, setIsAppCloseRequest] = useState(false);
+  const handledCloseRequestIdRef = useRef(closeRequestId);
+  const afterForceCloseRef = useRef<(() => void) | null>(null);
   const content = report ? normalizeReportContent(report.content) : null;
   const isCustomReport = report?.type === 'custom';
   const isStale = report?.status === 'stale';
@@ -55,6 +64,49 @@ export function ReportDetailDialog({
     if (shouldAllowReportDialogOpenChange(nextOpen, isRegenerating)) {
       onOpenChange(nextOpen);
     }
+  }
+
+  function resetPendingCloseRequest() {
+    afterForceCloseRef.current = null;
+    setIsAppCloseRequest(false);
+  }
+
+  const requestClose = useCallback((afterForceClose?: () => void) => {
+    afterForceCloseRef.current = afterForceClose ?? null;
+    setIsAppCloseRequest(Boolean(afterForceClose));
+
+    if (isRegenerating) {
+      setIsCloseConfirmOpen(true);
+      return;
+    }
+
+    onOpenChange(false);
+    afterForceClose?.();
+  }, [isRegenerating, onOpenChange]);
+
+  useEffect(() => {
+    if (closeRequestId === handledCloseRequestIdRef.current) {
+      return;
+    }
+
+    handledCloseRequestIdRef.current = closeRequestId;
+
+    if (!open) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => requestClose(onAfterForceClose), 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [closeRequestId, onAfterForceClose, open, requestClose]);
+
+  function handleForceClose() {
+    const afterForceClose = afterForceCloseRef.current;
+
+    resetPendingCloseRequest();
+    setIsCloseConfirmOpen(false);
+    onOpenChange(false);
+    afterForceClose?.();
   }
 
   return (
@@ -91,7 +143,7 @@ export function ReportDetailDialog({
               type="button"
               variant="ghost"
               className="cursor-pointer text-app-ink-muted hover:bg-app-surface-muted hover:text-app-ink disabled:cursor-not-allowed"
-              onClick={() => handleOpenChange(false)}
+              onClick={() => requestClose()}
               disabled={isRegenerating}
             >
               关闭
@@ -147,6 +199,18 @@ export function ReportDetailDialog({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <AiBusyCloseConfirmDialog
+        open={isCloseConfirmOpen}
+        isAppCloseRequest={isAppCloseRequest}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) {
+            resetPendingCloseRequest();
+          }
+
+          setIsCloseConfirmOpen(nextOpen);
+        }}
+        onConfirm={handleForceClose}
+      />
     </>
   );
 }

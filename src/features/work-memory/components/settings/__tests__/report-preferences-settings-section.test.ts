@@ -39,4 +39,14 @@ describe('ReportPreferencesSettingsSection', () => {
     expect(dialogSource).not.toContain('onUpdateSettings');
     expect(dialogSource).not.toContain('reportStyleProfile');
   });
+
+  it('routes native app close requests through the extraction dialog close flow', () => {
+    expect(sectionSource).toContain('closeRequestId?: number');
+    expect(sectionSource).toContain('onAfterForceClose?: () => void');
+    expect(sectionSource).toContain('closeRequestId={closeRequestId}');
+    expect(dialogSource).toContain('closeRequestId?: number');
+    expect(dialogSource).toContain('onAfterForceClose?: () => void');
+    expect(dialogSource).toContain('requestClose(onAfterForceClose)');
+    expect(dialogSource).toContain('<AiBusyCloseConfirmDialog');
+  });
 });

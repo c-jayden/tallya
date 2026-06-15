@@ -13,4 +13,11 @@ describe('SettingsDialog', () => {
     expect(source).toContain('ExportDiagnosticLogConfirmDialog');
     expect(source).toContain('settingsState.exportDiagnosticLog');
   });
+
+  it('passes native close requests into settings subdialogs', () => {
+    expect(source).toContain('closeRequestId?: number');
+    expect(source).toContain('onAfterForceClose?: () => void');
+    expect(source).toContain('closeRequestId={closeRequestId}');
+    expect(source).toContain('onAfterForceClose={onAfterForceClose}');
+  });
 });

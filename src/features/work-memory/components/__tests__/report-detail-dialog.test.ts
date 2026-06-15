@@ -31,4 +31,13 @@ describe('ReportDetailDialog copy', () => {
     expect(detailSource).toContain('variant="accent"');
     expect(previewSource).toContain('variant="accent"');
   });
+
+  it('routes native app close requests through its own busy close confirmation', () => {
+    const source = readFileSync(new URL('../report-detail-dialog.tsx', import.meta.url), 'utf8');
+
+    expect(source).toContain('closeRequestId?: number');
+    expect(source).toContain('onAfterForceClose?: () => void');
+    expect(source).toContain('requestClose(onAfterForceClose)');
+    expect(source).toContain('<AiBusyCloseConfirmDialog');
+  });
 });

@@ -25,6 +25,8 @@ export type SettingsContentProps = {
   isExportingDiagnosticLog: boolean;
   isExtractingReportStyle: boolean;
   isSendingTestNotification: boolean;
+  closeRequestId?: number;
+  onAfterForceClose?: () => void;
   onUpdateSettings: (patch: Partial<AppSettings>) => void;
   onCheckHealth: () => void;
   onCheckLocalGateway: () => void;
@@ -71,6 +73,8 @@ function SettingsSectionContent({
   isExportingDiagnosticLog,
   isExtractingReportStyle,
   isSendingTestNotification,
+  closeRequestId,
+  onAfterForceClose,
   onUpdateSettings,
   onCheckHealth,
   onCheckLocalGateway,
@@ -114,6 +118,8 @@ function SettingsSectionContent({
       <ReportPreferencesSettingsSection
         settings={settings}
         isExtractingReportStyle={isExtractingReportStyle}
+        closeRequestId={closeRequestId}
+        onAfterForceClose={onAfterForceClose}
         onUpdateSettings={onUpdateSettings}
         onExtractReportStylePrompt={onExtractReportStylePrompt}
       />

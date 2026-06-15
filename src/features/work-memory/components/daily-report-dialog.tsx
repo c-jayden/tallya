@@ -1,17 +1,7 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Loader2, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import {
   Dialog,
   DialogContent,
@@ -20,6 +10,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import type { AiTaskAlert } from '../hooks/use-ai-task-coordinator';
+import { AiBusyCloseConfirmDialog } from './ai-busy-close-confirm-dialog';
 import { preventReportDialogDismissWhenBusy } from './report-dialog-state';
 import { TallyaDialogFooter } from './tallya-dialog-footer';
 import { WorkMemoryAlerts } from './work-memory-alerts';
@@ -30,8 +21,10 @@ type DailyReportDialogProps = {
   reportText: string;
   isGenerating: boolean;
   aiAlert: AiTaskAlert | null;
+  closeRequestId?: number;
   onOpenChange: (open: boolean) => void;
   onForceClose: () => void;
+  onAfterForceClose?: () => void;
   onTextChange: (text: string) => void;
   onGenerateWithAI: () => void;
   onCopy: () => void;
@@ -43,22 +36,52 @@ export function DailyReportDialog({
   reportText,
   isGenerating,
   aiAlert,
+  closeRequestId = 0,
   onOpenChange,
   onForceClose,
+  onAfterForceClose,
   onTextChange,
   onGenerateWithAI,
   onCopy,
 }: DailyReportDialogProps) {
   const [isCloseConfirmOpen, setIsCloseConfirmOpen] = useState(false);
+  const [isAppCloseRequest, setIsAppCloseRequest] = useState(false);
+  const handledCloseRequestIdRef = useRef(closeRequestId);
+  const afterForceCloseRef = useRef<(() => void) | null>(null);
 
-  function requestClose() {
+  function resetPendingCloseRequest() {
+    afterForceCloseRef.current = null;
+    setIsAppCloseRequest(false);
+  }
+
+  const requestClose = useCallback((afterForceClose?: () => void) => {
+    afterForceCloseRef.current = afterForceClose ?? null;
+    setIsAppCloseRequest(Boolean(afterForceClose));
+
     if (isGenerating) {
       setIsCloseConfirmOpen(true);
       return;
     }
 
     onOpenChange(false);
-  }
+    afterForceClose?.();
+  }, [isGenerating, onOpenChange]);
+
+  useEffect(() => {
+    if (closeRequestId === handledCloseRequestIdRef.current) {
+      return;
+    }
+
+    handledCloseRequestIdRef.current = closeRequestId;
+
+    if (!open) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => requestClose(onAfterForceClose), 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [closeRequestId, onAfterForceClose, open, requestClose]);
 
   function handleOpenChange(nextOpen: boolean) {
     if (nextOpen) {
@@ -78,8 +101,12 @@ export function DailyReportDialog({
   }
 
   function handleForceClose() {
+    const afterForceClose = afterForceCloseRef.current;
+
+    resetPendingCloseRequest();
     setIsCloseConfirmOpen(false);
     onForceClose();
+    afterForceClose?.();
   }
 
   return (
@@ -115,7 +142,7 @@ export function DailyReportDialog({
               type="button"
               variant="ghost"
               className="cursor-pointer text-app-ink-muted hover:bg-app-surface-muted hover:text-app-ink disabled:cursor-not-allowed"
-              onClick={requestClose}
+              onClick={() => requestClose()}
             >
               关闭
             </Button>
@@ -145,22 +172,18 @@ export function DailyReportDialog({
           </TallyaDialogFooter>
         </DialogContent>
       </Dialog>
-      <AlertDialog open={isCloseConfirmOpen} onOpenChange={setIsCloseConfirmOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>正在整理，要关闭吗？</AlertDialogTitle>
-            <AlertDialogDescription>
-              关闭后这次整理仍会继续，完成后可以再回到整理窗口查看当前结果。
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="cursor-pointer">继续等待</AlertDialogCancel>
-            <AlertDialogAction className="cursor-pointer" onClick={handleForceClose}>
-              关闭窗口
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <AiBusyCloseConfirmDialog
+        open={isCloseConfirmOpen}
+        isAppCloseRequest={isAppCloseRequest}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) {
+            resetPendingCloseRequest();
+          }
+
+          setIsCloseConfirmOpen(nextOpen);
+        }}
+        onConfirm={handleForceClose}
+      />
     </>
   );
 }

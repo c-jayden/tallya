@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import { AiCloseBlockedDialog } from './components/ai-close-blocked-dialog';
 import { DailyReportDialog } from './components/daily-report-dialog';
 import { EntryComposer } from './components/entry-composer';
 import { EntryFeed } from './components/entry-feed';
@@ -32,11 +31,12 @@ import {
   isFutureMemoryDate,
   isTodayDate,
 } from './memory-date-view-model';
+import { quitApp } from './services/window-service';
 import type { Entry } from './types';
 
 export function WorkMemoryHome() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isAiCloseBlockedDialogOpen, setIsAiCloseBlockedDialogOpen] = useState(false);
+  const [closeBlockedRequestId, setCloseBlockedRequestId] = useState(0);
   const todayDate = useTodayDate();
   const [selectedDate, setSelectedDate] = useState(todayDate);
   const previousTodayRef = useRef(todayDate);
@@ -148,7 +148,7 @@ export function WorkMemoryHome() {
       setIsSettingsOpen(true);
     },
     onWindowHidden: aiTasks.handleWindowHidden,
-    onCloseBlocked: () => setIsAiCloseBlockedDialogOpen(true),
+    onCloseBlocked: () => setCloseBlockedRequestId((current) => current + 1),
   });
 
   function updateSelectedDate(date: string) {
@@ -280,6 +280,8 @@ export function WorkMemoryHome() {
         customEndDate={weeklyReport.customEndDate}
         isLoading={weeklyReport.isLoadingContext}
         isGenerating={weeklyReport.isGeneratingReport || weeklyReport.isDetectingGaps}
+        closeRequestId={closeBlockedRequestId}
+        onAfterForceClose={() => void quitApp()}
         onOpenChange={weeklyReport.setIsGenerateDialogOpen}
         onReportTypeChange={weeklyReport.setReportType}
         onCustomStartDateChange={weeklyReport.updateCustomStartDate}
@@ -292,6 +294,8 @@ export function WorkMemoryHome() {
         open={weeklyReport.isGapDialogOpen}
         gaps={weeklyReport.reportGaps}
         isGenerating={weeklyReport.isGeneratingReport}
+        closeRequestId={closeBlockedRequestId}
+        onAfterForceClose={() => void quitApp()}
         onOpenChange={weeklyReport.setIsGapDialogOpen}
         onBack={weeklyReport.backToGenerateFromGaps}
         onSubmit={weeklyReport.submitGapAnswers}
@@ -326,6 +330,8 @@ export function WorkMemoryHome() {
         open={weeklyReport.isReportDetailOpen}
         report={weeklyReport.selectedReport}
         isRegenerating={weeklyReport.isGeneratingReport}
+        closeRequestId={closeBlockedRequestId}
+        onAfterForceClose={() => void quitApp()}
         onOpenChange={weeklyReport.setIsReportDetailOpen}
         onCopyText={weeklyReport.copySavedReportPlainText}
         onCopyMarkdown={weeklyReport.copySavedReportMarkdown}
@@ -338,6 +344,8 @@ export function WorkMemoryHome() {
         onClearLocalData={handleClearLocalData}
         onDataRestored={entries.reload}
         aiTaskCoordinator={aiTasks}
+        closeRequestId={closeBlockedRequestId}
+        onAfterForceClose={() => void quitApp()}
       />
 
       <DailyReportDialog
@@ -346,19 +354,17 @@ export function WorkMemoryHome() {
         reportText={dailyReport.reportText}
         isGenerating={dailyReport.isGenerating}
         aiAlert={dailyReport.aiAlert}
+        closeRequestId={closeBlockedRequestId}
         onOpenChange={(open) => {
           if (!open) {
             dailyReport.close();
           }
         }}
         onForceClose={dailyReport.forceClose}
+        onAfterForceClose={() => void quitApp()}
         onTextChange={dailyReport.setReportText}
         onGenerateWithAI={dailyReport.generateWithAI}
         onCopy={dailyReport.copy}
-      />
-      <AiCloseBlockedDialog
-        open={isAiCloseBlockedDialogOpen}
-        onOpenChange={setIsAiCloseBlockedDialogOpen}
       />
       </main>
     </TooltipProvider>

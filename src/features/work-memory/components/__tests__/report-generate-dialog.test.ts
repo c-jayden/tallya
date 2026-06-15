@@ -80,6 +80,15 @@ describe('ReportGenerateDialog layout', () => {
     expect(source).toContain("saveMode: 'create'");
     expect(source).toContain("saveMode: 'overwrite'");
   });
+
+  it('routes native app close requests through its own busy close confirmation', () => {
+    const source = readFileSync(new URL('../report-generate-dialog.tsx', import.meta.url), 'utf8');
+
+    expect(source).toContain('closeRequestId?: number');
+    expect(source).toContain('onAfterForceClose?: () => void');
+    expect(source).toContain('requestClose(onAfterForceClose)');
+    expect(source).toContain('<AiBusyCloseConfirmDialog');
+  });
 });
 
 describe('ReportGapDialog layout', () => {
@@ -90,5 +99,12 @@ describe('ReportGapDialog layout', () => {
     expect(source).toContain('sm:justify-between');
     expect(source).toContain('返回');
     expect(source).toContain('onClick={onBack}');
+  });
+
+  it('routes native app close requests through its own busy close confirmation', () => {
+    expect(source).toContain('closeRequestId?: number');
+    expect(source).toContain('onAfterForceClose?: () => void');
+    expect(source).toContain('requestClose(onAfterForceClose)');
+    expect(source).toContain('<AiBusyCloseConfirmDialog');
   });
 });

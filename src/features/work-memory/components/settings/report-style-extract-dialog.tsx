@@ -1,5 +1,5 @@
 import { Loader2 } from 'lucide-react';
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -9,10 +9,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { AiBusyCloseConfirmDialog } from '../ai-busy-close-confirm-dialog';
 
 type ReportStyleExtractDialogProps = {
   open: boolean;
   isExtracting: boolean;
+  closeRequestId?: number;
+  onAfterForceClose?: () => void;
   onOpenChange: (open: boolean) => void;
   onExtractReportStylePrompt: (sampleText: string) => Promise<string>;
   onApplyPromptHint: (promptHint: string) => void;
@@ -21,12 +24,42 @@ type ReportStyleExtractDialogProps = {
 export function ReportStyleExtractDialog({
   open,
   isExtracting,
+  closeRequestId = 0,
+  onAfterForceClose,
   onOpenChange,
   onExtractReportStylePrompt,
   onApplyPromptHint,
 }: ReportStyleExtractDialogProps) {
   const [sampleText, setSampleText] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  const [isCloseConfirmOpen, setIsCloseConfirmOpen] = useState(false);
+  const [isAppCloseRequest, setIsAppCloseRequest] = useState(false);
+  const handledCloseRequestIdRef = useRef(closeRequestId);
+  const afterForceCloseRef = useRef<(() => void) | null>(null);
+
+  function resetPendingCloseRequest() {
+    afterForceCloseRef.current = null;
+    setIsAppCloseRequest(false);
+  }
+
+  function resetDialogState() {
+    setSampleText('');
+    setErrorMessage('');
+  }
+
+  const requestClose = useCallback((afterForceClose?: () => void) => {
+    afterForceCloseRef.current = afterForceClose ?? null;
+    setIsAppCloseRequest(Boolean(afterForceClose));
+
+    if (isExtracting) {
+      setIsCloseConfirmOpen(true);
+      return;
+    }
+
+    resetDialogState();
+    onOpenChange(false);
+    afterForceClose?.();
+  }, [isExtracting, onOpenChange]);
 
   function handleOpenChange(nextOpen: boolean) {
     if (isExtracting && !nextOpen) {
@@ -34,11 +67,36 @@ export function ReportStyleExtractDialog({
     }
 
     if (!nextOpen) {
-      setSampleText('');
-      setErrorMessage('');
+      resetDialogState();
     }
 
     onOpenChange(nextOpen);
+  }
+
+  useEffect(() => {
+    if (closeRequestId === handledCloseRequestIdRef.current) {
+      return;
+    }
+
+    handledCloseRequestIdRef.current = closeRequestId;
+
+    if (!open) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => requestClose(onAfterForceClose), 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [closeRequestId, onAfterForceClose, open, requestClose]);
+
+  function handleForceClose() {
+    const afterForceClose = afterForceCloseRef.current;
+
+    resetPendingCloseRequest();
+    setIsCloseConfirmOpen(false);
+    resetDialogState();
+    onOpenChange(false);
+    afterForceClose?.();
   }
 
   async function handleExtract() {
@@ -72,8 +130,9 @@ export function ReportStyleExtractDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent
+    <>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
+        <DialogContent
         overlayClassName="tallya-memory-overlay"
         closeButtonDisabled={isExtracting}
         className="tallya-dialog-content flex w-[min(520px,calc(100vw-3rem))] max-w-none flex-col gap-0 overflow-hidden p-0 sm:max-w-[min(520px,calc(100vw-3rem))]"
@@ -126,7 +185,20 @@ export function ReportStyleExtractDialog({
             {isExtracting ? '提取中' : '提取'}
           </Button>
         </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
+      <AiBusyCloseConfirmDialog
+        open={isCloseConfirmOpen}
+        isAppCloseRequest={isAppCloseRequest}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) {
+            resetPendingCloseRequest();
+          }
+
+          setIsCloseConfirmOpen(nextOpen);
+        }}
+        onConfirm={handleForceClose}
+      />
+    </>
   );
 }

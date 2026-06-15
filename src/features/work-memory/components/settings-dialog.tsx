@@ -19,6 +19,8 @@ type SettingsDialogProps = {
   onClearLocalData: () => Promise<void>;
   onDataRestored?: () => Promise<void>;
   aiTaskCoordinator?: AiTaskCoordinatorControls;
+  closeRequestId?: number;
+  onAfterForceClose?: () => void;
 };
 
 export function SettingsDialog({
@@ -27,6 +29,8 @@ export function SettingsDialog({
   onClearLocalData,
   onDataRestored,
   aiTaskCoordinator,
+  closeRequestId,
+  onAfterForceClose,
 }: SettingsDialogProps) {
   const settingsState = useSettingsDialogState({
     open,
@@ -83,6 +87,8 @@ export function SettingsDialog({
               isExportingDiagnosticLog={settingsState.isExportingDiagnosticLog}
               isExtractingReportStyle={settingsState.isExtractingReportStyle}
               isSendingTestNotification={settingsState.isSendingTestNotification}
+              closeRequestId={closeRequestId}
+              onAfterForceClose={onAfterForceClose}
               onUpdateSettings={settingsState.updateSettings}
               onCheckHealth={settingsState.checkProviderHealth}
               onCheckLocalGateway={settingsState.checkLocalGateway}

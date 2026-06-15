@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { CalendarDays, Loader2 } from 'lucide-react';
 import { TallyaScrollArea } from '@/components/tallya-scroll-area';
 import { Button } from '@/components/ui/button';
@@ -27,6 +27,7 @@ import {
   preventReportDialogDismissWhenBusy,
   shouldAllowReportDialogOpenChange,
 } from './report-dialog-state';
+import { AiBusyCloseConfirmDialog } from './ai-busy-close-confirm-dialog';
 import { DatePickerPopover } from './date-picker-popover';
 import { TallyaDialogFooter } from './tallya-dialog-footer';
 
@@ -38,6 +39,8 @@ type ReportGenerateDialogProps = {
   customEndDate: string;
   isLoading: boolean;
   isGenerating: boolean;
+  closeRequestId?: number;
+  onAfterForceClose?: () => void;
   onOpenChange: (open: boolean) => void;
   onReportTypeChange: (reportType: ReportGenerationType) => void;
   onCustomStartDateChange: (date: string) => void;
@@ -65,6 +68,8 @@ export function ReportGenerateDialog({
   customEndDate,
   isLoading,
   isGenerating,
+  closeRequestId = 0,
+  onAfterForceClose,
   onOpenChange,
   onReportTypeChange,
   onCustomStartDateChange,
@@ -73,6 +78,10 @@ export function ReportGenerateDialog({
   onViewReports,
 }: ReportGenerateDialogProps) {
   const [confirmMode, setConfirmMode] = useState<ConfirmMode | null>(null);
+  const [isCloseConfirmOpen, setIsCloseConfirmOpen] = useState(false);
+  const [isAppCloseRequest, setIsAppCloseRequest] = useState(false);
+  const handledCloseRequestIdRef = useRef(closeRequestId);
+  const afterForceCloseRef = useRef<(() => void) | null>(null);
   const availableMemoryCount = context?.entries.length ?? 0;
   const availableDayCount = context
     ? new Set(context.entries.map((entry) => entry.occurredOn)).size
@@ -104,6 +113,49 @@ export function ReportGenerateDialog({
     if (shouldAllowReportDialogOpenChange(nextOpen, !dialogState.canClose)) {
       onOpenChange(nextOpen);
     }
+  }
+
+  function resetPendingCloseRequest() {
+    afterForceCloseRef.current = null;
+    setIsAppCloseRequest(false);
+  }
+
+  const requestClose = useCallback((afterForceClose?: () => void) => {
+    afterForceCloseRef.current = afterForceClose ?? null;
+    setIsAppCloseRequest(Boolean(afterForceClose));
+
+    if (!dialogState.canClose) {
+      setIsCloseConfirmOpen(true);
+      return;
+    }
+
+    onOpenChange(false);
+    afterForceClose?.();
+  }, [dialogState.canClose, onOpenChange]);
+
+  useEffect(() => {
+    if (closeRequestId === handledCloseRequestIdRef.current) {
+      return;
+    }
+
+    handledCloseRequestIdRef.current = closeRequestId;
+
+    if (!open) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => requestClose(onAfterForceClose), 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [closeRequestId, onAfterForceClose, open, requestClose]);
+
+  function handleForceClose() {
+    const afterForceClose = afterForceCloseRef.current;
+
+    resetPendingCloseRequest();
+    setIsCloseConfirmOpen(false);
+    onOpenChange(false);
+    afterForceClose?.();
   }
 
   function handleGenerateClick() {
@@ -329,6 +381,18 @@ export function ReportGenerateDialog({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <AiBusyCloseConfirmDialog
+        open={isCloseConfirmOpen}
+        isAppCloseRequest={isAppCloseRequest}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) {
+            resetPendingCloseRequest();
+          }
+
+          setIsCloseConfirmOpen(nextOpen);
+        }}
+        onConfirm={handleForceClose}
+      />
     </>
   );
 }

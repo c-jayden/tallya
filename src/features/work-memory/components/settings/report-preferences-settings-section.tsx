@@ -13,6 +13,8 @@ import {
 type ReportPreferencesSettingsSectionProps = {
   settings: AppSettings;
   isExtractingReportStyle: boolean;
+  closeRequestId?: number;
+  onAfterForceClose?: () => void;
   onUpdateSettings: (patch: Partial<AppSettings>) => void;
   onExtractReportStylePrompt: (sampleText: string) => Promise<string>;
 };
@@ -25,6 +27,8 @@ type SegmentedOption<T extends string> = {
 export function ReportPreferencesSettingsSection({
   settings,
   isExtractingReportStyle,
+  closeRequestId,
+  onAfterForceClose,
   onUpdateSettings,
   onExtractReportStylePrompt,
 }: ReportPreferencesSettingsSectionProps) {
@@ -85,6 +89,8 @@ export function ReportPreferencesSettingsSection({
       <ReportStyleExtractDialog
         open={isStyleExtractOpen}
         isExtracting={isExtractingReportStyle}
+        closeRequestId={closeRequestId}
+        onAfterForceClose={onAfterForceClose}
         onOpenChange={setIsStyleExtractOpen}
         onExtractReportStylePrompt={onExtractReportStylePrompt}
         onApplyPromptHint={(reportStyleHint) => onUpdateSettings({ reportStyleHint })}
