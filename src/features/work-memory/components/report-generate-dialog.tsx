@@ -24,8 +24,6 @@ import type { ReportContext } from '../services/report-service';
 import type { ReportGenerationType } from '../types';
 import {
   getReportGenerateDialogState,
-  preventReportDialogDismissWhenBusy,
-  shouldAllowReportDialogOpenChange,
 } from './report-dialog-state';
 import { AiBusyCloseConfirmDialog } from './ai-busy-close-confirm-dialog';
 import { DatePickerPopover } from './date-picker-popover';
@@ -109,12 +107,6 @@ export function ReportGenerateDialog({
       ? `该范围内 ${availableDayCount} 天 · ${availableMemoryCount} 条记录`
       : `本周 ${availableDayCount} 天 · ${availableMemoryCount} 条记录`;
 
-  function handleOpenChange(nextOpen: boolean) {
-    if (shouldAllowReportDialogOpenChange(nextOpen, !dialogState.canClose)) {
-      onOpenChange(nextOpen);
-    }
-  }
-
   function resetPendingCloseRequest() {
     afterForceCloseRef.current = null;
     setIsAppCloseRequest(false);
@@ -132,6 +124,15 @@ export function ReportGenerateDialog({
     onOpenChange(false);
     afterForceClose?.();
   }, [dialogState.canClose, onOpenChange]);
+
+  function handleOpenChange(nextOpen: boolean) {
+    if (nextOpen) {
+      onOpenChange(nextOpen);
+      return;
+    }
+
+    requestClose();
+  }
 
   useEffect(() => {
     if (closeRequestId === handledCloseRequestIdRef.current) {
@@ -156,6 +157,13 @@ export function ReportGenerateDialog({
     setIsCloseConfirmOpen(false);
     onOpenChange(false);
     afterForceClose?.();
+  }
+
+  function handleDismissAttempt(event: { preventDefault: () => void }) {
+    if (!dialogState.canClose) {
+      event.preventDefault();
+      requestClose();
+    }
   }
 
   function handleGenerateClick() {
@@ -203,13 +211,8 @@ export function ReportGenerateDialog({
       <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogContent
           overlayClassName="tallya-memory-overlay"
-          closeButtonDisabled={!dialogState.canClose}
-          onEscapeKeyDown={(event) =>
-            preventReportDialogDismissWhenBusy(!dialogState.canClose, event)
-          }
-          onPointerDownOutside={(event) =>
-            preventReportDialogDismissWhenBusy(!dialogState.canClose, event)
-          }
+          onEscapeKeyDown={handleDismissAttempt}
+          onPointerDownOutside={handleDismissAttempt}
           className="tallya-dialog-content flex max-h-[calc(100vh-72px)] w-[min(540px,calc(100vw-48px))] max-w-none flex-col gap-0 overflow-hidden p-0 shadow-[0_24px_70px_rgb(15_23_42/0.18)] dark:shadow-[0_28px_80px_rgb(0_0_0/0.5)] sm:max-w-[min(540px,calc(100vw-48px))]"
         >
           <DialogHeader className="shrink-0 gap-1.5 px-6 pt-5 pb-4">
@@ -313,8 +316,7 @@ export function ReportGenerateDialog({
                   type="button"
                   variant="ghost"
                   className="cursor-pointer text-app-ink-muted hover:bg-app-surface-muted hover:text-app-ink disabled:cursor-not-allowed"
-                  onClick={() => handleOpenChange(false)}
-                  disabled={dialogState.cancelDisabled}
+                  onClick={() => requestClose()}
                 >
                   取消
                 </Button>

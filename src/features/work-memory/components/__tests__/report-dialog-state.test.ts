@@ -82,7 +82,7 @@ describe('getReportGenerateDialogState', () => {
     });
   });
 
-  it('blocks closing and repeat actions while generating', () => {
+  it('keeps the cancel action available while generating so close can ask for confirmation', () => {
     expect(
       getReportGenerateDialogState({
         availableMemoryCount: 2,
@@ -93,7 +93,7 @@ describe('getReportGenerateDialogState', () => {
     ).toMatchObject({
       kind: 'generating',
       canClose: false,
-      cancelDisabled: true,
+      cancelDisabled: false,
       showPrimary: true,
       primaryDisabled: true,
       primaryLabel: '重新整理中...',

@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { tauriMocks } from '@/test/tauri-mocks';
 import {
@@ -44,5 +45,16 @@ describe('window-service', () => {
     expect(tauriMocks.invoke).toHaveBeenCalledWith('set_active_ai_task_running', {
       active: true,
     });
+  });
+
+  it('lets close-to-tray take precedence over AI close blocking in the native close handler', () => {
+    const source = readFileSync(new URL('../../../../../src-tauri/src/lib.rs', import.meta.url), 'utf8');
+    const shouldHideIndex = source.indexOf('if should_hide {');
+    const shouldBlockIndex = source.indexOf('} else if should_block_close {');
+
+    expect(shouldHideIndex).toBeGreaterThan(-1);
+    expect(shouldBlockIndex).toBeGreaterThan(shouldHideIndex);
+    expect(source).toContain('app_handle.emit(TRAY_EVENT_WINDOW_HIDDEN');
+    expect(source).toContain('app_handle.emit(TRAY_EVENT_CLOSE_BLOCKED');
   });
 });

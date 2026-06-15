@@ -59,7 +59,7 @@ export function getReportGenerateDialogState({
       kind: 'generating',
       canClose: false,
       showCancel: true,
-      cancelDisabled: true,
+      cancelDisabled: false,
       showPrimary: true,
       primaryDisabled: true,
       primaryLabel: getReportGenerateActionLabel(hasExistingReport, true, reportType),

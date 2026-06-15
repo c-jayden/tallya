@@ -89,6 +89,16 @@ describe('ReportGenerateDialog layout', () => {
     expect(source).toContain('requestClose(onAfterForceClose)');
     expect(source).toContain('<AiBusyCloseConfirmDialog');
   });
+
+  it('keeps the dialog close affordance available while generating and confirms before closing', () => {
+    const source = readFileSync(new URL('../report-generate-dialog.tsx', import.meta.url), 'utf8');
+
+    expect(source).toContain('if (!nextOpen) {');
+    expect(source).toContain('requestClose();');
+    expect(source).toContain('setIsCloseConfirmOpen(true)');
+    expect(source).not.toContain('closeButtonDisabled={!dialogState.canClose}');
+    expect(source).not.toContain('disabled={dialogState.cancelDisabled}');
+  });
 });
 
 describe('ReportGapDialog layout', () => {
@@ -106,5 +116,11 @@ describe('ReportGapDialog layout', () => {
     expect(source).toContain('onAfterForceClose?: () => void');
     expect(source).toContain('requestClose(onAfterForceClose)');
     expect(source).toContain('<AiBusyCloseConfirmDialog');
+  });
+
+  it('keeps the close affordance available during AI generation and confirms before closing', () => {
+    expect(source).toContain('requestClose();');
+    expect(source).toContain('setIsCloseConfirmOpen(true)');
+    expect(source).not.toContain('closeButtonDisabled={isGenerating}');
   });
 });

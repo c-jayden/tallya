@@ -40,4 +40,12 @@ describe('ReportDetailDialog copy', () => {
     expect(source).toContain('requestClose(onAfterForceClose)');
     expect(source).toContain('<AiBusyCloseConfirmDialog');
   });
+
+  it('keeps the close affordance available during regeneration and confirms before closing', () => {
+    const source = readFileSync(new URL('../report-detail-dialog.tsx', import.meta.url), 'utf8');
+
+    expect(source).toContain('requestClose();');
+    expect(source).toContain('setIsCloseConfirmOpen(true)');
+    expect(source).not.toContain('closeButtonDisabled={isRegenerating}');
+  });
 });

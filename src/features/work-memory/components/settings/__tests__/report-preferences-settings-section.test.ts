@@ -49,4 +49,10 @@ describe('ReportPreferencesSettingsSection', () => {
     expect(dialogSource).toContain('requestClose(onAfterForceClose)');
     expect(dialogSource).toContain('<AiBusyCloseConfirmDialog');
   });
+
+  it('keeps the style extraction dialog close affordance available and confirms before closing', () => {
+    expect(dialogSource).toContain('requestClose();');
+    expect(dialogSource).toContain('setIsCloseConfirmOpen(true)');
+    expect(dialogSource).not.toContain('closeButtonDisabled={isExtracting}');
+  });
 });

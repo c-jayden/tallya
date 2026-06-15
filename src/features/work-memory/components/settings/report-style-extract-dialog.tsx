@@ -62,15 +62,12 @@ export function ReportStyleExtractDialog({
   }, [isExtracting, onOpenChange]);
 
   function handleOpenChange(nextOpen: boolean) {
-    if (isExtracting && !nextOpen) {
+    if (nextOpen) {
+      onOpenChange(true);
       return;
     }
 
-    if (!nextOpen) {
-      resetDialogState();
-    }
-
-    onOpenChange(nextOpen);
+    requestClose();
   }
 
   useEffect(() => {
@@ -134,7 +131,6 @@ export function ReportStyleExtractDialog({
       <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogContent
         overlayClassName="tallya-memory-overlay"
-        closeButtonDisabled={isExtracting}
         className="tallya-dialog-content flex w-[min(520px,calc(100vw-3rem))] max-w-none flex-col gap-0 overflow-hidden p-0 sm:max-w-[min(520px,calc(100vw-3rem))]"
       >
         <DialogHeader className="shrink-0 gap-1.5 px-6 pt-5 pb-4">
@@ -169,9 +165,8 @@ export function ReportStyleExtractDialog({
           <Button
             type="button"
             variant="ghost"
-            disabled={isExtracting}
             className="cursor-pointer disabled:cursor-not-allowed"
-            onClick={() => handleOpenChange(false)}
+            onClick={() => requestClose()}
           >
             取消
           </Button>

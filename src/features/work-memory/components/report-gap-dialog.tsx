@@ -12,10 +12,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { TallyaScrollArea } from '@/components/tallya-scroll-area';
 import type { GapAnswer } from '../services/report-service';
 import type { ReportGap } from '../types';
-import {
-  preventReportDialogDismissWhenBusy,
-  shouldAllowReportDialogOpenChange,
-} from './report-dialog-state';
 import { AiBusyCloseConfirmDialog } from './ai-busy-close-confirm-dialog';
 import { TallyaDialogFooter } from './tallya-dialog-footer';
 
@@ -51,16 +47,6 @@ export function ReportGapDialog({
   const handledCloseRequestIdRef = useRef(closeRequestId);
   const afterForceCloseRef = useRef<(() => void) | null>(null);
 
-  function handleOpenChange(nextOpen: boolean) {
-    if (shouldAllowReportDialogOpenChange(nextOpen, isGenerating)) {
-      if (!nextOpen) {
-        setAnswers({});
-      }
-
-      onOpenChange(nextOpen);
-    }
-  }
-
   function resetPendingCloseRequest() {
     afterForceCloseRef.current = null;
     setIsAppCloseRequest(false);
@@ -79,6 +65,15 @@ export function ReportGapDialog({
     onOpenChange(false);
     afterForceClose?.();
   }, [isGenerating, onOpenChange]);
+
+  function handleOpenChange(nextOpen: boolean) {
+    if (nextOpen) {
+      onOpenChange(true);
+      return;
+    }
+
+    requestClose();
+  }
 
   useEffect(() => {
     if (closeRequestId === handledCloseRequestIdRef.current) {
@@ -124,14 +119,20 @@ export function ReportGapDialog({
     afterForceClose?.();
   }
 
+  function handleDismissAttempt(event: { preventDefault: () => void }) {
+    if (isGenerating) {
+      event.preventDefault();
+      requestClose();
+    }
+  }
+
   return (
     <>
       <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogContent
           overlayClassName="tallya-memory-overlay"
-          closeButtonDisabled={isGenerating}
-          onEscapeKeyDown={(event) => preventReportDialogDismissWhenBusy(isGenerating, event)}
-          onPointerDownOutside={(event) => preventReportDialogDismissWhenBusy(isGenerating, event)}
+          onEscapeKeyDown={handleDismissAttempt}
+          onPointerDownOutside={handleDismissAttempt}
           className="tallya-dialog-content flex max-h-[calc(100vh-72px)] w-[min(540px,calc(100vw-48px))] max-w-none flex-col gap-0 overflow-hidden p-0 shadow-[0_24px_70px_rgb(15_23_42/0.18)] dark:shadow-[0_28px_80px_rgb(0_0_0/0.5)] sm:max-w-[min(540px,calc(100vw-48px))]"
         >
         <DialogHeader className="shrink-0 gap-1.5 px-6 pt-5 pb-4">

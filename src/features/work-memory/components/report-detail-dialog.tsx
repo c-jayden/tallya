@@ -15,10 +15,6 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { normalizeReportContent } from '../report-view-model';
 import type { Report } from '../types';
-import {
-  preventReportDialogDismissWhenBusy,
-  shouldAllowReportDialogOpenChange,
-} from './report-dialog-state';
 import { AiBusyCloseConfirmDialog } from './ai-busy-close-confirm-dialog';
 import { ReportDocument } from './report-document';
 import { TallyaDialogFooter } from './tallya-dialog-footer';
@@ -60,12 +56,6 @@ export function ReportDetailDialog({
     onRegenerate();
   }
 
-  function handleOpenChange(nextOpen: boolean) {
-    if (shouldAllowReportDialogOpenChange(nextOpen, isRegenerating)) {
-      onOpenChange(nextOpen);
-    }
-  }
-
   function resetPendingCloseRequest() {
     afterForceCloseRef.current = null;
     setIsAppCloseRequest(false);
@@ -83,6 +73,15 @@ export function ReportDetailDialog({
     onOpenChange(false);
     afterForceClose?.();
   }, [isRegenerating, onOpenChange]);
+
+  function handleOpenChange(nextOpen: boolean) {
+    if (nextOpen) {
+      onOpenChange(true);
+      return;
+    }
+
+    requestClose();
+  }
 
   useEffect(() => {
     if (closeRequestId === handledCloseRequestIdRef.current) {
@@ -109,16 +108,20 @@ export function ReportDetailDialog({
     afterForceClose?.();
   }
 
+  function handleDismissAttempt(event: { preventDefault: () => void }) {
+    if (isRegenerating) {
+      event.preventDefault();
+      requestClose();
+    }
+  }
+
   return (
     <>
       <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogContent
           overlayClassName="tallya-memory-overlay"
-          closeButtonDisabled={isRegenerating}
-          onEscapeKeyDown={(event) => preventReportDialogDismissWhenBusy(isRegenerating, event)}
-          onPointerDownOutside={(event) =>
-            preventReportDialogDismissWhenBusy(isRegenerating, event)
-          }
+          onEscapeKeyDown={handleDismissAttempt}
+          onPointerDownOutside={handleDismissAttempt}
           className="tallya-dialog-content flex max-h-[calc(100vh-56px)] w-[min(620px,calc(100vw-48px))] max-w-none flex-col gap-0 overflow-hidden p-0 shadow-[0_24px_70px_rgb(15_23_42/0.18)] dark:shadow-[0_28px_80px_rgb(0_0_0/0.5)] sm:max-w-[min(620px,calc(100vw-48px))]"
         >
           <DialogHeader className="shrink-0 gap-1.5 px-6 pt-5 pb-4">
@@ -144,7 +147,6 @@ export function ReportDetailDialog({
               variant="ghost"
               className="cursor-pointer text-app-ink-muted hover:bg-app-surface-muted hover:text-app-ink disabled:cursor-not-allowed"
               onClick={() => requestClose()}
-              disabled={isRegenerating}
             >
               关闭
             </Button>
