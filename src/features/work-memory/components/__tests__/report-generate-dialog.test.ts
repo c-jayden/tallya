@@ -68,3 +68,14 @@ describe('ReportGenerateDialog layout', () => {
     expect(source).not.toContain('可用记忆');
   });
 });
+
+describe('ReportGapDialog layout', () => {
+  const source = readFileSync(new URL('../report-gap-dialog.tsx', import.meta.url), 'utf8');
+
+  it('shows a left-aligned back action before supplement submission', () => {
+    expect(source).toContain('onBack: () => void');
+    expect(source).toContain('sm:justify-between');
+    expect(source).toContain('返回');
+    expect(source).toContain('onClick={onBack}');
+  });
+});

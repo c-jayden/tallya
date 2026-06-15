@@ -8,6 +8,7 @@ import {
   isValidReportDateRange,
 } from '../services/report-date';
 import { reportDraftRepository } from '../services/report-draft-repository';
+import type { ReportProgress } from '../services/report-draft-repository';
 import { reportService } from '../services/report-service';
 import type { GapAnswer, ReportContext, ReportDraft } from '../services/report-service';
 import { normalizeReportContent } from '../report-view-model';
@@ -32,9 +33,9 @@ export function useWeeklyReportFlow() {
   const [reportGaps, setReportGaps] = useState<ReportGap[]>([]);
   const [isGapDialogOpen, setIsGapDialogOpen] = useState(false);
   const [isDetectingGaps, setIsDetectingGaps] = useState(false);
-  // A generated-but-unsaved report recovered from a previous session; surfaced
-  // as a restore prompt the next time the user clicks 整理.
-  const [restoreDraft, setRestoreDraft] = useState<ReportDraft | null>(null);
+  // In-flight report progress recovered from a previous session; surfaced as a
+  // restore prompt the next time the user clicks 整理.
+  const [restoreProgress, setRestoreProgress] = useState<ReportProgress | null>(null);
   const [isRestorePromptOpen, setIsRestorePromptOpen] = useState(false);
   const currentWeekRange = getCurrentWeekRange();
   const hasCurrentWeekReport = reportListItems.some(
@@ -123,12 +124,12 @@ export function useWeeklyReportFlow() {
   }
 
   function openGenerateDialog() {
-    // If a previous session generated a report that was never saved, offer to
-    // pick it back up instead of silently starting over.
+    // If a previous session reached gap-fill or preview without saving, offer
+    // to pick it back up instead of silently starting over.
     const pending = reportDraftRepository.get();
 
     if (pending) {
-      setRestoreDraft(pending);
+      setRestoreProgress(pending);
       setIsRestorePromptOpen(true);
       return;
     }
@@ -137,22 +138,34 @@ export function useWeeklyReportFlow() {
   }
 
   function restoreLastReport() {
-    if (!restoreDraft) {
+    if (!restoreProgress) {
       return;
     }
 
-    setReportDraft(restoreDraft);
-    setReportType(restoreDraft.reportType);
-    setCustomStartDate(restoreDraft.startDate);
-    setCustomEndDate(restoreDraft.endDate);
+    if (restoreProgress.stage === 'gap') {
+      setReportType(restoreProgress.reportType);
+      setCustomStartDate(restoreProgress.startDate);
+      setCustomEndDate(restoreProgress.endDate);
+      setReportGaps(restoreProgress.gaps);
+      setIsGenerateDialogOpen(false);
+      setIsRestorePromptOpen(false);
+      setRestoreProgress(null);
+      setIsGapDialogOpen(true);
+      return;
+    }
+
+    setReportDraft(restoreProgress.draft);
+    setReportType(restoreProgress.draft.reportType);
+    setCustomStartDate(restoreProgress.draft.startDate);
+    setCustomEndDate(restoreProgress.draft.endDate);
     setIsRestorePromptOpen(false);
-    setRestoreDraft(null);
+    setRestoreProgress(null);
     setIsPreviewDialogOpen(true);
   }
 
   function discardLastReport() {
     reportDraftRepository.clear();
-    setRestoreDraft(null);
+    setRestoreProgress(null);
     setIsRestorePromptOpen(false);
     openGenerateDialogFresh();
   }
@@ -195,6 +208,16 @@ export function useWeeklyReportFlow() {
     setIsGapDialogOpen(false);
   }
 
+  function backToGenerateFromGaps() {
+    if (isGeneratingReport) {
+      return;
+    }
+
+    setIsGapDialogOpen(false);
+    setIsGenerateDialogOpen(true);
+    void loadContext(reportType, customStartDate, customEndDate);
+  }
+
   function getActiveRange() {
     return reportType === 'custom'
       ? { startDate: customStartDate, endDate: customEndDate }
@@ -214,7 +237,7 @@ export function useWeeklyReportFlow() {
       setReportDraft(draft as ReportDraft);
       // Persist immediately so a crash/refresh between here and save can be
       // recovered on the next 整理.
-      reportDraftRepository.save(draft as ReportDraft);
+      reportDraftRepository.save({ stage: 'preview', draft: draft as ReportDraft });
       setIsGapDialogOpen(false);
       setIsGenerateDialogOpen(false);
       setIsPreviewDialogOpen(true);
@@ -242,15 +265,22 @@ export function useWeeklyReportFlow() {
     setIsDetectingGaps(true);
 
     let gaps: ReportGap[];
+    const { startDate, endDate } = getActiveRange();
 
     try {
-      const { startDate, endDate } = getActiveRange();
       gaps = await reportService.getReportGaps(startDate, endDate);
     } finally {
       setIsDetectingGaps(false);
     }
 
     if (gaps.length > 0) {
+      reportDraftRepository.save({
+        stage: 'gap',
+        reportType,
+        startDate,
+        endDate,
+        gaps,
+      });
       setReportGaps(gaps);
       setIsGapDialogOpen(true);
       return;
@@ -386,7 +416,7 @@ export function useWeeklyReportFlow() {
       const draft = await reportService.generateReportForRange(selectedReport);
 
       setReportDraft(draft);
-      reportDraftRepository.save(draft);
+      reportDraftRepository.save({ stage: 'preview', draft });
       setIsReportDetailOpen(false);
       setIsPreviewDialogOpen(true);
     } catch (error) {
@@ -419,6 +449,7 @@ export function useWeeklyReportFlow() {
     reportGaps,
     isGapDialogOpen,
     setIsGapDialogOpen,
+    backToGenerateFromGaps,
     submitGapAnswers,
     skipGaps,
     hasSavedReports: reportListItems.length > 0,

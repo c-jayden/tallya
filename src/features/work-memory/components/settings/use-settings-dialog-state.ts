@@ -36,7 +36,7 @@ const initialLocalGatewayHealth: ProviderHealth = {
 };
 
 const SETTINGS_SAVE_DEBOUNCE_MS = 500;
-const REPORT_STYLE_EXTRACT_TIMEOUT_MS = 60_000;
+const REPORT_STYLE_EXTRACT_TIMEOUT_MS = 120_000;
 
 export function useSettingsDialogState({
   open,

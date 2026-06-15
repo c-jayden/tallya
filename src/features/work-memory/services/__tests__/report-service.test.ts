@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type {
   Clarification,
   CreateClarificationInput,
@@ -14,6 +14,18 @@ import {
   type ReportRepository,
 } from '../report-service';
 
+const loggerMock = vi.hoisted(() => ({
+  debug: vi.fn(),
+  warn: vi.fn(),
+}));
+
+vi.mock('../logger/logger', () => ({
+  logger: {
+    debug: loggerMock.debug,
+    warn: loggerMock.warn,
+  },
+}));
+
 const generatedReport: GeneratedReportContent = {
   title: '本周周报',
   summary: '本周完成存储迁移和通知验证。',
@@ -25,6 +37,11 @@ const generatedReport: GeneratedReportContent = {
 };
 
 describe('createReportService', () => {
+  beforeEach(() => {
+    loggerMock.debug.mockClear();
+    loggerMock.warn.mockClear();
+  });
+
   it('builds the weekly context from entries, oldest first with clarifications and thread titles', async () => {
     const service = createService({
       // Returned newest-first like the real repository; the service re-sorts ascending.
@@ -231,6 +248,19 @@ describe('createReportService', () => {
         },
       ],
     });
+    expect(loggerMock.debug).toHaveBeenCalledWith(
+      'ai',
+      'report-gaps.completed',
+      'Report gap detection completed',
+      {
+        startDate: '2026-06-01',
+        endDate: '2026-06-07',
+        entryCount: 1,
+        entriesWithThreadCount: 1,
+        entriesWithClarificationCount: 1,
+        gapCount: 1,
+      },
+    );
   });
 
   it('fails open to no gaps when detection throws', async () => {
@@ -240,6 +270,17 @@ describe('createReportService', () => {
     });
 
     await expect(service.getReportGaps('2026-06-01', '2026-06-07')).resolves.toEqual([]);
+    expect(loggerMock.warn).toHaveBeenCalledWith(
+      'ai',
+      'report-gaps.failed',
+      'Report gap detection failed',
+      {
+        startDate: '2026-06-01',
+        endDate: '2026-06-07',
+        entryCount: 1,
+        errorMessage: 'codex unavailable',
+      },
+    );
   });
 
   it('saves non-empty gap answers as clarifications', async () => {

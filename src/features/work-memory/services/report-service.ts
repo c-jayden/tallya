@@ -17,6 +17,7 @@ import { entryRepository as defaultEntryRepository } from './entry-repository';
 import { reportRepository as defaultReportRepository } from './report-repository';
 import { threadRepository as defaultThreadRepository } from './thread-repository';
 import { getCurrentWeekRange } from './report-date';
+import { logger } from './logger/logger';
 
 export type ReportEntryRepository = {
   listRange(startDate: string, endDate: string): Promise<Entry[]>;
@@ -191,15 +192,44 @@ export function createReportService({
     // Fail-open: any failure (no AI, network/parse error) yields no gaps so
     // report generation is never blocked or shown an error by gap detection.
     async getReportGaps(startDate: string, endDate: string): Promise<ReportGap[]> {
+      let gapEntries: ReportGapEntry[] = [];
+
       try {
-        const gapEntries = await buildGapEntries(sourceRepositories, startDate, endDate);
+        gapEntries = await buildGapEntries(sourceRepositories, startDate, endDate);
 
         if (gapEntries.length === 0) {
+          logger.debug('ai', 'report-gaps.completed', 'Report gap detection completed', {
+            startDate,
+            endDate,
+            entryCount: 0,
+            entriesWithThreadCount: 0,
+            entriesWithClarificationCount: 0,
+            gapCount: 0,
+            skippedReason: 'no_entries',
+          });
           return [];
         }
 
-        return await aiService.suggestReportGaps({ entries: gapEntries });
-      } catch {
+        const gaps = await aiService.suggestReportGaps({ entries: gapEntries });
+
+        logger.debug('ai', 'report-gaps.completed', 'Report gap detection completed', {
+          startDate,
+          endDate,
+          entryCount: gapEntries.length,
+          entriesWithThreadCount: gapEntries.filter((entry) => Boolean(entry.threadTitle)).length,
+          entriesWithClarificationCount: gapEntries.filter((entry) => entry.clarificationCount > 0)
+            .length,
+          gapCount: gaps.length,
+        });
+
+        return gaps;
+      } catch (error) {
+        logger.warn('ai', 'report-gaps.failed', 'Report gap detection failed', {
+          startDate,
+          endDate,
+          entryCount: gapEntries.length,
+          errorMessage: error instanceof Error ? error.message : String(error),
+        });
         return [];
       }
     },

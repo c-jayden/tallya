@@ -287,6 +287,7 @@ export function WorkMemoryHome() {
         gaps={weeklyReport.reportGaps}
         isGenerating={weeklyReport.isGeneratingReport}
         onOpenChange={weeklyReport.setIsGapDialogOpen}
+        onBack={weeklyReport.backToGenerateFromGaps}
         onSubmit={weeklyReport.submitGapAnswers}
         onSkip={weeklyReport.skipGaps}
       />

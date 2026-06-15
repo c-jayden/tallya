@@ -28,7 +28,7 @@ export function ReportRestoreConfirmDialog({
         <AlertDialogHeader>
           <AlertDialogTitle>恢复上次的整理进度？</AlertDialogTitle>
           <AlertDialogDescription>
-            上次整理已经生成了结果但还没保存。可以接着上次的结果继续，或重新整理一份。
+            上次整理还没有完成保存。可以接着上次的进度继续，或重新整理一份。
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

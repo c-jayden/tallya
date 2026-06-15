@@ -23,6 +23,7 @@ describe('useSettingsDialogState', () => {
 
   it('extracts report style prompt without saving pasted samples or settings directly', () => {
     expect(source).toContain('extractReportStylePrompt');
+    expect(source).toContain('const REPORT_STYLE_EXTRACT_TIMEOUT_MS = 120_000');
     expect(source).toContain('return result.promptHint');
     expect(source).toContain('sampleTextLength');
     expect(source).not.toContain('先粘贴一些历史日报或周报');

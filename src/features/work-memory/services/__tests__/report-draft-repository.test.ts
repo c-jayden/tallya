@@ -56,22 +56,52 @@ describe('reportDraftRepository', () => {
     expect(repository.get()).toBeNull();
   });
 
-  it('saves and reads back an unsaved report draft', () => {
+  it('saves and reads back an unsaved report preview', () => {
     const repository = createReportDraftRepository(new MemoryStorage());
     const draft = createDraft();
 
-    repository.save(draft);
+    repository.save({ stage: 'preview', draft });
 
-    expect(repository.get()).toEqual(draft);
+    expect(repository.get()).toEqual({ stage: 'preview', draft });
+  });
+
+  it('saves and reads back report gaps before preview generation', () => {
+    const repository = createReportDraftRepository(new MemoryStorage());
+    const progress = {
+      stage: 'gap' as const,
+      reportType: 'custom' as const,
+      startDate: '2026-06-01',
+      endDate: '2026-06-14',
+      gaps: [
+        {
+          entryId: 'entry_1',
+          threadTitle: '订单接口',
+          question: '这条线索后面推进到了哪一步？',
+        },
+      ],
+    };
+
+    repository.save(progress);
+
+    expect(repository.get()).toEqual(progress);
   });
 
   it('clears the draft', () => {
     const repository = createReportDraftRepository(new MemoryStorage());
 
-    repository.save(createDraft());
+    repository.save({ stage: 'preview', draft: createDraft() });
     repository.clear();
 
     expect(repository.get()).toBeNull();
+  });
+
+  it('restores legacy saved report drafts as preview progress', () => {
+    const storage = new MemoryStorage();
+    const draft = createDraft();
+    storage.setItem('tallya.report.unsaved-draft.v1', JSON.stringify(draft));
+    const repository = createReportDraftRepository(storage);
+
+    expect(repository.get()).toEqual({ stage: 'preview', draft });
   });
 
   it('ignores malformed stored data', () => {

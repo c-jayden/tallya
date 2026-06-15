@@ -23,6 +23,7 @@ type ReportGapDialogProps = {
   gaps: ReportGap[];
   isGenerating: boolean;
   onOpenChange: (open: boolean) => void;
+  onBack: () => void;
   onSubmit: (answers: GapAnswer[]) => void;
   onSkip: () => void;
 };
@@ -35,6 +36,7 @@ export function ReportGapDialog({
   gaps,
   isGenerating,
   onOpenChange,
+  onBack,
   onSubmit,
   onSkip,
 }: ReportGapDialogProps) {
@@ -108,28 +110,39 @@ export function ReportGapDialog({
             ))}
           </div>
         </TallyaScrollArea>
-        <TallyaDialogFooter>
+        <TallyaDialogFooter className="sm:justify-between">
           <Button
             type="button"
             variant="ghost"
             className="cursor-pointer text-app-ink-muted hover:bg-app-surface-muted hover:text-app-ink disabled:cursor-not-allowed"
-            onClick={handleSkip}
+            onClick={onBack}
             disabled={isGenerating}
           >
-            跳过，直接整理
+            返回
           </Button>
-          <Button
-            type="button"
-            variant="accent"
-            onClick={handleSubmit}
-            disabled={isGenerating}
-            aria-busy={isGenerating}
-          >
-            {isGenerating ? (
-              <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden="true" />
-            ) : null}
-            补充并整理
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              className="cursor-pointer text-app-ink-muted hover:bg-app-surface-muted hover:text-app-ink disabled:cursor-not-allowed"
+              onClick={handleSkip}
+              disabled={isGenerating}
+            >
+              跳过，直接整理
+            </Button>
+            <Button
+              type="button"
+              variant="accent"
+              onClick={handleSubmit}
+              disabled={isGenerating}
+              aria-busy={isGenerating}
+            >
+              {isGenerating ? (
+                <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden="true" />
+              ) : null}
+              补充并整理
+            </Button>
+          </div>
         </TallyaDialogFooter>
       </DialogContent>
     </Dialog>
