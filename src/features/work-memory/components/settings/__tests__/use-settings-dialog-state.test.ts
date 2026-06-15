@@ -23,6 +23,10 @@ describe('useSettingsDialogState', () => {
 
   it('extracts report style prompt without saving pasted samples or settings directly', () => {
     expect(source).toContain('extractReportStylePrompt');
+    expect(source).toContain('aiTaskCoordinator?: AiTaskCoordinatorControls');
+    expect(source).toContain("await aiTaskCoordinator?.beginTask('style-extract')");
+    expect(source).toContain("createAiTask('style-extract', 'completed')");
+    expect(source).toContain("createAiTask('style-extract', 'failed'");
     expect(source).toContain('const REPORT_STYLE_EXTRACT_TIMEOUT_MS = 120_000');
     expect(source).toContain('return result.promptHint');
     expect(source).toContain('sampleTextLength');

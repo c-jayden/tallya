@@ -26,4 +26,16 @@ describe('WorkMemoryHome selected date wiring', () => {
     expect(source).toContain('<ReportGenerateDialog');
     expect(source).toContain('onReportsClick');
   });
+
+  it('wires foreground-aware AI task handling into explicit AI flows and tray events', () => {
+    const source = readFileSync(new URL('../work-memory-home.tsx', import.meta.url), 'utf8');
+
+    expect(source).toContain('useAiTaskCoordinator');
+    expect(source).toContain('const aiTasks = useAiTaskCoordinator()');
+    expect(source).toContain('useWeeklyReportFlow({ aiTaskCoordinator: aiTasks })');
+    expect(source).toContain('useDailyReportFlow({ aiTaskCoordinator: aiTasks })');
+    expect(source).toContain('aiTaskCoordinator={aiTasks}');
+    expect(source).toContain('onWindowHidden: aiTasks.handleWindowHidden');
+    expect(source).toContain('onCloseBlocked: aiTasks.handleCloseBlocked');
+  });
 });

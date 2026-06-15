@@ -28,4 +28,13 @@ describe('useWeeklyReportFlow progress restore', () => {
     expect(source).toContain('setIsGenerateDialogOpen(true)');
     expect(source).toContain('backToGenerateFromGaps');
   });
+
+  it('coordinates report gap detection and report generation as active AI tasks', () => {
+    expect(source).toContain('aiTaskCoordinator?: AiTaskCoordinatorControls');
+    expect(source).toContain("await aiTaskCoordinator?.beginTask('report-gaps')");
+    expect(source).toContain("createAiTask('report-gaps', 'needs-input')");
+    expect(source).toContain("await aiTaskCoordinator?.beginTask('range-report')");
+    expect(source).toContain("createAiTask('range-report', 'completed')");
+    expect(source).toContain("createAiTask('range-report', 'failed'");
+  });
 });

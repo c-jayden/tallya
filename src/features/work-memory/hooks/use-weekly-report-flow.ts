@@ -13,8 +13,16 @@ import { reportService } from '../services/report-service';
 import type { GapAnswer, ReportContext, ReportDraft } from '../services/report-service';
 import { normalizeReportContent } from '../report-view-model';
 import type { Report, ReportGap, ReportGenerationType } from '../types';
+import {
+  createAiTask,
+  type AiTaskCoordinatorControls,
+} from './use-ai-task-coordinator';
 
-export function useWeeklyReportFlow() {
+type UseWeeklyReportFlowOptions = {
+  aiTaskCoordinator?: AiTaskCoordinatorControls;
+};
+
+export function useWeeklyReportFlow({ aiTaskCoordinator }: UseWeeklyReportFlowOptions = {}) {
   const defaultCustomRange = getDefaultCustomReportRange();
   const [isGenerateDialogOpen, setIsGenerateDialogOpen] = useState(false);
   const [isLoadingContext, setIsLoadingContext] = useState(false);
@@ -227,6 +235,7 @@ export function useWeeklyReportFlow() {
   // Run the actual AI report generation (the gap-fill step happens before this).
   async function runGenerate() {
     setIsGeneratingReport(true);
+    await aiTaskCoordinator?.beginTask('range-report');
 
     try {
       const draft =
@@ -241,9 +250,11 @@ export function useWeeklyReportFlow() {
       setIsGapDialogOpen(false);
       setIsGenerateDialogOpen(false);
       setIsPreviewDialogOpen(true);
+      await aiTaskCoordinator?.updateTask(createAiTask('range-report', 'completed'));
     } catch (error) {
       const message = error instanceof Error ? error.message : '整理失败，请稍后重试。';
 
+      await aiTaskCoordinator?.updateTask(createAiTask('range-report', 'failed', message));
       toast.error(message);
       await loadContext();
     } finally {
@@ -263,6 +274,7 @@ export function useWeeklyReportFlow() {
     // First ask the AI whether any important-but-thin thread is worth fleshing
     // out; if so, surface the gap dialog instead of generating right away.
     setIsDetectingGaps(true);
+    await aiTaskCoordinator?.beginTask('report-gaps');
 
     let gaps: ReportGap[];
     const { startDate, endDate } = getActiveRange();
@@ -283,6 +295,7 @@ export function useWeeklyReportFlow() {
       });
       setReportGaps(gaps);
       setIsGapDialogOpen(true);
+      await aiTaskCoordinator?.updateTask(createAiTask('report-gaps', 'needs-input'));
       return;
     }
 
@@ -411,6 +424,7 @@ export function useWeeklyReportFlow() {
     }
 
     setIsGeneratingReport(true);
+    await aiTaskCoordinator?.beginTask('range-report');
 
     try {
       const draft = await reportService.generateReportForRange(selectedReport);
@@ -419,9 +433,11 @@ export function useWeeklyReportFlow() {
       reportDraftRepository.save({ stage: 'preview', draft });
       setIsReportDetailOpen(false);
       setIsPreviewDialogOpen(true);
+      await aiTaskCoordinator?.updateTask(createAiTask('range-report', 'completed'));
     } catch (error) {
       const message = error instanceof Error ? error.message : '整理失败，请稍后重试。';
 
+      await aiTaskCoordinator?.updateTask(createAiTask('range-report', 'failed', message));
       toast.error(message);
     } finally {
       setIsGeneratingReport(false);

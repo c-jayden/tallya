@@ -3,6 +3,10 @@ import { toast } from 'sonner';
 import { aiService } from '../services/ai/ai-service';
 import { assembleDailyReportSource, assemblePlainDailyReport } from '../services/daily-report';
 import type { Clarification, Entry } from '../types';
+import {
+  createAiTask,
+  type AiTaskCoordinatorControls,
+} from './use-ai-task-coordinator';
 
 type OpenInput = {
   date: string;
@@ -10,7 +14,11 @@ type OpenInput = {
   clarificationsByEntry: Record<string, Clarification[]>;
 };
 
-export function useDailyReportFlow() {
+type UseDailyReportFlowOptions = {
+  aiTaskCoordinator?: AiTaskCoordinatorControls;
+};
+
+export function useDailyReportFlow({ aiTaskCoordinator }: UseDailyReportFlowOptions = {}) {
   const [isOpen, setIsOpen] = useState(false);
   const [reportText, setReportText] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -41,6 +49,7 @@ export function useDailyReportFlow() {
     }
 
     setIsGenerating(true);
+    await aiTaskCoordinator?.beginTask('daily-report');
 
     try {
       const generated = await aiService.generateDailyMemory({
@@ -52,17 +61,25 @@ export function useDailyReportFlow() {
 
       if (text) {
         setReportText(text);
+        await aiTaskCoordinator?.updateTask(createAiTask('daily-report', 'completed'));
       } else {
         toast.warning('AI 没有返回可用内容，已保留当前整理。');
+        await aiTaskCoordinator?.updateTask(
+          createAiTask('daily-report', 'failed', 'AI 没有返回可用内容，已保留当前整理。'),
+        );
       }
     } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'AI 整理失败，可以直接使用或编辑当前文本。';
+
+      await aiTaskCoordinator?.updateTask(createAiTask('daily-report', 'failed', message));
       toast.error(
-        error instanceof Error ? error.message : 'AI 整理失败，可以直接使用或编辑当前文本。',
+        message,
       );
     } finally {
       setIsGenerating(false);
     }
-  }, [isGenerating, source]);
+  }, [aiTaskCoordinator, isGenerating, source]);
 
   const copy = useCallback(async () => {
     const text = reportText.trim();

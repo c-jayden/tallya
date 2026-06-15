@@ -27,6 +27,11 @@ export type AiTaskAlert = {
   target?: AiTaskKind;
 };
 
+export type AiTaskCoordinatorControls = {
+  beginTask: (kind: AiTaskKind, message?: string) => Promise<AiTask>;
+  updateTask: (task: AiTask) => Promise<void>;
+};
+
 type NotifyDependencies = {
   getMainWindowState: () => Promise<MainWindowState>;
   sendNotification: (body: string) => Promise<void>;

@@ -14,6 +14,10 @@ import { logger } from '../../services/logger/logger';
 import { reminderService } from '../../services/reminder-service';
 import { syncWindowBehaviorSettings } from '../../services/window-service';
 import {
+  createAiTask,
+  type AiTaskCoordinatorControls,
+} from '../../hooks/use-ai-task-coordinator';
+import {
   defaultSettingsSection,
   type ProviderHealth,
   type SettingsSection,
@@ -23,6 +27,7 @@ type UseSettingsDialogStateOptions = {
   open: boolean;
   onClearLocalData: () => Promise<void>;
   onDataRestored?: () => Promise<void>;
+  aiTaskCoordinator?: AiTaskCoordinatorControls;
 };
 
 const initialProviderHealth: ProviderHealth = {
@@ -42,6 +47,7 @@ export function useSettingsDialogState({
   open,
   onClearLocalData,
   onDataRestored,
+  aiTaskCoordinator,
 }: UseSettingsDialogStateOptions) {
   const asyncRunId = useRef(0);
   // Separate run-id: the AI section fires the gateway + provider checks together,
@@ -413,6 +419,7 @@ export function useSettingsDialogState({
     }
 
     setIsExtractingReportStyle(true);
+    await aiTaskCoordinator?.beginTask('style-extract');
 
     try {
       const result = await withTimeout(
@@ -426,8 +433,12 @@ export function useSettingsDialogState({
         throw new Error('没有提取到可用风格，请换一段样本再试。');
       }
 
+      await aiTaskCoordinator?.updateTask(createAiTask('style-extract', 'completed'));
       return result.promptHint.trim();
     } catch (error) {
+      const message = error instanceof Error ? error.message : '风格提取失败，请稍后重试';
+
+      await aiTaskCoordinator?.updateTask(createAiTask('style-extract', 'failed', message));
       logger.error('settings', 'report_style.extract_failed', 'Failed to extract report style', {
         sampleTextLength: trimmedSampleText.length,
         error,

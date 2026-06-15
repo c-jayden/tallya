@@ -22,6 +22,7 @@ import { useMemorySearch } from './hooks/use-memory-search';
 import { useThreadsPanel } from './hooks/use-threads-panel';
 import { useTodayDate } from './hooks/use-today-date';
 import { useWeeklyReportFlow } from './hooks/use-weekly-report-flow';
+import { useAiTaskCoordinator } from './hooks/use-ai-task-coordinator';
 import { useTrayWindowEvents } from './hooks/use-tray-window-events';
 import { useWorkMemoryShortcuts } from './hooks/use-work-memory-shortcuts';
 import {
@@ -82,8 +83,9 @@ export function WorkMemoryHome() {
 
   const search = useMemorySearch({ onOpenMemory: openEntry });
   const threads = useThreadsPanel();
-  const weeklyReport = useWeeklyReportFlow();
-  const dailyReport = useDailyReportFlow();
+  const aiTasks = useAiTaskCoordinator();
+  const weeklyReport = useWeeklyReportFlow({ aiTaskCoordinator: aiTasks });
+  const dailyReport = useDailyReportFlow({ aiTaskCoordinator: aiTasks });
   const reportsButtonRef = useRef<HTMLButtonElement>(null);
 
   function openEntryFromThread(entry: Entry) {
@@ -143,6 +145,8 @@ export function WorkMemoryHome() {
       closeOverlays();
       setIsSettingsOpen(true);
     },
+    onWindowHidden: aiTasks.handleWindowHidden,
+    onCloseBlocked: aiTasks.handleCloseBlocked,
   });
 
   function updateSelectedDate(date: string) {
@@ -331,6 +335,7 @@ export function WorkMemoryHome() {
         onOpenChange={setIsSettingsOpen}
         onClearLocalData={handleClearLocalData}
         onDataRestored={entries.reload}
+        aiTaskCoordinator={aiTasks}
       />
 
       <DailyReportDialog
