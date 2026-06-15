@@ -134,44 +134,46 @@ export function createBackupService(dependencies: BackupServiceDependencies) {
     },
 
     async restoreBackupPayload(payload: BackupPayload) {
-      return runBackupRestoreTransaction(dependencies, async () => {
-        const entries =
-          payload.version === 1
-            ? buildEntriesFromDailyMemories(payload.data.dailyMemories ?? [])
-            : payload.data.entries;
+      const entries =
+        payload.version === 1
+          ? buildEntriesFromDailyMemories(payload.data.dailyMemories ?? [])
+          : payload.data.entries;
 
+      await runBackupRestoreTransaction(dependencies, async () => {
         await dependencies.threadRepository.replaceAll(payload.data.threads);
         await dependencies.entryRepository.replaceAll(entries);
         await dependencies.clarificationRepository.replaceAll(payload.data.clarifications);
         await dependencies.reportRepository.replaceAll(payload.data.reports);
+      });
 
-        // Exports strip API keys, so empty keys in the backup must not wipe
-        // the keys already configured on this machine.
-        const restoredSettings = payload.data.appSettings;
-        const hasOpenAIKey = hasText(restoredSettings.openAICompatible?.apiKey);
-        const hasAnthropicKey = hasText(restoredSettings.anthropic?.apiKey);
+      // Settings are saved after the data transaction, not inside it:
+      // saveSettings opens its own transaction, and nesting BEGIN within BEGIN
+      // breaks on SQLite. Exports strip API keys, so empty keys in the backup
+      // must not wipe the keys already configured on this machine.
+      const restoredSettings = payload.data.appSettings;
+      const hasOpenAIKey = hasText(restoredSettings.openAICompatible?.apiKey);
+      const hasAnthropicKey = hasText(restoredSettings.anthropic?.apiKey);
 
-        if (hasOpenAIKey && hasAnthropicKey) {
-          return dependencies.appSettingsRepository.saveSettings(restoredSettings);
-        }
+      if (hasOpenAIKey && hasAnthropicKey) {
+        return dependencies.appSettingsRepository.saveSettings(restoredSettings);
+      }
 
-        const currentSettings = await dependencies.appSettingsRepository.getSettings();
+      const currentSettings = await dependencies.appSettingsRepository.getSettings();
 
-        return dependencies.appSettingsRepository.saveSettings({
-          ...restoredSettings,
-          openAICompatible: {
-            ...restoredSettings.openAICompatible,
-            apiKey: hasOpenAIKey
-              ? restoredSettings.openAICompatible.apiKey
-              : currentSettings.openAICompatible.apiKey,
-          },
-          anthropic: {
-            ...restoredSettings.anthropic,
-            apiKey: hasAnthropicKey
-              ? restoredSettings.anthropic.apiKey
-              : currentSettings.anthropic.apiKey,
-          },
-        });
+      return dependencies.appSettingsRepository.saveSettings({
+        ...restoredSettings,
+        openAICompatible: {
+          ...restoredSettings.openAICompatible,
+          apiKey: hasOpenAIKey
+            ? restoredSettings.openAICompatible.apiKey
+            : currentSettings.openAICompatible.apiKey,
+        },
+        anthropic: {
+          ...restoredSettings.anthropic,
+          apiKey: hasAnthropicKey
+            ? restoredSettings.anthropic.apiKey
+            : currentSettings.anthropic.apiKey,
+        },
       });
     },
 

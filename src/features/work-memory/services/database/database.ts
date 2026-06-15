@@ -43,39 +43,59 @@ async function loadDatabase() {
 }
 
 export function createDatabaseClient(database: Pick<DatabaseClient, 'execute' | 'select'>): DatabaseClient {
-  let transactionDepth = 0;
+  const execute = (query: string, bindValues?: unknown[]) => database.execute(query, bindValues);
+  const select = <T>(query: string, bindValues?: unknown[]) => database.select<T>(query, bindValues);
+
+  // Tauri's SQL plugin runs over a connection pool, and BEGIN/COMMIT are issued
+  // as separate statements. Two overlapping transactions therefore race on
+  // BEGIN ("cannot start a transaction within a transaction") and on the write
+  // lock ("database is locked"). Chain every transaction onto the previous one
+  // so they run strictly one at a time.
+  let tail: Promise<unknown> = Promise.resolve();
+
+  // Passed to a transaction's operation: a nested transaction() call reuses the
+  // running transaction instead of issuing a second BEGIN (which would deadlock
+  // against the queue).
+  const transactionClient: DatabaseClient = {
+    execute,
+    select,
+    transaction: (operation) => operation(transactionClient),
+  };
 
   const client: DatabaseClient = {
-    execute: (query, bindValues) => database.execute(query, bindValues),
-    select: <T>(query: string, bindValues?: unknown[]) => database.select<T>(query, bindValues),
-    async transaction<T>(operation: (database: DatabaseClient) => Promise<T>) {
-      if (transactionDepth > 0) {
-        return operation(client);
-      }
+    execute,
+    select,
+    transaction<T>(operation: (database: DatabaseClient) => Promise<T>) {
+      const run = async (): Promise<T> => {
+        await execute('BEGIN IMMEDIATE');
 
-      await client.execute('BEGIN IMMEDIATE');
-      transactionDepth += 1;
-
-      try {
-        const result = await operation(client);
-        await client.execute('COMMIT');
-
-        return result;
-      } catch (error) {
         try {
-          await client.execute('ROLLBACK');
-        } catch (rollbackError) {
-          logger.warn('sqlite', 'database.transaction_rollback_failed', 'Failed to roll back SQLite transaction', {
-            error: rollbackError,
-          });
-        }
+          const result = await operation(transactionClient);
+          await execute('COMMIT');
 
-        throw error;
-      } finally {
-        transactionDepth -= 1;
-      }
+          return result;
+        } catch (error) {
+          try {
+            await execute('ROLLBACK');
+          } catch (rollbackError) {
+            logger.warn('sqlite', 'database.transaction_rollback_failed', 'Failed to roll back SQLite transaction', {
+              error: rollbackError,
+            });
+          }
+
+          throw error;
+        }
+      };
+
+      const result = tail.then(run, run);
+      // Keep the queue alive regardless of this transaction's outcome.
+      tail = result.then(noop, noop);
+
+      return result;
     },
   };
 
   return client;
 }
+
+function noop() {}

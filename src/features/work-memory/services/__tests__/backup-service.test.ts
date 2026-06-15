@@ -125,7 +125,7 @@ describe('backup-service', () => {
     expect(appSettingsRepository.saveSettings).toHaveBeenCalledWith(payload.data.appSettings);
   });
 
-  it('restores backup data inside the provided transaction boundary', async () => {
+  it('restores backup data inside the transaction, then saves settings afterward', async () => {
     const payload = createBackupPayload({
       entries: [createEntry()],
       clarifications: [createClarification()],
@@ -189,8 +189,8 @@ describe('backup-service', () => {
       'entries',
       'clarifications',
       'reports',
-      'settings',
       'commit',
+      'settings',
     ]);
   });
 
