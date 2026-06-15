@@ -38,4 +38,11 @@ describe('WorkMemoryHome selected date wiring', () => {
     expect(source).toContain('onWindowHidden: aiTasks.handleWindowHidden');
     expect(source).toContain('onCloseBlocked: aiTasks.handleCloseBlocked');
   });
+
+  it('does not render dialog-scoped AI status on the home surface', () => {
+    const source = readFileSync(new URL('../work-memory-home.tsx', import.meta.url), 'utf8');
+
+    expect(source).not.toContain('<WorkMemoryAlerts');
+    expect(source).toContain('aiAlert={dailyReport.aiAlert}');
+  });
 });

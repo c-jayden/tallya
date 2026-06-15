@@ -10,4 +10,11 @@ describe('useDailyReportFlow AI task coordination', () => {
     expect(source).toContain("createAiTask('daily-report', 'completed')");
     expect(source).toContain("createAiTask('daily-report', 'failed'");
   });
+
+  it('keeps daily report AI status local to the dialog flow', () => {
+    expect(source).toContain('const [aiAlert, setAiAlert]');
+    expect(source).toContain("setAiAlert(createDailyReportAiAlert('info'");
+    expect(source).toContain("setAiAlert(createDailyReportAiAlert('success'");
+    expect(source).toContain("setAiAlert(createDailyReportAiAlert('error'");
+  });
 });

@@ -13,7 +13,6 @@ import { ReportRestoreConfirmDialog } from './components/report-restore-confirm-
 import { SettingsDialog } from './components/settings-dialog';
 import { SpotlightSearchPanel } from './components/spotlight-search-panel';
 import { ThreadsPanel } from './components/threads-panel';
-import { WorkMemoryAlerts } from './components/work-memory-alerts';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { getCommandKeyLabel } from '@/lib/platform';
 import { useDailyReportFlow } from './hooks/use-daily-report-flow';
@@ -33,7 +32,6 @@ import {
   isTodayDate,
 } from './memory-date-view-model';
 import type { Entry } from './types';
-import type { AiTaskKind } from './hooks/use-ai-task-coordinator';
 
 export function WorkMemoryHome() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -110,17 +108,6 @@ export function WorkMemoryHome() {
       entries: entries.entries,
       clarificationsByEntry: entries.clarificationsByEntry,
     });
-  }
-
-  function openAiTaskTarget(target: AiTaskKind | undefined) {
-    if (target === 'style-extract') {
-      closeOverlays();
-      setIsSettingsOpen(true);
-    } else if (target === 'daily-report' && !dailyReport.isOpen && entries.entries.length > 0) {
-      openDailyReport();
-    }
-
-    aiTasks.dismissAlert();
   }
 
   const toolbarDate = formatToolbarDate(selectedDate);
@@ -215,12 +202,6 @@ export function WorkMemoryHome() {
             title={heroCopy.title}
             description={heroCopy.description}
             selectedDateHint={selectedDateHint}
-          />
-
-          <WorkMemoryAlerts
-            alert={aiTasks.alert}
-            onAction={openAiTaskTarget}
-            onDismiss={aiTasks.dismissAlert}
           />
 
           <EntryComposer
@@ -362,11 +343,13 @@ export function WorkMemoryHome() {
         dateLabel={isSelectedDateToday ? '今天' : toolbarDate.date}
         reportText={dailyReport.reportText}
         isGenerating={dailyReport.isGenerating}
+        aiAlert={dailyReport.aiAlert}
         onOpenChange={(open) => {
           if (!open) {
             dailyReport.close();
           }
         }}
+        onForceClose={dailyReport.forceClose}
         onTextChange={dailyReport.setReportText}
         onGenerateWithAI={dailyReport.generateWithAI}
         onCopy={dailyReport.copy}
