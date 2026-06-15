@@ -1,9 +1,10 @@
-import { useState, type KeyboardEvent as ReactKeyboardEvent, type Ref } from 'react';
+import { type KeyboardEvent as ReactKeyboardEvent, type Ref } from 'react';
 import { CornerDownLeft, Loader2, Plus } from 'lucide-react';
 import { TallyaScrollArea } from '@/components/tallya-scroll-area';
 import { Button } from '@/components/ui/button';
 import { Kbd, KbdGroup } from '@/components/ui/kbd';
 import { Textarea } from '@/components/ui/textarea';
+import { useComposerDraft } from '../hooks/use-composer-draft';
 
 type EntryComposerProps = {
   placeholder: string;
@@ -13,7 +14,7 @@ type EntryComposerProps = {
 };
 
 export function EntryComposer({ placeholder, isSaving, inputRef, onSubmit }: EntryComposerProps) {
-  const [value, setValue] = useState('');
+  const { draft: value, setDraft: setValue, clearDraft } = useComposerDraft();
 
   async function submit() {
     if (!value.trim() || isSaving) {
@@ -23,7 +24,7 @@ export function EntryComposer({ placeholder, isSaving, inputRef, onSubmit }: Ent
     const saved = await onSubmit(value);
 
     if (saved) {
-      setValue('');
+      clearDraft();
     }
   }
 
