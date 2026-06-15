@@ -42,9 +42,20 @@ type ReportGenerateDialogProps = {
   onReportTypeChange: (reportType: ReportGenerationType) => void;
   onCustomStartDateChange: (date: string) => void;
   onCustomEndDateChange: (date: string) => void;
-  onGenerate: () => void;
+  onGenerate: (saveIntent?: ReportGenerateIntent) => void;
   onViewReports: () => void;
 };
+
+type ConfirmMode = 'exact' | 'overlap';
+
+type ReportGenerateIntent =
+  | {
+      saveMode: 'create';
+    }
+  | {
+      saveMode: 'overwrite';
+      overwriteReportId: string;
+    };
 
 export function ReportGenerateDialog({
   open,
@@ -61,13 +72,15 @@ export function ReportGenerateDialog({
   onGenerate,
   onViewReports,
 }: ReportGenerateDialogProps) {
-  const [isOverwriteConfirmOpen, setIsOverwriteConfirmOpen] = useState(false);
+  const [confirmMode, setConfirmMode] = useState<ConfirmMode | null>(null);
   const availableMemoryCount = context?.entries.length ?? 0;
   const availableDayCount = context
     ? new Set(context.entries.map((entry) => entry.occurredOn)).size
     : 0;
   const hasAvailableMemories = availableMemoryCount > 0;
   const hasExistingReport = Boolean(context?.existingReport);
+  const overlappingReports = context?.overlappingReports ?? [];
+  const hasOverlappingReports = overlappingReports.length > 0;
   const isRangeValid =
     reportType === 'weekly' || isValidReportDateRange(customStartDate, customEndDate);
   const dialogState = getReportGenerateDialogState({
@@ -80,8 +93,8 @@ export function ReportGenerateDialog({
   });
   const existingReportCopy =
     reportType === 'custom'
-      ? '这个时间范围已保存过整理结果，重新整理会覆盖原内容。'
-      : '本周已经保存过整理结果，重新整理会覆盖原内容。';
+      ? '已有相同时间范围的整理，可以覆盖原整理，也可以新增一份。'
+      : '已有相同时间范围的整理，可以覆盖原整理，也可以新增一份。';
   const countCopy =
     reportType === 'custom'
       ? `该范围内 ${availableDayCount} 天 · ${availableMemoryCount} 条记录`
@@ -99,15 +112,37 @@ export function ReportGenerateDialog({
     }
 
     if (hasExistingReport) {
-      setIsOverwriteConfirmOpen(true);
+      setConfirmMode('exact');
+      return;
+    }
+
+    if (hasOverlappingReports) {
+      setConfirmMode('overlap');
       return;
     }
 
     onGenerate();
   }
 
+  function handleCreateDuplicate() {
+    setConfirmMode(null);
+    onGenerate({ saveMode: 'create' });
+  }
+
   function handleConfirmOverwrite() {
-    setIsOverwriteConfirmOpen(false);
+    if (!context?.existingReport) {
+      return;
+    }
+
+    setConfirmMode(null);
+    onGenerate({
+      saveMode: 'overwrite',
+      overwriteReportId: context.existingReport.id,
+    });
+  }
+
+  function handleContinueWithOverlap() {
+    setConfirmMode(null);
     onGenerate();
   }
 
@@ -203,6 +238,11 @@ export function ReportGenerateDialog({
                   {existingReportCopy}
                 </p>
               ) : null}
+              {!isLoading && !hasExistingReport && hasOverlappingReports ? (
+                <p className="rounded-lg bg-app-surface-muted px-3 py-2 text-[13px] leading-[1.5] text-app-ink-muted">
+                  已有整理记录和这个时间范围重叠，继续整理会新增一份。
+                </p>
+              ) : null}
             </div>
           </TallyaScrollArea>
           <TallyaDialogFooter className="sm:justify-between">
@@ -245,21 +285,47 @@ export function ReportGenerateDialog({
           </TallyaDialogFooter>
         </DialogContent>
       </Dialog>
-      <AlertDialog open={isOverwriteConfirmOpen} onOpenChange={setIsOverwriteConfirmOpen}>
+      <AlertDialog
+        open={confirmMode !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setConfirmMode(null);
+          }
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {reportType === 'custom' ? '重新整理这段时间？' : '重新整理本周？'}
+              {confirmMode === 'exact'
+                ? '已有相同时间范围的整理'
+                : '已有整理记录和这个时间范围重叠'}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              重新整理会覆盖当前保存的内容。
+              {confirmMode === 'exact'
+                ? '可以覆盖原整理，也可以保留原内容并新增一份。'
+                : '继续整理会新增一份，不会改动已有记录。'}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel className="cursor-pointer">取消</AlertDialogCancel>
-            <AlertDialogAction className="cursor-pointer" onClick={handleConfirmOverwrite}>
-              重新整理
-            </AlertDialogAction>
+            {confirmMode === 'exact' ? (
+              <>
+                <AlertDialogAction
+                  variant="outline"
+                  className="cursor-pointer"
+                  onClick={handleCreateDuplicate}
+                >
+                  新增一份
+                </AlertDialogAction>
+                <AlertDialogAction className="cursor-pointer" onClick={handleConfirmOverwrite}>
+                  覆盖原整理
+                </AlertDialogAction>
+              </>
+            ) : (
+              <AlertDialogAction className="cursor-pointer" onClick={handleContinueWithOverlap}>
+                继续整理
+              </AlertDialogAction>
+            )}
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

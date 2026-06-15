@@ -68,10 +68,15 @@ export type ReportContext = {
   endDate: string;
   entries: ReportSourceEntry[];
   existingReport: Report | null;
+  overlappingReports?: Report[];
 };
+
+export type ReportSaveMode = 'overwrite' | 'create';
 
 export type ReportDraft = ReportContext & {
   generated: GeneratedReportContent;
+  saveMode?: ReportSaveMode;
+  overwriteReportId?: string;
 };
 
 export type WeeklyReportContext = Omit<ReportContext, 'reportType'>;
@@ -161,16 +166,29 @@ export function createReportService({
     },
 
     async saveReport(draft: ReportDraft): Promise<Report> {
-      const existingReport =
-        draft.existingReport ??
-        (await reportRepository.getReportByTypeAndRange(
-          draft.reportType,
-          draft.startDate,
-          draft.endDate,
-        ));
       const timestamp = now().toISOString();
+      const overwriteReport = draft.overwriteReportId
+        ? await reportRepository.getReportById(draft.overwriteReportId)
+        : null;
+      const existingReport =
+        draft.saveMode === 'create'
+          ? null
+          : overwriteReport ??
+            draft.existingReport ??
+            (await reportRepository.getReportByTypeAndRange(
+              draft.reportType,
+              draft.startDate,
+              draft.endDate,
+            ));
       const report: Report = {
-        id: existingReport?.id ?? getReportId(draft.reportType, draft.startDate, draft.endDate),
+        id:
+          existingReport?.id ??
+          getReportId(
+            draft.reportType,
+            draft.startDate,
+            draft.endDate,
+            draft.saveMode === 'create' ? timestamp : undefined,
+          ),
         type: draft.reportType,
         title: draft.generated.title,
         startDate: draft.startDate,
@@ -338,17 +356,19 @@ async function getReportContext(
   startDate: string,
   endDate: string,
 ): Promise<ReportContext> {
-  const [entries, existingReport] = await Promise.all([
+  const [entries, savedReports] = await Promise.all([
     buildReportEntries(repositories, startDate, endDate),
-    reportRepository.getReportByTypeAndRange(reportType, startDate, endDate),
+    reportRepository.getReportsByType(reportType),
   ]);
+  const rangeConflict = getReportRangeConflict(savedReports, startDate, endDate);
 
   return {
     reportType,
     startDate,
     endDate,
     entries,
-    existingReport,
+    existingReport: rangeConflict.exactReport,
+    overlappingReports: rangeConflict.overlappingReports,
   };
 }
 
@@ -379,6 +399,7 @@ function toWeeklyContext(context: ReportContext): WeeklyReportContext {
     endDate: context.endDate,
     entries: context.entries,
     existingReport: context.existingReport,
+    overlappingReports: context.overlappingReports,
   };
 }
 
@@ -398,6 +419,30 @@ function getSupportedGenerationType(type: Report['type']): ReportGenerationType 
   return 'weekly';
 }
 
-function getReportId(reportType: ReportGenerationType, startDate: string, endDate: string) {
-  return `${reportType}-report-${startDate}-${endDate}`;
+function getReportRangeConflict(reports: Report[], startDate: string, endDate: string) {
+  const exactReport =
+    reports.find((report) => report.startDate === startDate && report.endDate === endDate) ?? null;
+  const overlappingReports = reports.filter(
+    (report) =>
+      (report.startDate !== startDate || report.endDate !== endDate) &&
+      report.startDate <= endDate &&
+      report.endDate >= startDate,
+  );
+
+  return { exactReport, overlappingReports };
+}
+
+function getReportId(
+  reportType: ReportGenerationType,
+  startDate: string,
+  endDate: string,
+  uniqueSeed?: string,
+) {
+  const baseId = `${reportType}-report-${startDate}-${endDate}`;
+
+  if (!uniqueSeed) {
+    return baseId;
+  }
+
+  return `${baseId}-${uniqueSeed.replace(/\D/g, '')}`;
 }

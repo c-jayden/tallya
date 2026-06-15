@@ -67,6 +67,19 @@ describe('ReportGenerateDialog layout', () => {
     expect(source).not.toContain('生成报告');
     expect(source).not.toContain('可用记忆');
   });
+
+  it('separates exact-range overwrite from overlapping-range continuation', () => {
+    const source = readFileSync(new URL('../report-generate-dialog.tsx', import.meta.url), 'utf8');
+
+    expect(source).toContain("type ConfirmMode = 'exact' | 'overlap'");
+    expect(source).toContain('已有相同时间范围的整理');
+    expect(source).toContain('覆盖原整理');
+    expect(source).toContain('新增一份');
+    expect(source).toContain('已有整理记录和这个时间范围重叠');
+    expect(source).toContain('继续整理');
+    expect(source).toContain("saveMode: 'create'");
+    expect(source).toContain("saveMode: 'overwrite'");
+  });
 });
 
 describe('ReportGapDialog layout', () => {

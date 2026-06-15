@@ -71,7 +71,39 @@ describe('createReportService', () => {
         },
       ],
       existingReport: null,
+      overlappingReports: [],
     });
+  });
+
+  it('reports exact and overlapping saved reports for the active range', async () => {
+    const exactReport = createReport({
+      id: 'same-range',
+      startDate: '2026-06-01',
+      endDate: '2026-06-07',
+    });
+    const overlappingReport = createReport({
+      id: 'overlap',
+      startDate: '2026-05-30',
+      endDate: '2026-06-03',
+    });
+    const outsideReport = createReport({
+      id: 'outside',
+      startDate: '2026-06-08',
+      endDate: '2026-06-14',
+    });
+    const service = createService({
+      entries: [createEntry('e1', '2026-06-01', '对接订单接口')],
+      reportRepository: createReportRepository({
+        getReportsByType: vi.fn().mockResolvedValue([outsideReport, exactReport, overlappingReport]),
+      }),
+    });
+
+    await expect(service.getReportContext('weekly', '2026-06-01', '2026-06-07')).resolves.toEqual(
+      expect.objectContaining({
+        existingReport: exactReport,
+        overlappingReports: [overlappingReport],
+      }),
+    );
   });
 
   it('does not generate a weekly report when the range has no entries', async () => {
@@ -104,6 +136,7 @@ describe('createReportService', () => {
       ],
       generated: generatedReport,
       existingReport: null,
+      overlappingReports: [],
     });
     expect(generateRangeReport).toHaveBeenCalledWith({
       reportType: 'weekly',
@@ -174,6 +207,35 @@ describe('createReportService', () => {
     expect(saveReport).toHaveBeenCalledWith(report);
   });
 
+  it('creates a new report when the draft is marked to keep an existing same range', async () => {
+    const existingReport = createReport({
+      id: 'existing-weekly-report',
+      createdAt: '2026-06-07T01:00:00.000Z',
+    });
+    const saveReport = vi.fn();
+    const service = createService({
+      entries: [createEntry('e1', '2026-06-01', '对接订单接口')],
+      reportRepository: createReportRepository({
+        getReportByTypeAndRange: vi.fn().mockResolvedValue(existingReport),
+        saveReport,
+      }),
+    });
+
+    const report = await service.saveWeeklyReport({
+      startDate: '2026-06-01',
+      endDate: '2026-06-07',
+      entries: [],
+      generated: generatedReport,
+      existingReport,
+      saveMode: 'create',
+    });
+
+    expect(report.id).not.toBe(existingReport.id);
+    expect(report.id).toContain('weekly-report-2026-06-01-2026-06-07');
+    expect(report.createdAt).toBe('2026-06-03T10:00:00.000Z');
+    expect(saveReport).toHaveBeenCalledWith(report);
+  });
+
   it('regenerates a weekly preview for an existing report range', async () => {
     const existingReport = createReport({
       id: 'existing-weekly-report',
@@ -200,6 +262,7 @@ describe('createReportService', () => {
       ],
       generated: generatedReport,
       existingReport,
+      overlappingReports: [],
     });
     expect(generateRangeReport).toHaveBeenCalledWith({
       reportType: 'weekly',
@@ -347,7 +410,7 @@ function createService({
 function createReportRepository(overrides: Partial<ReportRepository> = {}): ReportRepository {
   return {
     getAllReports: vi.fn(),
-    getReportsByType: vi.fn(),
+    getReportsByType: vi.fn().mockResolvedValue([]),
     getReportByTypeAndRange: vi.fn().mockResolvedValue(null),
     getWeeklyReportByRange: vi.fn().mockResolvedValue(null),
     saveReport: vi.fn(),

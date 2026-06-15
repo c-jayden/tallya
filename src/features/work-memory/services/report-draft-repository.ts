@@ -1,4 +1,5 @@
 import type { ReportDraft } from './report-service';
+import type { ReportSaveMode } from './report-service';
 import type { ReportGap, ReportGenerationType } from '../types';
 
 // Persists in-flight report progress so a refresh, crash, or app restart doesn't
@@ -15,6 +16,8 @@ export type ReportProgress =
       reportType: ReportGenerationType;
       startDate: string;
       endDate: string;
+      saveMode?: ReportSaveMode;
+      overwriteReportId?: string;
       gaps: ReportGap[];
     }
   | {

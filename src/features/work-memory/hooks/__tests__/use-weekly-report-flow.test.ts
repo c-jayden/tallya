@@ -37,4 +37,12 @@ describe('useWeeklyReportFlow progress restore', () => {
     expect(source).toContain("createAiTask('range-report', 'completed')");
     expect(source).toContain("createAiTask('range-report', 'failed'");
   });
+
+  it('carries exact-range save intent from generation to preview save', () => {
+    expect(source).toContain('type ReportSaveIntent');
+    expect(source).toContain('applyReportSaveIntent');
+    expect(source).toContain('reportSaveIntent');
+    expect(source).toContain('overwriteReportId');
+    expect(source).toContain('saveMode');
+  });
 });

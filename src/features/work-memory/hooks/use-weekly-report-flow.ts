@@ -10,7 +10,12 @@ import {
 import { reportDraftRepository } from '../services/report-draft-repository';
 import type { ReportProgress } from '../services/report-draft-repository';
 import { reportService } from '../services/report-service';
-import type { GapAnswer, ReportContext, ReportDraft } from '../services/report-service';
+import type {
+  GapAnswer,
+  ReportContext,
+  ReportDraft,
+  ReportSaveMode,
+} from '../services/report-service';
 import { normalizeReportContent } from '../report-view-model';
 import type { Report, ReportGap, ReportGenerationType } from '../types';
 import {
@@ -20,6 +25,11 @@ import {
 
 type UseWeeklyReportFlowOptions = {
   aiTaskCoordinator?: AiTaskCoordinatorControls;
+};
+
+type ReportSaveIntent = {
+  saveMode?: ReportSaveMode;
+  overwriteReportId?: string;
 };
 
 export function useWeeklyReportFlow({ aiTaskCoordinator }: UseWeeklyReportFlowOptions = {}) {
@@ -41,6 +51,7 @@ export function useWeeklyReportFlow({ aiTaskCoordinator }: UseWeeklyReportFlowOp
   const [reportGaps, setReportGaps] = useState<ReportGap[]>([]);
   const [isGapDialogOpen, setIsGapDialogOpen] = useState(false);
   const [isDetectingGaps, setIsDetectingGaps] = useState(false);
+  const [reportSaveIntent, setReportSaveIntent] = useState<ReportSaveIntent | null>(null);
   // In-flight report progress recovered from a previous session; surfaced as a
   // restore prompt the next time the user clicks 整理.
   const [restoreProgress, setRestoreProgress] = useState<ReportProgress | null>(null);
@@ -154,6 +165,7 @@ export function useWeeklyReportFlow({ aiTaskCoordinator }: UseWeeklyReportFlowOp
       setReportType(restoreProgress.reportType);
       setCustomStartDate(restoreProgress.startDate);
       setCustomEndDate(restoreProgress.endDate);
+      setReportSaveIntent(getReportSaveIntentFromProgress(restoreProgress));
       setReportGaps(restoreProgress.gaps);
       setIsGenerateDialogOpen(false);
       setIsRestorePromptOpen(false);
@@ -163,6 +175,7 @@ export function useWeeklyReportFlow({ aiTaskCoordinator }: UseWeeklyReportFlowOp
     }
 
     setReportDraft(restoreProgress.draft);
+    setReportSaveIntent(getReportSaveIntentFromDraft(restoreProgress.draft));
     setReportType(restoreProgress.draft.reportType);
     setCustomStartDate(restoreProgress.draft.startDate);
     setCustomEndDate(restoreProgress.draft.endDate);
@@ -233,7 +246,7 @@ export function useWeeklyReportFlow({ aiTaskCoordinator }: UseWeeklyReportFlowOp
   }
 
   // Run the actual AI report generation (the gap-fill step happens before this).
-  async function runGenerate() {
+  async function runGenerate(nextSaveIntent: ReportSaveIntent | null = reportSaveIntent) {
     setIsGeneratingReport(true);
     await aiTaskCoordinator?.beginTask('range-report');
 
@@ -243,10 +256,12 @@ export function useWeeklyReportFlow({ aiTaskCoordinator }: UseWeeklyReportFlowOp
           ? await reportService.generateCustomRangeReport(customStartDate, customEndDate)
           : await reportService.generateCurrentWeeklyReport();
 
-      setReportDraft(draft as ReportDraft);
+      const draftWithSaveIntent = applyReportSaveIntent(draft as ReportDraft, nextSaveIntent);
+
+      setReportDraft(draftWithSaveIntent);
       // Persist immediately so a crash/refresh between here and save can be
       // recovered on the next 整理.
-      reportDraftRepository.save({ stage: 'preview', draft: draft as ReportDraft });
+      reportDraftRepository.save({ stage: 'preview', draft: draftWithSaveIntent });
       setIsGapDialogOpen(false);
       setIsGenerateDialogOpen(false);
       setIsPreviewDialogOpen(true);
@@ -262,7 +277,7 @@ export function useWeeklyReportFlow({ aiTaskCoordinator }: UseWeeklyReportFlowOp
     }
   }
 
-  async function generateReport() {
+  async function generateReport(nextSaveIntent: ReportSaveIntent | null = null) {
     if (isGeneratingReport || isDetectingGaps) {
       return;
     }
@@ -278,6 +293,7 @@ export function useWeeklyReportFlow({ aiTaskCoordinator }: UseWeeklyReportFlowOp
 
     let gaps: ReportGap[];
     const { startDate, endDate } = getActiveRange();
+    setReportSaveIntent(nextSaveIntent);
 
     try {
       gaps = await reportService.getReportGaps(startDate, endDate);
@@ -291,6 +307,7 @@ export function useWeeklyReportFlow({ aiTaskCoordinator }: UseWeeklyReportFlowOp
         reportType,
         startDate,
         endDate,
+        ...nextSaveIntent,
         gaps,
       });
       setReportGaps(gaps);
@@ -299,7 +316,7 @@ export function useWeeklyReportFlow({ aiTaskCoordinator }: UseWeeklyReportFlowOp
       return;
     }
 
-    await runGenerate();
+    await runGenerate(nextSaveIntent);
   }
 
   async function submitGapAnswers(answers: GapAnswer[]) {
@@ -316,7 +333,7 @@ export function useWeeklyReportFlow({ aiTaskCoordinator }: UseWeeklyReportFlowOp
       return;
     }
 
-    await runGenerate();
+    await runGenerate(reportSaveIntent);
   }
 
   async function skipGaps() {
@@ -324,7 +341,7 @@ export function useWeeklyReportFlow({ aiTaskCoordinator }: UseWeeklyReportFlowOp
       return;
     }
 
-    await runGenerate();
+    await runGenerate(reportSaveIntent);
   }
 
   async function copyMarkdown() {
@@ -372,6 +389,7 @@ export function useWeeklyReportFlow({ aiTaskCoordinator }: UseWeeklyReportFlowOp
       toast.success(reportDraft.reportType === 'custom' ? '总结已保存' : '本周回顾已保存');
       setIsPreviewDialogOpen(false);
       setReportDraft(null);
+      setReportSaveIntent(null);
       setReportContext(null);
       setSelectedReport(null);
       await loadReports();
@@ -492,6 +510,48 @@ export function useWeeklyReportFlow({ aiTaskCoordinator }: UseWeeklyReportFlowOp
     setReportType: updateReportType,
     updateCustomEndDate,
     updateCustomStartDate,
+  };
+}
+
+function applyReportSaveIntent(
+  draft: ReportDraft,
+  saveIntent: ReportSaveIntent | null,
+): ReportDraft {
+  if (!saveIntent?.saveMode && !saveIntent?.overwriteReportId) {
+    return draft;
+  }
+
+  return {
+    ...draft,
+    existingReport: saveIntent.saveMode === 'create' ? null : draft.existingReport,
+    saveMode: saveIntent.saveMode,
+    overwriteReportId: saveIntent.overwriteReportId,
+  };
+}
+
+function getReportSaveIntentFromProgress(progress: ReportProgress): ReportSaveIntent | null {
+  if (progress.stage === 'preview') {
+    return getReportSaveIntentFromDraft(progress.draft);
+  }
+
+  if (!progress.saveMode && !progress.overwriteReportId) {
+    return null;
+  }
+
+  return {
+    saveMode: progress.saveMode,
+    overwriteReportId: progress.overwriteReportId,
+  };
+}
+
+function getReportSaveIntentFromDraft(draft: ReportDraft): ReportSaveIntent | null {
+  if (!draft.saveMode && !draft.overwriteReportId) {
+    return null;
+  }
+
+  return {
+    saveMode: draft.saveMode,
+    overwriteReportId: draft.overwriteReportId,
   };
 }
 
