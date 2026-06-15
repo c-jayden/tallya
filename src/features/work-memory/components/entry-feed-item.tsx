@@ -32,6 +32,27 @@ const timeFormatter = new Intl.DateTimeFormat('zh-CN', {
   hour12: false,
 });
 
+function toLocalDay(iso: string) {
+  const parsed = new Date(iso);
+
+  if (Number.isNaN(parsed.getTime())) {
+    return '';
+  }
+
+  const year = parsed.getFullYear();
+  const month = `${parsed.getMonth() + 1}`.padStart(2, '0');
+  const day = `${parsed.getDate()}`.padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
+}
+
+// An entry is backfilled when it was logged onto a past day: its "created"
+// local day differs from the day it belongs to, so the noon occurredAt is
+// synthetic and carries no real clock time.
+function isBackfilledEntry(entry: Entry) {
+  return toLocalDay(entry.createdAt) !== entry.occurredOn;
+}
+
 function formatEntryTime(occurredAt: string) {
   const parsed = new Date(occurredAt);
 
@@ -192,7 +213,8 @@ export function EntryFeedItem({
     );
   }
 
-  const time = formatEntryTime(entry.occurredAt);
+  const backfilled = isBackfilledEntry(entry);
+  const time = backfilled ? '' : formatEntryTime(entry.occurredAt);
 
   return (
     <li
@@ -208,6 +230,8 @@ export function EntryFeedItem({
           <span className="h-6 shrink-0 font-mono text-xs leading-6 tabular-nums text-app-ink-subtle">
             {time}
           </span>
+        ) : backfilled ? (
+          <span className="h-6 shrink-0 text-xs leading-6 text-app-ink-subtle">追记</span>
         ) : null}
         <p className="min-w-0 flex-1 text-sm leading-6 whitespace-pre-wrap break-words text-app-ink">
           {entry.content}
