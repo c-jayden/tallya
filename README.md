@@ -14,14 +14,14 @@ Tallya 是一个桌面端本地工具，当前处于早期开发阶段。
 - 当天条目流首页 + 历史日期切换；
 - AI 追问式补充：对单条记录可让 AI 追问 1-2 个问题来补细节，未配置 AI 时退化为手动补充；
 - 补充以子条目形式挂在记录下，可删；
+- 跨天线索：AI 建议把同一件事的多条记录归并成线索，独立线索视图查看跨天故事线；
 - Spotlight 风格搜索（SQLite FTS5，覆盖记录与补充）；
+- 报告：基于条目生成日报 / 周报 / 自定义范围报告，支持预览、保存、历史与缺口补全追问；
 - 本地数据存储（SQLite）；
-- AI 服务：Codex CLI 与 OpenAI Compatible；
+- AI 服务：Codex CLI、OpenAI Compatible 与 Claude / Anthropic；
 - 通知提醒配置与系统通知；
 - 设置页；
 - 本地优先。
-
-> 周报/范围报告在条目模型重构期间暂时下线，后续会重接到条目模型。
 
 ## 产品原则
 
@@ -129,16 +129,17 @@ Windows 打包机需要可用的 NSIS / `makensis`。如果 Tauri 已生成 rele
 
 发布前按 [RELEASE_CHECKLIST.md](./RELEASE_CHECKLIST.md) 做安装、覆盖安装、托盘、通知、Codex CLI、SQLite 数据保留和备份恢复检查。
 
-Tallya 当前 AI 生成依赖本机 Codex CLI。SQLite 数据库使用 Tauri SQL 插件保存到应用数据目录，配置为 `sqlite:tallya.db`；覆盖安装不应清空工作记忆、报告或设置。
+Tallya 的 AI 生成可使用本机 Codex CLI，或用户配置的 OpenAI Compatible / Claude（Anthropic）API 服务。SQLite 数据库使用 Tauri SQL 插件保存到应用数据目录，配置为 `sqlite:tallya.db`；覆盖安装不应清空工作记忆、报告或设置。
 
 ## AI 服务
 
-Tallya 当前支持两种用户可见 AI 服务：
+Tallya 当前支持三种用户可见 AI 服务：
 
 - Codex CLI：适合本机已安装并登录 Codex CLI 的用户，生成通过本机 Codex CLI 执行。
 - OpenAI Compatible：适合使用 API Key、OpenAI API 兼容服务、中转服务、DeepSeek、Kimi 或 OpenRouter 的用户。
+- Claude / Anthropic：适合使用 Anthropic 原生 Messages API（或兼容中转）的用户。
 
-使用 OpenAI Compatible 时，需要在设置页填写 Base URL、API Key 和模型。生成所需的工作记录内容会发送到用户配置的 API 服务；API Key 和设置保存在本机，不会用于云同步。Mock Provider 仅用于测试和开发，不会在用户界面中暴露。
+使用 OpenAI Compatible 或 Claude / Anthropic 时，需要在设置页填写 Base URL、API Key 和模型。生成所需的工作记录内容会发送到用户配置的 API 服务；API Key 和设置保存在本机，不会用于云同步。Mock Provider 仅用于测试和开发，不会在用户界面中暴露。
 
 ## 项目结构
 

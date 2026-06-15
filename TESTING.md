@@ -23,6 +23,8 @@ pnpm build
 pnpm check:release
 ```
 
+Use Node 22 to run the suite. `src/test/setup.ts` configures `navigator`, which only exists as a global on Node 21+; on Node 20 every test fails at setup. CI also runs on Node 22 — with `fnm`, run `fnm use 22` first.
+
 Do not run `pnpm tauri dev` as part of automated verification.
 
 ## Frontend Tauri Mocks

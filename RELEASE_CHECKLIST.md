@@ -40,13 +40,16 @@
 
 ## Core Flow
 
-- Create one work memory for today.
-- Save a draft.
-- Generate and save today's work memory.
-- View memory details.
-- Search memories.
+- Capture several entries for today (type + Enter, no required fields).
+- Confirm new entries appear newest-first.
+- Add a clarification to an entry (AI follow-up or manual fallback).
+- Accept an AI thread suggestion and view the thread's cross-day storyline.
+- Switch to a past date and review/capture its entries.
+- Search entries and clarifications via Spotlight.
+- Generate a daily report.
 - Generate a weekly report.
 - Generate a custom range report.
+- Answer report gap follow-ups, then generate.
 - View saved reports.
 - Copy plain text.
 - Copy Markdown.
@@ -95,7 +98,8 @@
 - Confirm Codex CLI Provider detection still works.
 - Confirm OpenAI Compatible Provider can detect a valid API service.
 - Confirm OpenAI Compatible Provider shows a friendly error for invalid API Key.
-- Confirm memory search still works.
+- Confirm Claude / Anthropic Provider can detect a valid API service and shows a friendly error for an invalid API Key.
+- Confirm entry search still works.
 
 ## Uninstall
 
@@ -105,9 +109,9 @@
 
 ## Known Requirements
 
-- AI generation can use the user's local Codex CLI or an OpenAI Compatible API service.
+- AI generation can use the user's local Codex CLI, an OpenAI Compatible API service, or a Claude / Anthropic API service.
 - Codex CLI users should install and sign in to Codex CLI before using AI generation.
-- OpenAI Compatible users should configure Base URL, API Key, and model in Settings > AI.
+- OpenAI Compatible and Claude / Anthropic users should configure Base URL, API Key, and model in Settings > AI.
 
 ## Known TODO
 

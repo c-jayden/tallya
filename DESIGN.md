@@ -26,7 +26,7 @@ Tallya records work as **entries**, not one record per day. See `docs/PLAN.md` f
 - **Clarifications** attach detail to an entry without rewriting it (AI-asked or manual). They show as quiet sub-items under the entry.
 - AI is an optional enhancement: it suggests follow-up questions ("追问"), it never blocks capture and never invents content. Without AI configured, "补充" degrades to a manual input.
 - Search (Spotlight) spans entries and their clarifications, backed by SQLite FTS5.
-- Reports (weekly/range) are temporarily degraded during the entry-model transition and will be rebuilt on top of entries.
+- Reports (daily / weekly / custom range) are generated on top of entries, with preview, save, history, and gap-filling follow-ups.
 
 ## Product Personality
 
@@ -118,7 +118,7 @@ It does not rush users, create pressure, use exaggerated language, or turn work 
 
 ## Data And AI
 
-- User-visible AI providers are Codex CLI and OpenAI Compatible. Do not expose Mock or unfinished providers.
+- User-visible AI providers are Codex CLI, OpenAI Compatible, and Claude / Anthropic. Do not expose Mock or unfinished providers.
 - Structure AI settings as provider management first, provider-specific configuration second.
 - Do not expose Mock or development-only providers in user-facing settings.
 - Settings persistence must go through repository/service modules, not direct component storage access.

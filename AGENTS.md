@@ -55,7 +55,7 @@ UI 约束：
 - AI 逻辑放到 `src/features/work-memory/services/ai`。
 - 设置存储逻辑放到 `app-settings-repository`。
 - 工作记录存储走 `entry-repository`（条目）和 `clarification-repository`（补充）。
-- 旧的 `daily-memory-repository` 已被 entry 模型取代，仅作迁移/归档保留，不要在新功能里使用。
+- 旧的 `daily-memory-repository` 已随 entry 模型移除；`daily_memories` 表与一次性迁移（`migrations.ts` / `daily-memory-entry-migration.ts`）仅为兼容旧数据保留，不要在新功能里使用。
 - 检索走 `memory-search-service`（合并 entry 与 clarification 命中），不要在 UI 里直接拼检索逻辑。
 
 测试组织规则：
@@ -76,8 +76,8 @@ Provider 规则：
 
 - 不要向用户暴露 Mock Provider。
 - Mock Provider 只用于测试和开发。
-- 当前用户可见 AI 服务是 Codex CLI 和 OpenAI Compatible。
-- Provider 结构要继续为 Ollama 等后续服务预留扩展。
+- 当前用户可见 AI 服务是 Codex CLI、OpenAI Compatible 和 Claude / Anthropic。
+- Provider 结构要继续为后续服务（如本地模型）预留扩展。
 - 不要把未来 Provider 假设写死进 UI。
 
 目录边界：
