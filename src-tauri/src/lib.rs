@@ -21,6 +21,7 @@ const TRAY_EVENT_FOCUS_ENTRY: &str = "tray://focus-entry";
 const TRAY_EVENT_OPEN_SEARCH: &str = "tray://open-search";
 const TRAY_EVENT_OPEN_SETTINGS: &str = "tray://open-settings";
 const TRAY_EVENT_WINDOW_HIDDEN: &str = "tray://window-hidden";
+const TRAY_EVENT_CLOSE_BLOCKED: &str = "tray://close-blocked";
 #[cfg(target_os = "windows")]
 const TALLYA_NOTIFICATION_APP_ID: &str = "com.tallya";
 #[cfg(target_os = "windows")]
@@ -30,6 +31,7 @@ const TALLYA_NOTIFICATION_APP_NAME: &str = "Tallya";
 struct AppWindowState {
     close_to_tray: Arc<AtomicBool>,
     is_quitting: Arc<AtomicBool>,
+    active_ai_task: Arc<AtomicBool>,
 }
 
 #[derive(serde::Serialize)]
@@ -45,6 +47,7 @@ impl Default for AppWindowState {
         Self {
             close_to_tray: Arc::new(AtomicBool::new(true)),
             is_quitting: Arc::new(AtomicBool::new(false)),
+            active_ai_task: Arc::new(AtomicBool::new(false)),
         }
     }
 }
@@ -82,6 +85,15 @@ fn hide_main_window(app: tauri::AppHandle) -> Result<(), String> {
         eprintln!("Failed to hide main window: {error}");
         "隐藏主窗口失败，请稍后重试。".to_string()
     })
+}
+
+#[tauri::command]
+fn set_active_ai_task_running(
+    state: tauri::State<'_, AppWindowState>,
+    active: bool,
+) -> Result<(), String> {
+    state.active_ai_task.store(active, Ordering::SeqCst);
+    Ok(())
 }
 
 #[tauri::command]
@@ -307,11 +319,16 @@ fn setup_close_to_tray(app: &mut tauri::App, state: AppWindowState) {
             if let WindowEvent::CloseRequested { api, .. } = event {
                 let should_hide = state.close_to_tray.load(Ordering::SeqCst)
                     && !state.is_quitting.load(Ordering::SeqCst);
+                let should_block_close = state.active_ai_task.load(Ordering::SeqCst)
+                    && !state.is_quitting.load(Ordering::SeqCst);
 
                 if should_hide {
                     api.prevent_close();
                     let _ = window_for_close.hide();
                     let _ = app_handle.emit(TRAY_EVENT_WINDOW_HIDDEN, ());
+                } else if should_block_close {
+                    api.prevent_close();
+                    let _ = app_handle.emit(TRAY_EVENT_CLOSE_BLOCKED, ());
                 }
             }
         });
@@ -350,6 +367,7 @@ pub fn run() {
             open_app_directory,
             quit_app,
             send_tallya_notification,
+            set_active_ai_task_running,
             set_window_behavior,
             show_main_window,
             codex::suggest_clarifications_with_codex,

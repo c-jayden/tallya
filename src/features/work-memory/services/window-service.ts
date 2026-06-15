@@ -6,6 +6,7 @@ export const trayEvents = {
   openSearch: 'tray://open-search',
   openSettings: 'tray://open-settings',
   windowHidden: 'tray://window-hidden',
+  closeBlocked: 'tray://close-blocked',
 } as const;
 
 export type MainWindowState = {
@@ -19,6 +20,7 @@ type TrayEventHandlers = {
   onOpenSearch: () => void;
   onOpenSettings: () => void;
   onWindowHidden: () => void;
+  onCloseBlocked: () => void;
 };
 
 export async function showMainWindow() {
@@ -65,6 +67,10 @@ export async function sendTallyaNotification(body: string) {
   await invoke('send_tallya_notification', { body });
 }
 
+export async function setActiveAiTaskRunning(active: boolean) {
+  await invokeWindowCommand('set_active_ai_task_running', { active });
+}
+
 export async function syncWindowBehaviorSettings(settings: AppSettings) {
   await invokeWindowCommand('set_window_behavior', {
     closeToTray: settings.closeToTray,
@@ -109,6 +115,7 @@ export async function registerTrayEventHandlers(handlers: TrayEventHandlers) {
       listen(trayEvents.openSearch, handlers.onOpenSearch),
       listen(trayEvents.openSettings, handlers.onOpenSettings),
       listen(trayEvents.windowHidden, handlers.onWindowHidden),
+      listen(trayEvents.closeBlocked, handlers.onCloseBlocked),
     ]);
 
     return () => {

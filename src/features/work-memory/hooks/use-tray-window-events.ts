@@ -23,6 +23,7 @@ export function useTrayWindowEvents(options: UseTrayWindowEventsOptions) {
       onOpenSearch: () => handlersRef.current.onOpenSearch(),
       onOpenSettings: () => handlersRef.current.onOpenSettings(),
       onWindowHidden: () => {},
+      onCloseBlocked: () => {},
     }).then((unlisten) => {
       if (isMounted) {
         dispose = unlisten;

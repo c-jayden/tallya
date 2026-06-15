@@ -4,6 +4,7 @@ import {
   getMainWindowState,
   isMainWindowForeground,
   sendTallyaNotification,
+  setActiveAiTaskRunning,
 } from '../window-service';
 
 describe('window-service', () => {
@@ -34,6 +35,14 @@ describe('window-service', () => {
 
     expect(tauriMocks.invoke).toHaveBeenCalledWith('send_tallya_notification', {
       body: '整理好了，可以查看。',
+    });
+  });
+
+  it('syncs active AI task state to Tauri close handling', async () => {
+    await setActiveAiTaskRunning(true);
+
+    expect(tauriMocks.invoke).toHaveBeenCalledWith('set_active_ai_task_running', {
+      active: true,
     });
   });
 });
