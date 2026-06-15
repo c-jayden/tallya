@@ -1,4 +1,4 @@
-import { Loader2 } from 'lucide-react';
+import { Copy, FileText, Loader2, Save, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { TallyaScrollArea } from '@/components/tallya-scroll-area';
 import {
@@ -72,6 +72,7 @@ export function ReportPreviewDialog({
             onClick={() => handleOpenChange(false)}
             disabled={isSaving}
           >
+            <X className="size-4" aria-hidden="true" />
             取消
           </Button>
           <Button
@@ -81,6 +82,7 @@ export function ReportPreviewDialog({
             onClick={onCopyText}
             disabled={isSaving || !content}
           >
+            <Copy className="size-4" aria-hidden="true" />
             复制文本
           </Button>
           <Button
@@ -90,6 +92,7 @@ export function ReportPreviewDialog({
             onClick={onCopyMarkdown}
             disabled={isSaving || !content}
           >
+            <FileText className="size-4" aria-hidden="true" />
             复制 Markdown
           </Button>
           <Button
@@ -101,7 +104,9 @@ export function ReportPreviewDialog({
           >
             {isSaving ? (
               <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden="true" />
-            ) : null}
+            ) : (
+              <Save className="size-4" aria-hidden="true" />
+            )}
             {isSaving ? '保存中...' : isCustomReport ? '保存总结' : '保存本周回顾'}
           </Button>
         </TallyaDialogFooter>

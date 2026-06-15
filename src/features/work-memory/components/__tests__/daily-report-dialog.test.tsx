@@ -11,6 +11,8 @@ describe('DailyReportDialog', () => {
   it('renders AI status inside the dialog instead of the home page', () => {
     expect(source).toContain('<WorkMemoryAlerts');
     expect(source).toContain('aiAlert');
+    expect(source).toContain('onDismissAlert: () => void');
+    expect(source).toContain('onDismiss={onDismissAlert}');
   });
 
   it('asks before closing while AI整理 is still running', () => {
@@ -26,5 +28,12 @@ describe('DailyReportDialog', () => {
     expect(source).toContain('handledCloseRequestIdRef');
     expect(source).toContain('requestClose(onAfterForceClose)');
     expect(source).toContain('<AiBusyCloseConfirmDialog');
+  });
+
+  it('uses a single primary action and icons for important actions', () => {
+    expect(source.match(/variant="accent"/g)?.length).toBe(1);
+    expect(source).toContain('Copy');
+    expect(source).toContain('<Copy');
+    expect(source).toContain('<Sparkles');
   });
 });

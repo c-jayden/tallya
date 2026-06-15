@@ -9,4 +9,12 @@ describe('ReportPreviewDialog close policy', () => {
     expect(source).toContain('preventReportDialogDismissWhenBusy(isSaving');
     expect(source).toContain('disabled={isSaving}');
   });
+
+  it('keeps one primary save action and uses icons for close, copy, markdown, and save', () => {
+    expect(source.match(/variant="accent"/g)?.length).toBe(1);
+    expect(source).toContain('X');
+    expect(source).toContain('Copy');
+    expect(source).toContain('FileText');
+    expect(source).toContain('Save');
+  });
 });

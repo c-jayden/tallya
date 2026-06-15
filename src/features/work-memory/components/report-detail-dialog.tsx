@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Copy, FileText, Loader2, RefreshCw, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { TallyaScrollArea } from '@/components/tallya-scroll-area';
 import {
@@ -148,6 +148,7 @@ export function ReportDetailDialog({
               className="cursor-pointer text-app-ink-muted hover:bg-app-surface-muted hover:text-app-ink disabled:cursor-not-allowed"
               onClick={() => requestClose()}
             >
+              <X className="size-4" aria-hidden="true" />
               关闭
             </Button>
             <Button
@@ -157,6 +158,7 @@ export function ReportDetailDialog({
               onClick={onCopyText}
               disabled={!content || isRegenerating}
             >
+              <Copy className="size-4" aria-hidden="true" />
               复制文本
             </Button>
             <Button
@@ -166,6 +168,7 @@ export function ReportDetailDialog({
               onClick={onCopyMarkdown}
               disabled={!content?.markdown || isRegenerating}
             >
+              <FileText className="size-4" aria-hidden="true" />
               复制 Markdown
             </Button>
             <Button
@@ -177,7 +180,9 @@ export function ReportDetailDialog({
             >
               {isRegenerating ? (
                 <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden="true" />
-              ) : null}
+              ) : (
+                <RefreshCw className="size-4" aria-hidden="true" />
+              )}
               {isRegenerating ? '重新整理中...' : '重新整理'}
             </Button>
           </TallyaDialogFooter>

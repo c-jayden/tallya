@@ -55,4 +55,10 @@ describe('ReportPreferencesSettingsSection', () => {
     expect(dialogSource).toContain('setIsCloseConfirmOpen(true)');
     expect(dialogSource).not.toContain('closeButtonDisabled={isExtracting}');
   });
+
+  it('keeps extraction as the only primary action and gives it an icon', () => {
+    expect(dialogSource.match(/variant="accent"/g)?.length).toBe(1);
+    expect(dialogSource).toContain('Sparkles');
+    expect(dialogSource).toContain('<Sparkles');
+  });
 });

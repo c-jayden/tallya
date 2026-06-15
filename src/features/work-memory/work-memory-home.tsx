@@ -362,6 +362,7 @@ export function WorkMemoryHome() {
         }}
         onForceClose={dailyReport.forceClose}
         onAfterForceClose={() => void quitApp()}
+        onDismissAlert={dailyReport.dismissAiAlert}
         onTextChange={dailyReport.setReportText}
         onGenerateWithAI={dailyReport.generateWithAI}
         onCopy={dailyReport.copy}

@@ -24,6 +24,8 @@ describe('WorkMemoryAlerts', () => {
   });
 
   it('renders nothing when there is no alert', () => {
-    expect(renderToStaticMarkup(<WorkMemoryAlerts alert={null} />)).toBe('');
+    expect(
+      renderToStaticMarkup(<WorkMemoryAlerts alert={null} onDismiss={() => undefined} />),
+    ).toBe('');
   });
 });

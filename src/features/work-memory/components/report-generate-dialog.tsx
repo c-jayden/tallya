@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { CalendarDays, Loader2 } from 'lucide-react';
+import { CalendarDays, History, Loader2, Sparkles } from 'lucide-react';
 import { TallyaScrollArea } from '@/components/tallya-scroll-area';
 import { Button } from '@/components/ui/button';
 import {
@@ -22,9 +22,7 @@ import {
 import { formatReportDateRange, isValidReportDateRange } from '../services/report-date';
 import type { ReportContext } from '../services/report-service';
 import type { ReportGenerationType } from '../types';
-import {
-  getReportGenerateDialogState,
-} from './report-dialog-state';
+import { getReportGenerateDialogState } from './report-dialog-state';
 import { AiBusyCloseConfirmDialog } from './ai-busy-close-confirm-dialog';
 import { DatePickerPopover } from './date-picker-popover';
 import { TallyaDialogFooter } from './tallya-dialog-footer';
@@ -308,6 +306,7 @@ export function ReportGenerateDialog({
               onClick={onViewReports}
               disabled={!dialogState.canClose}
             >
+              <History className="size-4" aria-hidden="true" />
               查看整理记录
             </Button>
             <div className="flex items-center gap-2">
@@ -331,7 +330,9 @@ export function ReportGenerateDialog({
                 >
                   {isGenerating ? (
                     <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden="true" />
-                  ) : null}
+                  ) : (
+                    <Sparkles className="size-4" aria-hidden="true" />
+                  )}
                   {dialogState.primaryLabel}
                 </Button>
               ) : null}

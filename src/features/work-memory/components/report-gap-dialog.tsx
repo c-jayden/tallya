@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Loader2 } from 'lucide-react';
+import { ArrowLeft, Loader2, SkipForward, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -174,6 +174,7 @@ export function ReportGapDialog({
             onClick={onBack}
             disabled={isGenerating}
           >
+            <ArrowLeft className="size-4" aria-hidden="true" />
             返回
           </Button>
           <div className="flex items-center gap-2">
@@ -184,6 +185,7 @@ export function ReportGapDialog({
               onClick={handleSkip}
               disabled={isGenerating}
             >
+              <SkipForward className="size-4" aria-hidden="true" />
               跳过，直接整理
             </Button>
             <Button
@@ -195,7 +197,9 @@ export function ReportGapDialog({
             >
               {isGenerating ? (
                 <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden="true" />
-              ) : null}
+              ) : (
+                <Sparkles className="size-4" aria-hidden="true" />
+              )}
               补充并整理
             </Button>
           </div>

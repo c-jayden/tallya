@@ -62,6 +62,8 @@ export function useDailyReportFlow({ aiTaskCoordinator }: UseDailyReportFlowOpti
     setIsOpen(false);
   }, []);
 
+  const dismissAiAlert = useCallback(() => setAiAlert(null), []);
+
   const generateWithAI = useCallback(async () => {
     if (!source || isGenerating) {
       return;
@@ -129,6 +131,7 @@ export function useDailyReportFlow({ aiTaskCoordinator }: UseDailyReportFlowOpti
     open,
     close,
     forceClose,
+    dismissAiAlert,
     generateWithAI,
     copy,
     setReportText,

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Loader2, Sparkles } from 'lucide-react';
+import { Copy, Loader2, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -25,6 +25,7 @@ type DailyReportDialogProps = {
   onOpenChange: (open: boolean) => void;
   onForceClose: () => void;
   onAfterForceClose?: () => void;
+  onDismissAlert: () => void;
   onTextChange: (text: string) => void;
   onGenerateWithAI: () => void;
   onCopy: () => void;
@@ -40,6 +41,7 @@ export function DailyReportDialog({
   onOpenChange,
   onForceClose,
   onAfterForceClose,
+  onDismissAlert,
   onTextChange,
   onGenerateWithAI,
   onCopy,
@@ -128,7 +130,7 @@ export function DailyReportDialog({
           </DialogHeader>
 
           <div className="min-h-0 flex-1 px-6 pb-5">
-            <WorkMemoryAlerts alert={aiAlert} />
+            <WorkMemoryAlerts alert={aiAlert} onDismiss={onDismissAlert} />
             <Textarea
               className="block field-sizing-content max-h-[calc(100vh-300px)] min-h-40 w-full resize-none rounded-xl border border-app-border bg-app-surface px-3 py-2.5 text-sm leading-[1.6] text-app-ink shadow-none outline-none focus-visible:border-app-border-strong focus-visible:ring-0"
               value={reportText}
@@ -167,6 +169,7 @@ export function DailyReportDialog({
               onClick={onCopy}
               disabled={!reportText.trim()}
             >
+              <Copy className="size-4" aria-hidden="true" />
               复制
             </Button>
           </TallyaDialogFooter>

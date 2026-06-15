@@ -5,7 +5,7 @@ import type { AiTaskAlert } from '../hooks/use-ai-task-coordinator';
 type WorkMemoryAlertsProps = {
   alert: AiTaskAlert | null;
   onAction?: (target: AiTaskAlert['target']) => void;
-  onDismiss?: () => void;
+  onDismiss: () => void;
 };
 
 const toneClassName: Record<AiTaskAlert['tone'], string> = {
@@ -48,16 +48,14 @@ export function WorkMemoryAlerts({ alert, onAction, onDismiss }: WorkMemoryAlert
           {alert.actionLabel}
         </button>
       ) : null}
-      {onDismiss ? (
-        <button
-          type="button"
-          className="grid size-6 shrink-0 cursor-pointer place-items-center rounded-md text-current opacity-70 transition-opacity hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none"
-          aria-label="关闭提示"
-          onClick={onDismiss}
-        >
-          <X className="size-3.5" aria-hidden="true" />
-        </button>
-      ) : null}
+      <button
+        type="button"
+        className="grid size-6 shrink-0 cursor-pointer place-items-center rounded-md text-current opacity-70 transition-opacity hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none"
+        aria-label="关闭提示"
+        onClick={onDismiss}
+      >
+        <X className="size-3.5" aria-hidden="true" />
+      </button>
     </div>
   );
 }

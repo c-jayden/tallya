@@ -48,4 +48,14 @@ describe('ReportDetailDialog copy', () => {
     expect(source).toContain('setIsCloseConfirmOpen(true)');
     expect(source).not.toContain('closeButtonDisabled={isRegenerating}');
   });
+
+  it('keeps one primary action and uses icons for close, copy, markdown, and regenerate', () => {
+    const source = readFileSync(new URL('../report-detail-dialog.tsx', import.meta.url), 'utf8');
+
+    expect(source.match(/variant="accent"/g)?.length).toBe(1);
+    expect(source).toContain('X');
+    expect(source).toContain('Copy');
+    expect(source).toContain('FileText');
+    expect(source).toContain('RefreshCw');
+  });
 });

@@ -17,4 +17,9 @@ describe('useDailyReportFlow AI task coordination', () => {
     expect(source).toContain("setAiAlert(createDailyReportAiAlert('success'");
     expect(source).toContain("setAiAlert(createDailyReportAiAlert('error'");
   });
+
+  it('exposes a way to dismiss the dialog-scoped AI alert', () => {
+    expect(source).toContain('const dismissAiAlert = useCallback(() => setAiAlert(null), [])');
+    expect(source).toContain('dismissAiAlert,');
+  });
 });

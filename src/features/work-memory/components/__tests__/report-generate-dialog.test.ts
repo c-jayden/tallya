@@ -99,6 +99,16 @@ describe('ReportGenerateDialog layout', () => {
     expect(source).not.toContain('closeButtonDisabled={!dialogState.canClose}');
     expect(source).not.toContain('disabled={dialogState.cancelDisabled}');
   });
+
+  it('keeps one primary action and uses icons for secondary and primary actions', () => {
+    const source = readFileSync(new URL('../report-generate-dialog.tsx', import.meta.url), 'utf8');
+
+    expect(source.match(/variant="accent"/g)?.length).toBe(1);
+    expect(source).toContain('History');
+    expect(source).toContain('<History');
+    expect(source).toContain('Sparkles');
+    expect(source).toContain('<Sparkles');
+  });
 });
 
 describe('ReportGapDialog layout', () => {
@@ -122,5 +132,12 @@ describe('ReportGapDialog layout', () => {
     expect(source).toContain('requestClose();');
     expect(source).toContain('setIsCloseConfirmOpen(true)');
     expect(source).not.toContain('closeButtonDisabled={isGenerating}');
+  });
+
+  it('keeps one primary action and uses icons for navigation and generation', () => {
+    expect(source.match(/variant="accent"/g)?.length).toBe(1);
+    expect(source).toContain('ArrowLeft');
+    expect(source).toContain('SkipForward');
+    expect(source).toContain('Sparkles');
   });
 });

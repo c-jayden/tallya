@@ -1,4 +1,4 @@
-import { Loader2 } from 'lucide-react';
+import { Loader2, Sparkles } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
@@ -172,11 +172,16 @@ export function ReportStyleExtractDialog({
           </Button>
           <Button
             type="button"
+            variant="accent"
             disabled={isExtracting}
             className="cursor-pointer disabled:cursor-not-allowed"
             onClick={() => void handleExtract()}
           >
-            {isExtracting && <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />}
+            {isExtracting ? (
+              <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+            ) : (
+              <Sparkles className="size-3.5" aria-hidden="true" />
+            )}
             {isExtracting ? '提取中' : '提取'}
           </Button>
         </DialogFooter>

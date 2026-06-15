@@ -44,6 +44,7 @@ describe('WorkMemoryHome selected date wiring', () => {
 
     expect(source).not.toContain('<WorkMemoryAlerts');
     expect(source).toContain('aiAlert={dailyReport.aiAlert}');
+    expect(source).toContain('onDismissAlert={dailyReport.dismissAiAlert}');
   });
 
   it('routes native close blocks into the active AI dialog close flow', () => {
