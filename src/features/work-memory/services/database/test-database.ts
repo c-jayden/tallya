@@ -281,13 +281,18 @@ export class TestDatabaseClient implements DatabaseClient {
     }
 
     if (normalizedQuery.startsWith('insert into app_settings')) {
-      const row: AppSettingsRow = {
-        key: String(bindValues[0]),
-        value: String(bindValues[1]),
-        updated_at: String(bindValues[2]),
-      };
+      // Settings are written as one multi-row upsert: bind values arrive as
+      // flat (key, value, updated_at) triples.
+      for (let index = 0; index + 3 <= bindValues.length; index += 3) {
+        const row: AppSettingsRow = {
+          key: String(bindValues[index]),
+          value: String(bindValues[index + 1]),
+          updated_at: String(bindValues[index + 2]),
+        };
 
-      this.appSettings.set(row.key, row);
+        this.appSettings.set(row.key, row);
+      }
+
       return;
     }
 

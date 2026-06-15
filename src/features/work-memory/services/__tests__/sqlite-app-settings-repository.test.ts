@@ -108,7 +108,10 @@ describe('SQLiteAppSettingsRepository', () => {
     expect(database.lastSettingsWrite?.query.toLowerCase()).not.toContain('value_json');
   });
 
-  it('saves all settings rows inside one transaction', async () => {
+  it('saves all settings rows in a single upsert without a transaction', async () => {
+    // tauri-plugin-sql cannot pin a connection across calls, so a multi-call
+    // BEGIN/COMMIT transaction self-locks. The save must be one multi-row
+    // statement instead.
     const database = new TransactionRecordingAppSettingsDatabase();
     const repository = new SQLiteAppSettingsRepository(Promise.resolve(database));
 
@@ -117,7 +120,9 @@ describe('SQLiteAppSettingsRepository', () => {
       theme: 'dark',
     });
 
-    expect(database.transactionCalls).toBe(1);
+    expect(database.transactionCalls).toBe(0);
+    expect(database.lastSettingsWrite?.bindValues.length).toBeGreaterThan(3);
+    expect(database.appSettings.get('theme')?.value).toBe('dark');
   });
 
   it('fills missing report preferences and style settings from defaults when reading older settings rows', async () => {

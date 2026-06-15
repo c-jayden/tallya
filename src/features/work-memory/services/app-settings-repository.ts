@@ -300,20 +300,26 @@ async function saveAppSettingsRow(
   settings: AppSettings,
   updatedAt: string,
 ) {
-  await database.transaction(async (transactionDatabase) => {
-    for (const [key, value] of Object.entries(appSettingsToRows(settings))) {
-      await transactionDatabase.execute(
-        `
-          INSERT INTO app_settings (key, value, updated_at)
-          VALUES ($1, $2, $3)
-          ON CONFLICT(key) DO UPDATE SET
-            value = excluded.value,
-            updated_at = excluded.updated_at
-        `,
-        [key, value, updatedAt],
-      );
-    }
-  });
+  const entries = Object.entries(appSettingsToRows(settings));
+
+  // tauri-plugin-sql runs every execute on a pooled connection that is NOT
+  // pinned across calls, so a multi-statement BEGIN/COMMIT transaction can land
+  // its statements on different connections and self-lock ("database is locked"
+  // / "cannot start a transaction within a transaction"). Writing all keys in a
+  // single multi-row upsert keeps the whole save on one connection and atomic.
+  const placeholders = entries
+    .map((_, index) => `($${index * 3 + 1}, $${index * 3 + 2}, $${index * 3 + 3})`)
+    .join(', ');
+  const bindValues = entries.flatMap(([key, value]) => [key, value, updatedAt]);
+
+  await database.execute(
+    `INSERT INTO app_settings (key, value, updated_at)
+     VALUES ${placeholders}
+     ON CONFLICT(key) DO UPDATE SET
+       value = excluded.value,
+       updated_at = excluded.updated_at`,
+    bindValues,
+  );
 }
 
 function appSettingsToRows(settings: AppSettings): Record<string, string> {
