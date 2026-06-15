@@ -4,6 +4,7 @@ import {
   createAiTask,
   createCloseBlockedAlert,
   notifyIfWindowNotForeground,
+  shouldPersistAiTaskAlert,
 } from '../use-ai-task-coordinator';
 
 describe('ai task coordinator helpers', () => {
@@ -51,6 +52,13 @@ describe('ai task coordinator helpers', () => {
       message: '正在整理，先等它完成后再关闭。',
       actionLabel: '继续等待',
     });
+  });
+
+  it('keeps completed alerts only when the user was away, while preserving action-required states', () => {
+    expect(shouldPersistAiTaskAlert(createAiTask('range-report', 'completed'), false)).toBe(false);
+    expect(shouldPersistAiTaskAlert(createAiTask('range-report', 'completed'), true)).toBe(true);
+    expect(shouldPersistAiTaskAlert(createAiTask('report-gaps', 'needs-input'), false)).toBe(true);
+    expect(shouldPersistAiTaskAlert(createAiTask('range-report', 'failed'), false)).toBe(true);
   });
 });
 

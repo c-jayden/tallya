@@ -117,6 +117,18 @@ export async function notifyIfWindowNotForeground(
   return true;
 }
 
+export function shouldPersistAiTaskAlert(task: AiTask, wasNotified: boolean) {
+  if (task.status === 'running') {
+    return false;
+  }
+
+  if (task.status === 'completed') {
+    return wasNotified;
+  }
+
+  return true;
+}
+
 export function useAiTaskCoordinator() {
   const [activeTask, setActiveTask] = useState<AiTask | null>(null);
   const [alert, setAlert] = useState<AiTaskAlert | null>(null);
@@ -131,14 +143,14 @@ export function useAiTaskCoordinator() {
   }, []);
 
   const updateTask = useCallback(async (task: AiTask) => {
+    const wasNotified = await notifyIfWindowNotForeground(task);
+
     setActiveTask(task.status === 'running' ? task : null);
-    setAlert(task.status === 'running' ? null : createAiTaskAlert(task));
+    setAlert(shouldPersistAiTaskAlert(task, wasNotified) ? createAiTaskAlert(task) : null);
 
     if (task.status !== 'running') {
       await setActiveAiTaskRunning(false);
     }
-
-    await notifyIfWindowNotForeground(task);
   }, []);
 
   const handleWindowHidden = useCallback(async () => {
