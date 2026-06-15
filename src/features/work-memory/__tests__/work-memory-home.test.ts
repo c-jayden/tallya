@@ -36,7 +36,7 @@ describe('WorkMemoryHome selected date wiring', () => {
     expect(source).toContain('useDailyReportFlow({ aiTaskCoordinator: aiTasks })');
     expect(source).toContain('aiTaskCoordinator={aiTasks}');
     expect(source).toContain('onWindowHidden: aiTasks.handleWindowHidden');
-    expect(source).toContain('onCloseBlocked: aiTasks.handleCloseBlocked');
+    expect(source).toContain('onCloseBlocked: () => setIsAiCloseBlockedDialogOpen(true)');
   });
 
   it('does not render dialog-scoped AI status on the home surface', () => {
@@ -44,5 +44,12 @@ describe('WorkMemoryHome selected date wiring', () => {
 
     expect(source).not.toContain('<WorkMemoryAlerts');
     expect(source).toContain('aiAlert={dailyReport.aiAlert}');
+  });
+
+  it('shows an app-level dialog when the native close request is blocked by AI work', () => {
+    const source = readFileSync(new URL('../work-memory-home.tsx', import.meta.url), 'utf8');
+
+    expect(source).toContain('const [isAiCloseBlockedDialogOpen, setIsAiCloseBlockedDialogOpen]');
+    expect(source).toContain('<AiCloseBlockedDialog');
   });
 });

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { AiCloseBlockedDialog } from './components/ai-close-blocked-dialog';
 import { DailyReportDialog } from './components/daily-report-dialog';
 import { EntryComposer } from './components/entry-composer';
 import { EntryFeed } from './components/entry-feed';
@@ -35,6 +36,7 @@ import type { Entry } from './types';
 
 export function WorkMemoryHome() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isAiCloseBlockedDialogOpen, setIsAiCloseBlockedDialogOpen] = useState(false);
   const todayDate = useTodayDate();
   const [selectedDate, setSelectedDate] = useState(todayDate);
   const previousTodayRef = useRef(todayDate);
@@ -146,7 +148,7 @@ export function WorkMemoryHome() {
       setIsSettingsOpen(true);
     },
     onWindowHidden: aiTasks.handleWindowHidden,
-    onCloseBlocked: aiTasks.handleCloseBlocked,
+    onCloseBlocked: () => setIsAiCloseBlockedDialogOpen(true),
   });
 
   function updateSelectedDate(date: string) {
@@ -353,6 +355,10 @@ export function WorkMemoryHome() {
         onTextChange={dailyReport.setReportText}
         onGenerateWithAI={dailyReport.generateWithAI}
         onCopy={dailyReport.copy}
+      />
+      <AiCloseBlockedDialog
+        open={isAiCloseBlockedDialogOpen}
+        onOpenChange={setIsAiCloseBlockedDialogOpen}
       />
       </main>
     </TooltipProvider>
