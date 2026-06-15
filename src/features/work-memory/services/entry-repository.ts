@@ -48,15 +48,23 @@ function getBrowserStorage() {
   return window.localStorage;
 }
 
+// occurredAt is the primary key, but entries backfilled onto a past day all
+// share the same (noon) timestamp, so createdAt — the real wall-clock creation
+// time — breaks the tie by insertion order. id (a random UUID) is the last
+// resort only to keep the sort deterministic.
 function compareByOccurredAtDesc(first: Entry, second: Entry) {
   return (
-    second.occurredAt.localeCompare(first.occurredAt) || second.id.localeCompare(first.id)
+    second.occurredAt.localeCompare(first.occurredAt) ||
+    second.createdAt.localeCompare(first.createdAt) ||
+    second.id.localeCompare(first.id)
   );
 }
 
 function compareByOccurredAtAsc(first: Entry, second: Entry) {
   return (
-    first.occurredAt.localeCompare(second.occurredAt) || first.id.localeCompare(second.id)
+    first.occurredAt.localeCompare(second.occurredAt) ||
+    first.createdAt.localeCompare(second.createdAt) ||
+    first.id.localeCompare(second.id)
   );
 }
 
@@ -319,7 +327,7 @@ export class SQLiteEntryRepository implements EntryRepository {
   async listByDate(date: string) {
     return this.safeRead(async (database) => {
       const rows = await database.select<EntryRow[]>(
-        'SELECT * FROM entries WHERE occurred_on = $1 ORDER BY occurred_at DESC',
+        'SELECT * FROM entries WHERE occurred_on = $1 ORDER BY occurred_at DESC, created_at DESC, id DESC',
         [date],
       );
 
@@ -330,7 +338,7 @@ export class SQLiteEntryRepository implements EntryRepository {
   async listRange(startDate: string, endDate: string) {
     return this.safeRead(async (database) => {
       const rows = await database.select<EntryRow[]>(
-        'SELECT * FROM entries WHERE occurred_on >= $1 AND occurred_on <= $2 ORDER BY occurred_at DESC',
+        'SELECT * FROM entries WHERE occurred_on >= $1 AND occurred_on <= $2 ORDER BY occurred_at DESC, created_at DESC, id DESC',
         [startDate, endDate],
       );
 
@@ -341,7 +349,7 @@ export class SQLiteEntryRepository implements EntryRepository {
   async listByThread(threadId: string) {
     return this.safeRead(async (database) => {
       const rows = await database.select<EntryRow[]>(
-        'SELECT * FROM entries WHERE thread_id = $1 ORDER BY occurred_at ASC',
+        'SELECT * FROM entries WHERE thread_id = $1 ORDER BY occurred_at ASC, created_at ASC, id ASC',
         [threadId],
       );
 
@@ -352,7 +360,7 @@ export class SQLiteEntryRepository implements EntryRepository {
   async listRecent(limit: number) {
     return this.safeRead(async (database) => {
       const rows = await database.select<EntryRow[]>(
-        'SELECT * FROM entries ORDER BY occurred_at DESC LIMIT $1',
+        'SELECT * FROM entries ORDER BY occurred_at DESC, created_at DESC, id DESC LIMIT $1',
         [Math.max(0, limit)],
       );
 
@@ -363,7 +371,7 @@ export class SQLiteEntryRepository implements EntryRepository {
   async listAll() {
     return this.safeRead(async (database) => {
       const rows = await database.select<EntryRow[]>(
-        'SELECT * FROM entries ORDER BY occurred_at DESC, id DESC',
+        'SELECT * FROM entries ORDER BY occurred_at DESC, created_at DESC, id DESC',
       );
 
       return rows.map(mapRowToEntry);
@@ -428,7 +436,7 @@ export class SQLiteEntryRepository implements EntryRepository {
         const ftsQuery = `"${normalized.replace(/"/g, '""')}"`;
         const rows = await database.select<EntryRow[]>(
           `SELECT e.* FROM entries e JOIN entries_fts f ON f.rowid = e.rowid
-           WHERE entries_fts MATCH $1 ORDER BY e.occurred_at DESC`,
+           WHERE entries_fts MATCH $1 ORDER BY e.occurred_at DESC, e.created_at DESC, e.id DESC`,
           [ftsQuery],
         );
 
@@ -448,7 +456,7 @@ export class SQLiteEntryRepository implements EntryRepository {
 
   private async searchByLike(database: DatabaseClient, normalized: string) {
     const rows = await database.select<EntryRow[]>(
-      `SELECT * FROM entries WHERE content LIKE $1 ESCAPE '\\' ORDER BY occurred_at DESC`,
+      `SELECT * FROM entries WHERE content LIKE $1 ESCAPE '\\' ORDER BY occurred_at DESC, created_at DESC, id DESC`,
       [`%${escapeLikePattern(normalized)}%`],
     );
 

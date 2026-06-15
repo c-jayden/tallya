@@ -67,6 +67,23 @@ describe('LocalStorageEntryRepository', () => {
     expect(todayEntries.map((entry) => entry.content)).toEqual(['second', 'first']);
   });
 
+  it('orders same-day entries by creation time when occurredAt ties', async () => {
+    // Entries backfilled onto a past day all share the same noon occurredAt, so
+    // ordering must fall back to creation time (newest first), not the random
+    // UUID id.
+    let tick = 0;
+    const repository = new LocalStorageEntryRepository(new MemoryStorage(), {
+      now: () => new Date(`2026-06-10T09:00:0${tick++}+08:00`),
+    });
+
+    await repository.create({ content: 'first', occurredAt: '2026-06-10T04:00:00.000Z' });
+    await repository.create({ content: 'second', occurredAt: '2026-06-10T04:00:00.000Z' });
+    await repository.create({ content: 'third', occurredAt: '2026-06-10T04:00:00.000Z' });
+
+    const entries = await repository.listByDate('2026-06-10');
+    expect(entries.map((entry) => entry.content)).toEqual(['third', 'second', 'first']);
+  });
+
   it('updates and removes entries', async () => {
     const repository = createLocalRepository();
     const entry = await repository.create({ content: 'draft note' });
@@ -193,6 +210,21 @@ describe('SQLiteEntryRepository', () => {
 
     await repository.remove(entry.id);
     expect(await repository.getById(entry.id)).toBeNull();
+  });
+
+  it('orders same-day entries by creation time when occurredAt ties', async () => {
+    const database = new TestDatabaseClient();
+    let tick = 0;
+    const repository = new SQLiteEntryRepository(Promise.resolve(database), {
+      now: () => new Date(`2026-06-10T09:00:0${tick++}+08:00`),
+    });
+
+    await repository.create({ content: 'first', occurredAt: '2026-06-10T04:00:00.000Z' });
+    await repository.create({ content: 'second', occurredAt: '2026-06-10T04:00:00.000Z' });
+    await repository.create({ content: 'third', occurredAt: '2026-06-10T04:00:00.000Z' });
+
+    const entries = await repository.listByDate('2026-06-10');
+    expect(entries.map((entry) => entry.content)).toEqual(['third', 'second', 'first']);
   });
 
   it('searches entries through the FTS path', async () => {

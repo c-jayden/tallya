@@ -398,7 +398,10 @@ export class TestDatabaseClient implements DatabaseClient {
         .sort(compareEntriesByOccurredAtAsc) as T;
     }
 
-    if (normalizedQuery.startsWith('select * from entries order by occurred_at desc limit')) {
+    if (
+      normalizedQuery.startsWith('select * from entries order by occurred_at desc') &&
+      normalizedQuery.includes(' limit ')
+    ) {
       const limit = Number(bindValues[0]);
       return Array.from(this.entries.values())
         .sort(compareEntriesByOccurredAtDesc)
@@ -540,9 +543,13 @@ function normalizeQuery(query: string) {
   return query.replace(/\s+/g, ' ').trim().toLowerCase();
 }
 
+// Mirror the real SQL tiebreak: occurred_at, then created_at (real creation
+// time, so backfilled same-day entries keep insertion order), then id as a
+// deterministic last resort.
 function compareEntriesByOccurredAtDesc(first: EntryRow, second: EntryRow) {
   return (
     second.occurred_at.localeCompare(first.occurred_at) ||
+    second.created_at.localeCompare(first.created_at) ||
     second.id.localeCompare(first.id)
   );
 }
@@ -550,6 +557,7 @@ function compareEntriesByOccurredAtDesc(first: EntryRow, second: EntryRow) {
 function compareEntriesByOccurredAtAsc(first: EntryRow, second: EntryRow) {
   return (
     first.occurred_at.localeCompare(second.occurred_at) ||
+    first.created_at.localeCompare(second.created_at) ||
     first.id.localeCompare(second.id)
   );
 }
