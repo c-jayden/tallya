@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { TallyaScrollArea } from '@/components/tallya-scroll-area';
 import { EntryFeedItem } from './entry-feed-item';
+import { EntryMergeDialog } from './entry-merge-dialog';
 import type { Clarification, Entry } from '../types';
 
 // Entries are newest-first, so each older row dims a little more, fading toward
@@ -35,6 +36,8 @@ type EntryFeedProps = {
     answer: string,
   ) => Promise<boolean> | boolean;
   onRemoveClarification: (id: string) => void;
+  onMergeEntryExisting: (entryId: string, threadId: string) => void;
+  onMergeEntryNew: (entryId: string, title: string) => void;
   onSuggestQuestions: (content: string) => Promise<string[]>;
 };
 
@@ -48,10 +51,16 @@ export function EntryFeed({
   onRemoveEntry,
   onAddClarification,
   onRemoveClarification,
+  onMergeEntryExisting,
+  onMergeEntryNew,
   onSuggestQuestions,
 }: EntryFeedProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [pendingMergeId, setPendingMergeId] = useState<string | null>(null);
+  const mergeEntry = pendingMergeId
+    ? (entries.find((entry) => entry.id === pendingMergeId) ?? null)
+    : null;
 
   async function handleSubmitEdit(id: string, content: string) {
     const saved = await onUpdateEntry(id, content);
@@ -98,6 +107,7 @@ export function EntryFeed({
                   onAddClarification(entry.id, question, answer)
                 }
                 onRemoveClarification={onRemoveClarification}
+                onRequestMerge={() => setPendingMergeId(entry.id)}
                 onSuggestQuestions={onSuggestQuestions}
               />
             ))}
@@ -126,6 +136,30 @@ export function EntryFeed({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <EntryMergeDialog
+        open={mergeEntry !== null}
+        entryContent={mergeEntry?.content ?? ''}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPendingMergeId(null);
+          }
+        }}
+        onMergeExisting={(threadId) => {
+          if (pendingMergeId) {
+            onMergeEntryExisting(pendingMergeId, threadId);
+          }
+
+          setPendingMergeId(null);
+        }}
+        onMergeNew={(title) => {
+          if (pendingMergeId) {
+            onMergeEntryNew(pendingMergeId, title);
+          }
+
+          setPendingMergeId(null);
+        }}
+      />
     </section>
   );
 }

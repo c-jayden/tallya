@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
-import { Check, MessageSquarePlus, Pencil, Trash2, X } from 'lucide-react';
+import { Check, GitMerge, MessageSquarePlus, Pencil, Trash2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -19,6 +19,7 @@ type EntryFeedItemProps = {
   onRequestDelete: () => void;
   onAddClarification: (question: string | null, answer: string) => Promise<boolean> | boolean;
   onRemoveClarification: (id: string) => void;
+  onRequestMerge: () => void;
   onSuggestQuestions: (content: string) => Promise<string[]>;
 };
 
@@ -137,6 +138,7 @@ export function EntryFeedItem({
   onRequestDelete,
   onAddClarification,
   onRemoveClarification,
+  onRequestMerge,
   onSuggestQuestions,
 }: EntryFeedItemProps) {
   const [isSupplementOpen, setIsSupplementOpen] = useState(false);
@@ -202,6 +204,21 @@ export function EntryFeedItem({
             </TooltipTrigger>
             <TooltipContent>补充细节</TooltipContent>
           </Tooltip>
+          {entry.threadId ? null : (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  className="grid size-6 cursor-pointer place-items-center rounded-md text-app-ink-subtle transition-colors duration-150 hover:bg-app-surface hover:text-app-ink focus-visible:bg-app-surface focus-visible:text-app-ink focus-visible:outline-none"
+                  onClick={onRequestMerge}
+                  aria-label="归并到线索"
+                >
+                  <GitMerge className="size-3.5" aria-hidden="true" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>归并到线索</TooltipContent>
+            </Tooltip>
+          )}
           <Tooltip>
             <TooltipTrigger asChild>
               <button

@@ -247,6 +247,8 @@ export function WorkMemoryHome() {
             onRemoveEntry={entries.removeEntry}
             onAddClarification={entries.addClarification}
             onRemoveClarification={entries.removeClarification}
+            onMergeEntryExisting={entries.mergeEntryIntoThread}
+            onMergeEntryNew={entries.mergeEntryIntoNewThread}
             onSuggestQuestions={entries.suggestQuestions}
           />
         </div>

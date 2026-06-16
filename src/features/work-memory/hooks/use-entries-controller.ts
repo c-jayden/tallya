@@ -5,6 +5,7 @@ import { clarificationRepository } from '../services/clarification-repository';
 import { entryRepository } from '../services/entry-repository';
 import { reportRepository } from '../services/report-repository';
 import { threadRepository } from '../services/thread-repository';
+import { threadService } from '../services/thread-service';
 import { threadSuggestionService } from '../services/thread-suggestion-service';
 import { usageStatsRepository } from '../services/usage-stats-repository';
 import type { Clarification, Entry, ThreadLinkCandidate } from '../types';
@@ -339,6 +340,52 @@ export function useEntriesController({
     [reload],
   );
 
+  // Manual merge fallback for when the AI never suggested a link: join the entry
+  // to an existing thread, or start a new one from it. The pending-suggestion set
+  // can shift (a stale suggestion for this entry drops once it's threaded), so the
+  // hub is asked to refresh.
+  const mergeEntryIntoThread = useCallback(
+    async (entryId: string, threadId: string) => {
+      try {
+        await threadService.addEntryToThread(threadId, entryId);
+        onSuggestionsChangedRef.current?.();
+        await reload();
+        toast.success('已归并到线索');
+
+        return true;
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : '归并失败，请稍后重试。');
+
+        return false;
+      }
+    },
+    [reload],
+  );
+
+  const mergeEntryIntoNewThread = useCallback(
+    async (entryId: string, title: string) => {
+      const trimmed = title.trim();
+
+      if (!trimmed) {
+        return false;
+      }
+
+      try {
+        await threadService.createThreadFromEntries(trimmed, [entryId]);
+        onSuggestionsChangedRef.current?.();
+        await reload();
+        toast.success('已新建线索');
+
+        return true;
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : '归并失败，请稍后重试。');
+
+        return false;
+      }
+    },
+    [reload],
+  );
+
   const suggestQuestions = useCallback(async (content: string) => {
     return aiService.suggestClarifications({ content });
   }, []);
@@ -365,6 +412,8 @@ export function useEntriesController({
     removeEntry,
     addClarification,
     removeClarification,
+    mergeEntryIntoThread,
+    mergeEntryIntoNewThread,
     suggestQuestions,
     reload,
     clearLocalData,
