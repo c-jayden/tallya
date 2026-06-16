@@ -20,6 +20,7 @@ const MAIN_WINDOW_LABEL: &str = "main";
 const TRAY_EVENT_FOCUS_ENTRY: &str = "tray://focus-entry";
 const TRAY_EVENT_OPEN_SEARCH: &str = "tray://open-search";
 const TRAY_EVENT_OPEN_SETTINGS: &str = "tray://open-settings";
+const TRAY_EVENT_CHECK_UPDATE: &str = "tray://check-update";
 const TRAY_EVENT_WINDOW_HIDDEN: &str = "tray://window-hidden";
 const TRAY_EVENT_CLOSE_BLOCKED: &str = "tray://close-blocked";
 #[cfg(target_os = "windows")]
@@ -257,6 +258,7 @@ fn setup_tray(app: &mut tauri::App, state: AppWindowState) -> tauri::Result<()> 
         .text("record-today", "记录今天")
         .text("search", "搜索记忆")
         .text("settings", "设置")
+        .text("check-update", "检查更新")
         .separator()
         .text("quit", "退出")
         .build()?;
@@ -288,6 +290,10 @@ fn setup_tray(app: &mut tauri::App, state: AppWindowState) -> tauri::Result<()> 
         "settings" => {
             show_and_focus_main_window(app);
             let _ = app.emit(TRAY_EVENT_OPEN_SETTINGS, ());
+        }
+        "check-update" => {
+            show_and_focus_main_window(app);
+            let _ = app.emit(TRAY_EVENT_CHECK_UPDATE, ());
         }
         "quit" => {
             menu_state.is_quitting.store(true, Ordering::SeqCst);

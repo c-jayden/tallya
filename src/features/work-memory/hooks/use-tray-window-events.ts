@@ -5,6 +5,7 @@ type UseTrayWindowEventsOptions = {
   onFocusEntry: () => void;
   onOpenSearch: () => void;
   onOpenSettings: () => void;
+  onCheckUpdate: () => void;
   onWindowHidden?: () => void;
   onCloseBlocked?: () => void;
 };
@@ -24,6 +25,7 @@ export function useTrayWindowEvents(options: UseTrayWindowEventsOptions) {
       onFocusEntry: () => handlersRef.current.onFocusEntry(),
       onOpenSearch: () => handlersRef.current.onOpenSearch(),
       onOpenSettings: () => handlersRef.current.onOpenSettings(),
+      onCheckUpdate: () => handlersRef.current.onCheckUpdate(),
       onWindowHidden: () => handlersRef.current.onWindowHidden?.(),
       onCloseBlocked: () => handlersRef.current.onCloseBlocked?.(),
     }).then((unlisten) => {

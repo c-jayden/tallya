@@ -34,10 +34,14 @@ import {
   isTodayDate,
 } from './memory-date-view-model';
 import { quitApp } from './services/window-service';
+import type { SettingsSection } from './components/settings/settings-types';
 import type { Entry } from './types';
 
 export function WorkMemoryHome() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [settingsInitialSection, setSettingsInitialSection] = useState<SettingsSection | undefined>(
+    undefined,
+  );
   const [closeBlockedRequestId, setCloseBlockedRequestId] = useState(0);
   const todayDate = useTodayDate();
   const [selectedDate, setSelectedDate] = useState(todayDate);
@@ -113,6 +117,12 @@ export function WorkMemoryHome() {
     dailyReport.close();
   }
 
+  function openSettings(section?: SettingsSection) {
+    closeOverlays();
+    setSettingsInitialSection(section);
+    setIsSettingsOpen(true);
+  }
+
   function openDailyReport() {
     closeOverlays();
     dailyReport.open({
@@ -153,10 +163,8 @@ export function WorkMemoryHome() {
       closeOverlays();
       search.openSearchPanel();
     },
-    onOpenSettings: () => {
-      closeOverlays();
-      setIsSettingsOpen(true);
-    },
+    onOpenSettings: () => openSettings(),
+    onCheckUpdate: () => openSettings('about'),
     onWindowHidden: aiTasks.handleWindowHidden,
     onCloseBlocked: () => setCloseBlockedRequestId((current) => current + 1),
   });
@@ -209,10 +217,7 @@ export function WorkMemoryHome() {
               closeOverlays();
               weeklyReport.openGenerateDialog();
             }}
-            onSettingsClick={() => {
-              closeOverlays();
-              setIsSettingsOpen(true);
-            }}
+            onSettingsClick={() => openSettings()}
           />
 
           <MemoryHero
@@ -358,6 +363,7 @@ export function WorkMemoryHome() {
 
       <SettingsDialog
         open={isSettingsOpen}
+        initialSection={settingsInitialSection}
         onOpenChange={setIsSettingsOpen}
         onClearLocalData={handleClearLocalData}
         onDataRestored={entries.reload}

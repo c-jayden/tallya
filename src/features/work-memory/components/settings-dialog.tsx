@@ -11,10 +11,12 @@ import { ImportBackupConfirmDialog } from './settings/import-backup-confirm-dial
 import { SettingsContent } from './settings/settings-content';
 import { SettingsMenu } from './settings/settings-menu';
 import { useSettingsDialogState } from './settings/use-settings-dialog-state';
+import type { SettingsSection } from './settings/settings-types';
 import type { AiTaskCoordinatorControls } from '../hooks/use-ai-task-coordinator';
 
 type SettingsDialogProps = {
   open: boolean;
+  initialSection?: SettingsSection;
   onOpenChange: (open: boolean) => void;
   onClearLocalData: () => Promise<void>;
   onDataRestored?: () => Promise<void>;
@@ -25,6 +27,7 @@ type SettingsDialogProps = {
 
 export function SettingsDialog({
   open,
+  initialSection,
   onOpenChange,
   onClearLocalData,
   onDataRestored,
@@ -34,6 +37,7 @@ export function SettingsDialog({
 }: SettingsDialogProps) {
   const settingsState = useSettingsDialogState({
     open,
+    initialSection,
     onClearLocalData,
     onDataRestored,
     aiTaskCoordinator,

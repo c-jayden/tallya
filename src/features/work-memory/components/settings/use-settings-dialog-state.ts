@@ -25,6 +25,7 @@ import {
 
 type UseSettingsDialogStateOptions = {
   open: boolean;
+  initialSection?: SettingsSection;
   onClearLocalData: () => Promise<void>;
   onDataRestored?: () => Promise<void>;
   aiTaskCoordinator?: AiTaskCoordinatorControls;
@@ -45,6 +46,7 @@ const REPORT_STYLE_EXTRACT_TIMEOUT_MS = 120_000;
 
 export function useSettingsDialogState({
   open,
+  initialSection,
   onClearLocalData,
   onDataRestored,
   aiTaskCoordinator,
@@ -78,6 +80,18 @@ export function useSettingsDialogState({
   const [providerHealth, setProviderHealth] = useState<ProviderHealth>(initialProviderHealth);
   const [localGatewayHealth, setLocalGatewayHealth] =
     useState<ProviderHealth>(initialLocalGatewayHealth);
+  const [wasOpen, setWasOpen] = useState(open);
+
+  // When the dialog opens via a section-targeted entry point (e.g. the tray's
+  // "检查更新" → 关于), jump to that section. Done during render (not an effect)
+  // to avoid a setState-in-effect cascade.
+  if (open !== wasOpen) {
+    setWasOpen(open);
+
+    if (open && initialSection) {
+      setActiveSection(initialSection);
+    }
+  }
 
   useEffect(() => {
     if (!open) {

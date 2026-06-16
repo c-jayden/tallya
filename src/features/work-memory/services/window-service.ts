@@ -5,6 +5,7 @@ export const trayEvents = {
   focusEntry: 'tray://focus-entry',
   openSearch: 'tray://open-search',
   openSettings: 'tray://open-settings',
+  checkUpdate: 'tray://check-update',
   windowHidden: 'tray://window-hidden',
   closeBlocked: 'tray://close-blocked',
 } as const;
@@ -19,6 +20,7 @@ type TrayEventHandlers = {
   onFocusEntry: () => void;
   onOpenSearch: () => void;
   onOpenSettings: () => void;
+  onCheckUpdate: () => void;
   onWindowHidden: () => void;
   onCloseBlocked: () => void;
 };
@@ -114,6 +116,7 @@ export async function registerTrayEventHandlers(handlers: TrayEventHandlers) {
       listen(trayEvents.focusEntry, handlers.onFocusEntry),
       listen(trayEvents.openSearch, handlers.onOpenSearch),
       listen(trayEvents.openSettings, handlers.onOpenSettings),
+      listen(trayEvents.checkUpdate, handlers.onCheckUpdate),
       listen(trayEvents.windowHidden, handlers.onWindowHidden),
       listen(trayEvents.closeBlocked, handlers.onCloseBlocked),
     ]);
