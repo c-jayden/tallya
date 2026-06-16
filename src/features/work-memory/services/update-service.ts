@@ -1,6 +1,21 @@
 import { check, type Update } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
+import { invoke } from '@tauri-apps/api/core';
 import { logger } from './logger/logger';
+
+// The updater's reqwest client ignores the Windows system proxy that the browser
+// uses, so behind a proxy the fetch fails with "error sending request". Read the
+// configured system proxy and pass it through so checks/downloads use the same
+// route the user already relies on for GitHub.
+async function getSystemProxy(): Promise<string | undefined> {
+  try {
+    const proxy = await invoke<string | null>('get_system_proxy');
+
+    return proxy ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 // Result of a manual update check. `update` is kept so the UI can trigger the
 // download/install only after the user opts in.
@@ -17,7 +32,9 @@ export type UpdateService = {
 // failures so the caller can show a friendly retry; "no update" resolves to
 // up-to-date rather than throwing.
 async function checkForUpdate(): Promise<UpdateCheckResult> {
-  const update = await check();
+  const proxy = await getSystemProxy();
+  // The proxy set here is reused by the returned Update for the download too.
+  const update = await check(proxy ? { proxy } : undefined);
 
   if (!update) {
     logger.info('app', 'updater.up_to_date', 'No update available');

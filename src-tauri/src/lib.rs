@@ -183,6 +183,69 @@ fn show_and_focus_main_window(app: &tauri::AppHandle) {
     }
 }
 
+// The updater's HTTP client (reqwest) does not read the Windows system proxy that
+// the browser uses, so behind a proxy update checks fail with "error sending
+// request". Surface the configured system proxy as a URL the frontend can pass to
+// the updater's `check({ proxy })`. None when no proxy is set / non-Windows.
+#[cfg(target_os = "windows")]
+#[tauri::command]
+fn get_system_proxy() -> Option<String> {
+    let key = windows_registry::CURRENT_USER
+        .open(r"Software\Microsoft\Windows\CurrentVersion\Internet Settings")
+        .ok()?;
+
+    if key.get_u32("ProxyEnable").unwrap_or(0) == 0 {
+        return None;
+    }
+
+    normalize_proxy_server(&key.get_string("ProxyServer").ok()?)
+}
+
+#[cfg(not(target_os = "windows"))]
+#[tauri::command]
+fn get_system_proxy() -> Option<String> {
+    // reqwest already honours HTTP(S)_PROXY env vars on other platforms.
+    None
+}
+
+#[cfg(target_os = "windows")]
+fn normalize_proxy_server(server: &str) -> Option<String> {
+    let trimmed = server.trim();
+
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    // Per-protocol form "http=host:port;https=host:port;..." — prefer https, then
+    // http. Single form "host:port" applies to all protocols.
+    if trimmed.contains('=') {
+        let mut http_proxy = None;
+
+        for part in trimmed.split(';') {
+            if let Some((scheme, value)) = part.split_once('=') {
+                match scheme.trim().to_ascii_lowercase().as_str() {
+                    "https" => return Some(ensure_proxy_scheme(value.trim())),
+                    "http" => http_proxy = Some(ensure_proxy_scheme(value.trim())),
+                    _ => {}
+                }
+            }
+        }
+
+        return http_proxy;
+    }
+
+    Some(ensure_proxy_scheme(trimmed))
+}
+
+#[cfg(target_os = "windows")]
+fn ensure_proxy_scheme(value: &str) -> String {
+    if value.contains("://") {
+        value.to_string()
+    } else {
+        format!("http://{value}")
+    }
+}
+
 #[cfg(not(target_os = "windows"))]
 fn send_system_notification(app: tauri::AppHandle, body: String) -> Result<(), String> {
     app.notification()
@@ -374,6 +437,7 @@ pub fn run() {
             codex::generate_range_report_with_codex,
             codex::generate_weekly_report_with_codex,
             get_main_window_state,
+            get_system_proxy,
             hide_main_window,
             open_app_directory,
             quit_app,
