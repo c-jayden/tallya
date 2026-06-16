@@ -231,6 +231,39 @@ export type ThreadLinkSuggestion = {
   threadTitle: string;
 };
 
+// A persisted pending merge suggestion: the AI thinks `entryId` continues
+// `relatedEntryId`. proposedThreadTitle names the shared thread; existingThreadId
+// is set when relatedEntry already belongs to a thread (join it) and null when a
+// new thread should be created from both entries. Persisted (not session-only) so
+// a slow/late AI response and cross-day captures are never lost.
+export type ThreadSuggestion = {
+  entryId: string;
+  relatedEntryId: string;
+  proposedThreadTitle: string;
+  existingThreadId: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CreateThreadSuggestionInput = {
+  entryId: string;
+  relatedEntryId: string;
+  proposedThreadTitle: string;
+  existingThreadId?: string | null;
+};
+
+// A pending merge suggestion enriched for the review hub: the new entry's text,
+// the matched entry's text, and the target thread (existing, or the proposed
+// title for a brand-new thread). Stale rows are filtered out before this view.
+export type PendingMergeSuggestion = {
+  entryId: string;
+  entryContent: string;
+  relatedEntryContent: string;
+  proposedThreadTitle: string;
+  existingThreadId: string | null;
+  existingThreadTitle: string | null;
+};
+
 // One entry offered to report gap-detection, carrying its id (so an answer can
 // be saved back), thread, and how many clarifications it already has.
 export type ReportGapEntry = {
