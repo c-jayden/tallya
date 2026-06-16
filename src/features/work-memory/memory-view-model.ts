@@ -45,6 +45,12 @@ export function formatMemoryDate(date: string) {
   }).format(getMemoryDate(date));
 }
 
+const WEEKDAY_LABELS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+
+export function getMemoryWeekday(date: string) {
+  return WEEKDAY_LABELS[getMemoryDate(date).getDay()];
+}
+
 export function getRelativeMemoryDate(date: string, currentDate: string) {
   const memoryDate = getMemoryDate(date);
   const current = getMemoryDate(currentDate);
@@ -139,9 +145,7 @@ export function formatMemoryDateLabel(date: string, currentDate: string) {
     return '昨天';
   }
 
-  const weekdays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
-
-  return `${memoryDate.getMonth() + 1}月${memoryDate.getDate()}日 ${weekdays[memoryDate.getDay()]}`;
+  return `${memoryDate.getMonth() + 1}月${memoryDate.getDate()}日 ${WEEKDAY_LABELS[memoryDate.getDay()]}`;
 }
 
 export function getWeeklySnapshotFromMemories(

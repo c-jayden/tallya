@@ -3,7 +3,7 @@ import type { RefObject } from 'react';
 import { Button } from '@/components/ui/button';
 import { TallyaScrollArea } from '@/components/tallya-scroll-area';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { formatMemoryDate, getRelativeMemoryDate } from '../memory-view-model';
+import { formatMemoryDate, getMemoryWeekday, getRelativeMemoryDate } from '../memory-view-model';
 import type { ThreadStoryline } from '../services/thread-service';
 import type { Entry, PendingMergeSuggestion, ThreadSummary } from '../types';
 
@@ -155,10 +155,12 @@ function ThreadStorylineView({
         {storyline.entries.length > 0 ? (
           <div className="grid gap-1">
             {storyline.entries.map((entry) => {
-              const relativeDate = getRelativeMemoryDate(entry.occurredOn, currentDate);
-              const dateLabel = `${formatMemoryDate(entry.occurredOn)}${
-                relativeDate ? ` · ${relativeDate}` : ''
-              }`;
+              // Recent days keep 今天/昨天/本周周X; older days fall back to the plain
+              // weekday so every entry shows one consistently.
+              const relativeDate =
+                getRelativeMemoryDate(entry.occurredOn, currentDate) ||
+                getMemoryWeekday(entry.occurredOn);
+              const dateLabel = `${formatMemoryDate(entry.occurredOn)} · ${relativeDate}`;
 
               return (
                 <button
