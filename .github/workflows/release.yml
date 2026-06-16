@@ -220,8 +220,27 @@ jobs:
           }
           $signature = (Get-Content $sig.FullName -Raw).Trim()
           $downloadUrl = "https://github.com/${{ github.repository }}/releases/download/$env:TAG_NAME/${prefix}_setup.exe"
+
+          # Pull the current version's section from CHANGELOG.md into the updater
+          # notes so the in-app "检查更新" shows what changed. Missing section -> "".
+          $notes = ""
+          if (Test-Path "CHANGELOG.md") {
+            $capture = $false
+            $collected = @()
+            foreach ($line in (Get-Content "CHANGELOG.md")) {
+              if ($line -match '^##\s') {
+                if ($capture) { break }
+                if ($line -match "^##\s+v?$([regex]::Escape($env:APP_VERSION))\b") { $capture = $true }
+                continue
+              }
+              if ($capture) { $collected += $line }
+            }
+            $notes = ($collected -join "`n").Trim()
+          }
+
           $manifest = [ordered]@{
             version = $env:APP_VERSION
+            notes = $notes
             pub_date = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
             platforms = [ordered]@{
               "windows-x86_64" = [ordered]@{
