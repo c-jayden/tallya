@@ -1,22 +1,60 @@
-import { useCallback, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { appVersion } from '@/lib/app-version';
+import type { AppSettings } from '../../services/app-settings-repository';
 import { updateService } from '../../services/update-service';
+import { SwitchField } from './settings-shared';
 import type { Update } from '@tauri-apps/plugin-updater';
+
+type AboutSettingsSectionProps = {
+  settings: AppSettings;
+  onUpdateSettings: (patch: Partial<AppSettings>) => void;
+};
 
 type UpdateState =
   | { kind: 'idle' }
   | { kind: 'checking' }
   | { kind: 'up-to-date' }
-  | { kind: 'available'; version: string; update: Update }
+  | { kind: 'available'; version: string; notes: string | null; update: Update }
   | { kind: 'installing'; version: string }
-  | { kind: 'error'; message: string };
+  | { kind: 'error' };
 
-export function AboutSettingsSection() {
+export function AboutSettingsSection({ settings, onUpdateSettings }: AboutSettingsSectionProps) {
   const [state, setState] = useState<UpdateState>({ kind: 'idle' });
 
-  const handleCheck = useCallback(async () => {
+  // Silent auto-check when opening 关于 (only when enabled): surfaces an available
+  // update without a click, and stays quiet on "up to date" / transient failures
+  // (e.g. no published release yet) so it never nags.
+  useEffect(() => {
+    if (!settings.autoCheckUpdates) {
+      return;
+    }
+
+    let isMounted = true;
+
+    void updateService
+      .check()
+      .then((result) => {
+        if (isMounted && result.status === 'available') {
+          setState({
+            kind: 'available',
+            version: result.version,
+            notes: result.notes,
+            update: result.update,
+          });
+        }
+      })
+      .catch(() => {
+        // Silent: an auto-check failure must not surface an error.
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [settings.autoCheckUpdates]);
+
+  async function handleCheck() {
     setState({ kind: 'checking' });
 
     try {
@@ -24,18 +62,15 @@ export function AboutSettingsSection() {
 
       setState(
         result.status === 'available'
-          ? { kind: 'available', version: result.version, update: result.update }
+          ? { kind: 'available', version: result.version, notes: result.notes, update: result.update }
           : { kind: 'up-to-date' },
       );
-    } catch (error) {
-      setState({
-        kind: 'error',
-        message: error instanceof Error ? error.message : '检查更新失败，请稍后再试。',
-      });
+    } catch {
+      setState({ kind: 'error' });
     }
-  }, []);
+  }
 
-  const handleInstall = useCallback(async () => {
+  async function handleInstall() {
     if (state.kind !== 'available') {
       return;
     }
@@ -46,24 +81,23 @@ export function AboutSettingsSection() {
     try {
       // On success the app relaunches, so this promise typically never resolves.
       await updateService.downloadAndInstall(update);
-    } catch (error) {
-      setState({
-        kind: 'error',
-        message: error instanceof Error ? error.message : '更新安装失败，请稍后再试。',
-      });
+    } catch {
+      setState({ kind: 'error' });
     }
-  }, [state]);
+  }
 
   const isBusy = state.kind === 'checking' || state.kind === 'installing';
+  const showCheckButton = state.kind !== 'available' && state.kind !== 'installing';
 
   return (
-    <section className="space-y-4 text-sm" aria-label="关于">
+    <section className="space-y-5 text-sm" aria-label="关于">
       <div>
         <div className="text-base font-semibold text-app-ink">Tallya / 职迹</div>
         <div className="mt-1 text-app-ink-muted">本地 AI 工作记忆库</div>
+
         <div className="mt-3 flex items-center gap-3">
           <span className="text-[13px] text-app-ink-muted">版本 {appVersion}</span>
-          {state.kind === 'available' || state.kind === 'installing' ? null : (
+          {showCheckButton ? (
             <Button
               type="button"
               variant="ghost"
@@ -78,7 +112,7 @@ export function AboutSettingsSection() {
               ) : null}
               检查更新
             </Button>
-          )}
+          ) : null}
         </div>
 
         {state.kind === 'up-to-date' ? (
@@ -86,21 +120,30 @@ export function AboutSettingsSection() {
         ) : null}
 
         {state.kind === 'error' ? (
-          <p className="mt-2 text-[13px] text-[var(--app-danger,#dc2626)]">{state.message}</p>
+          <p className="mt-2 text-[13px] text-app-ink-subtle">
+            暂时没检查到更新，可能还没有发布新版本或网络不可用，稍后再试。
+          </p>
         ) : null}
 
         {state.kind === 'available' ? (
-          <div className="mt-2 flex items-center gap-3">
-            <span className="text-[13px] text-app-ink">发现新版本 v{state.version}</span>
-            <Button
-              type="button"
-              variant="accent"
-              size="sm"
-              className="h-7 cursor-pointer rounded-lg px-3 text-[13px]"
-              onClick={handleInstall}
-            >
-              下载并安装
-            </Button>
+          <div className="mt-2.5 rounded-lg bg-app-surface-muted px-3 py-2.5">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-[13px] font-medium text-app-ink">发现新版本 v{state.version}</span>
+              <Button
+                type="button"
+                variant="accent"
+                size="sm"
+                className="h-7 shrink-0 cursor-pointer rounded-lg px-3 text-[13px]"
+                onClick={handleInstall}
+              >
+                下载并安装
+              </Button>
+            </div>
+            {state.notes ? (
+              <p className="mt-1.5 text-[12.5px] leading-[1.55] whitespace-pre-wrap text-app-ink-muted">
+                {state.notes}
+              </p>
+            ) : null}
           </div>
         ) : null}
 
@@ -110,6 +153,17 @@ export function AboutSettingsSection() {
             正在下载并安装 v{state.version}，完成后会自动重启。
           </p>
         ) : null}
+      </div>
+
+      <div className="space-y-1">
+        <SwitchField
+          label="启动时自动检查更新"
+          checked={settings.autoCheckUpdates}
+          onCheckedChange={(checked) => onUpdateSettings({ autoCheckUpdates: checked })}
+        />
+        <p className="text-[13px] leading-5 text-app-ink-subtle">
+          打开应用时静默检查 GitHub 上是否有新版本。
+        </p>
       </div>
 
       <div className="space-y-1.5 leading-6">

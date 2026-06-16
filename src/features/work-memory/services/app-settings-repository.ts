@@ -63,6 +63,7 @@ export type AppSettings = {
   closeToTray: boolean;
   startMinimized: boolean;
   diagnosticLoggingEnabled: boolean;
+  autoCheckUpdates: boolean;
 };
 
 const STORAGE_KEY = 'tallya.app-settings.v1';
@@ -126,6 +127,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   closeToTray: true,
   startMinimized: false,
   diagnosticLoggingEnabled: false,
+  autoCheckUpdates: true,
 };
 
 function getBrowserStorage() {
@@ -349,6 +351,7 @@ function appSettingsToRows(settings: AppSettings): Record<string, string> {
     closeToTray: String(settings.closeToTray),
     startMinimized: String(settings.startMinimized),
     diagnosticLoggingEnabled: String(settings.diagnosticLoggingEnabled),
+    autoCheckUpdates: String(settings.autoCheckUpdates),
   };
 }
 
@@ -394,6 +397,7 @@ function rowsToAppSettingsInput(rows: AppSettingsRow[]) {
     closeToTray: getBooleanString(values.closeToTray),
     startMinimized: getBooleanString(values.startMinimized),
     diagnosticLoggingEnabled: getBooleanString(values.diagnosticLoggingEnabled),
+    autoCheckUpdates: getBooleanString(values.autoCheckUpdates),
   };
 }
 
@@ -467,6 +471,7 @@ function normalizeAppSettings(value: unknown): AppSettings {
       input.diagnosticLoggingEnabled,
       DEFAULT_APP_SETTINGS.diagnosticLoggingEnabled,
     ),
+    autoCheckUpdates: getBoolean(input.autoCheckUpdates, DEFAULT_APP_SETTINGS.autoCheckUpdates),
   };
 }
 

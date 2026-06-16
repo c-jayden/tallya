@@ -100,6 +100,7 @@ const settings: AppSettings = {
   closeToTray: true,
   startMinimized: false,
   diagnosticLoggingEnabled: false,
+  autoCheckUpdates: true,
 };
 
 describe('createAIService', () => {

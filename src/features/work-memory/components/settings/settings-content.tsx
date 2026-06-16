@@ -154,5 +154,5 @@ function SettingsSectionContent({
     );
   }
 
-  return <AboutSettingsSection />;
+  return <AboutSettingsSection settings={settings} onUpdateSettings={onUpdateSettings} />;
 }
