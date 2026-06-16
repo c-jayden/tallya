@@ -10,6 +10,7 @@ type ThreadsPanelProps = {
   open: boolean;
   currentDate: string;
   threadSummaries: ThreadSummary[];
+  stalledThreadIds: Set<string>;
   selectedThread: ThreadStoryline | null;
   inputRef?: RefObject<HTMLButtonElement | null>;
   onClose: () => void;
@@ -30,18 +31,26 @@ function formatThreadSpan(thread: ThreadSummary) {
 
 type ThreadRowProps = {
   thread: ThreadSummary;
+  isStalled: boolean;
   onOpen: () => void;
 };
 
-function ThreadRow({ thread, onOpen }: ThreadRowProps) {
+function ThreadRow({ thread, isStalled, onOpen }: ThreadRowProps) {
   return (
     <button
       type="button"
       className="block w-full cursor-pointer rounded-[10px] bg-transparent px-3.5 py-2.5 text-left transition-colors duration-150 hover:bg-app-surface-muted focus-visible:bg-app-surface-muted focus-visible:outline-none"
       onClick={onOpen}
     >
-      <span className="block truncate text-[14px] leading-[1.5] text-app-ink">
-        {thread.title}
+      <span className="flex min-w-0 items-center gap-2">
+        <span className="min-w-0 flex-1 truncate text-[14px] leading-[1.5] text-app-ink">
+          {thread.title}
+        </span>
+        {isStalled ? (
+          <span className="shrink-0 rounded-md bg-app-surface-muted px-1.5 py-0.5 text-[11px] leading-4 text-app-ink-subtle">
+            停顿中
+          </span>
+        ) : null}
       </span>
       <span className="mt-0.5 block text-xs leading-4 text-app-ink-subtle">
         {formatThreadSpan(thread)}
@@ -123,6 +132,7 @@ export function ThreadsPanel({
   open,
   currentDate,
   threadSummaries,
+  stalledThreadIds,
   selectedThread,
   onClose,
   onOpenThread,
@@ -173,6 +183,7 @@ export function ThreadsPanel({
                       <ThreadRow
                         key={thread.id}
                         thread={thread}
+                        isStalled={stalledThreadIds.has(thread.id)}
                         onOpen={() => onOpenThread(thread.id)}
                       />
                     ))}

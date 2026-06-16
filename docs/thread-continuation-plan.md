@@ -91,7 +91,30 @@
 
 ---
 
-## M-B：打开应用被动回顾（次做，需先验证 M-A 后的信号）
+## M-B：打开应用被动回顾 ✅ 已完成
+
+> 已实现并随测试通过（typecheck + lint + 431 测试全绿）。真机验证仍待做（见末尾）。
+> 注意：这是计划里建议「等 M-A 信号再做」的一块，按用户决定提前实现。
+
+**实现摘要**：
+
+- 纯逻辑复用 M-A 的 `selectStalledThreads`（同一条判定规则）。
+- **圆点**：[home-toolbar.tsx](../src/features/work-memory/components/home-toolbar.tsx) 线索按钮右上角加
+  `bg-app-accent` 小圆点（带 `ring-app-bg`），仅 `hasThreadsNudge` 为真时出现，aria-label 同步。
+- **每日检查 + 问过静默**：新增 hook
+  [use-stalled-thread-review.ts](../src/features/work-memory/hooks/use-stalled-thread-review.ts)，
+  挂 `visibilitychange/focus`，以「上次判断日期」去重做到**每天首次显示窗口判断一次**；
+  决策抽成纯函数 [stalled-review.ts](../src/features/work-memory/services/stalled-review.ts)
+  `planStalledReviewNudge`（④：同一线索 3 天内不重复亮点，离开停顿窗口即丢弃）。
+- **存储**：[stalled-review-repository.ts](../src/features/work-memory/services/stalled-review-repository.ts)
+  用 localStorage 存「上次判断日期 + 每线索上次亮点日期」——这是可丢弃的提示态、非用户内容，
+  故不进 SQLite（零迁移），接口隔离，日后可换。
+- **面板标注 + 置顶**：[use-threads-panel.ts](../src/features/work-memory/hooks/use-threads-panel.ts)
+  打开时算出停顿线索 id、把停顿的稳定排到列表前；
+  [threads-panel.tsx](../src/features/work-memory/components/threads-panel.tsx) 给停顿行加安静的
+  「停顿中」标。打开面板即 `markReviewed()` 清掉圆点（含异步在途的竞态保护）。
+- 共用日期口径：新增 [memory-date.ts](../src/features/work-memory/services/memory-date.ts)
+  `differenceInCalendarDays`（UTC 计算，避免跨时区差一天），M-A/M-B 共用。
 
 **目标**：每天首次显示窗口时，若存在停顿线索，给一个**安静的、可点开**的回顾入口；
 **首页布局完全不动**。

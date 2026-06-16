@@ -1,4 +1,5 @@
 import type { ReportGap, ThreadSummary } from '../types';
+import { differenceInCalendarDays } from './memory-date';
 
 // Rules for deciding a thread is "停顿" (stalled) — recorded across several days
 // with real momentum, then went quiet recently — so we can ask "还在进行吗？"
@@ -19,15 +20,22 @@ export const DEFAULT_STALLED_THREAD_THRESHOLDS: StalledThreadThresholds = {
   maxSilentDays: 14,
 };
 
-// Picks the stalled threads from thread summaries and turns each into a report
-// gap with a fixed question (no AI needed). referenceDate is "today" (YYYY-MM-DD);
-// a thread qualifies only when its silence falls inside [minSilentDays, maxSilentDays].
-export function selectStalledThreadGaps(
+// A stalled thread plus how many days it has been quiet, so callers can both mark
+// it and phrase a question without recomputing.
+export type StalledThread = {
+  summary: ThreadSummary;
+  silentDays: number;
+};
+
+// Picks the stalled threads from thread summaries. referenceDate is "today"
+// (YYYY-MM-DD); a thread qualifies only when it has cross-day momentum and its
+// silence falls inside [minSilentDays, maxSilentDays].
+export function selectStalledThreads(
   summaries: ThreadSummary[],
   referenceDate: string,
   thresholds: StalledThreadThresholds = DEFAULT_STALLED_THREAD_THRESHOLDS,
-): ReportGap[] {
-  const gaps: ReportGap[] = [];
+): StalledThread[] {
+  const stalled: StalledThread[] = [];
 
   for (const summary of summaries) {
     // ① real cross-day momentum, not a single stray note.
@@ -40,30 +48,28 @@ export function selectStalledThreadGaps(
     }
 
     // ②③ the thread must be quiet, but not so long that it's clearly dropped.
-    const silentDays = daysBetween(summary.lastOccurredOn, referenceDate);
+    const silentDays = differenceInCalendarDays(summary.lastOccurredOn, referenceDate);
 
     if (silentDays < thresholds.minSilentDays || silentDays > thresholds.maxSilentDays) {
       continue;
     }
 
-    gaps.push({
-      entryId: summary.lastEntryId,
-      threadTitle: summary.title,
-      question: `《${summary.title}》最近 ${silentDays} 天没再记了，还在进行吗？现在到哪一步了？`,
-    });
+    stalled.push({ summary, silentDays });
   }
 
-  return gaps;
+  return stalled;
 }
 
-// Calendar-day difference between two YYYY-MM-DD dates, computed in UTC so it is
-// not skewed by local DST or time-of-day.
-function daysBetween(fromDate: string, toDate: string): number {
-  return Math.round((parseYmd(toDate) - parseYmd(fromDate)) / 86_400_000);
-}
-
-function parseYmd(value: string): number {
-  const [year, month, day] = value.split('-').map(Number);
-
-  return Date.UTC(year, month - 1, day);
+// Turns stalled threads into report gaps with a fixed question (no AI needed);
+// the answer attaches to the thread's most recent entry.
+export function selectStalledThreadGaps(
+  summaries: ThreadSummary[],
+  referenceDate: string,
+  thresholds: StalledThreadThresholds = DEFAULT_STALLED_THREAD_THRESHOLDS,
+): ReportGap[] {
+  return selectStalledThreads(summaries, referenceDate, thresholds).map(({ summary, silentDays }) => ({
+    entryId: summary.lastEntryId,
+    threadTitle: summary.title,
+    question: `《${summary.title}》最近 ${silentDays} 天没再记了，还在进行吗？现在到哪一步了？`,
+  }));
 }

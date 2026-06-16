@@ -19,6 +19,7 @@ import { useDailyReportFlow } from './hooks/use-daily-report-flow';
 import { useEntriesController } from './hooks/use-entries-controller';
 import { useHomeWindowSizing } from './hooks/use-home-window-sizing';
 import { useMemorySearch } from './hooks/use-memory-search';
+import { useStalledThreadReview } from './hooks/use-stalled-thread-review';
 import { useThreadsPanel } from './hooks/use-threads-panel';
 import { useTodayDate } from './hooks/use-today-date';
 import { useWeeklyReportFlow } from './hooks/use-weekly-report-flow';
@@ -84,7 +85,8 @@ export function WorkMemoryHome() {
   }
 
   const search = useMemorySearch({ onOpenMemory: openEntry });
-  const threads = useThreadsPanel();
+  const threads = useThreadsPanel({ currentDate: todayDate });
+  const stalledReview = useStalledThreadReview({ currentDate: todayDate });
   const aiTasks = useAiTaskCoordinator();
   const weeklyReport = useWeeklyReportFlow({ aiTaskCoordinator: aiTasks });
   const dailyReport = useDailyReportFlow({ aiTaskCoordinator: aiTasks });
@@ -181,6 +183,7 @@ export function WorkMemoryHome() {
             reportsButtonRef={reportsButtonRef}
             selectedDate={selectedDate}
             weekday={toolbarDate.weekday}
+            hasThreadsNudge={stalledReview.hasReviewNudge}
             onDateChange={updateSelectedDate}
             onSearchClick={() => {
               closeOverlays();
@@ -188,6 +191,8 @@ export function WorkMemoryHome() {
             }}
             onThreadsClick={() => {
               closeOverlays();
+              // Opening the panel counts as seeing the review, so clear the dot.
+              stalledReview.markReviewed();
               threads.openThreadsPanel();
             }}
             onReportsClick={() => {
@@ -265,6 +270,7 @@ export function WorkMemoryHome() {
         open={threads.isThreadsOpen}
         currentDate={todayDate}
         threadSummaries={threads.threadSummaries}
+        stalledThreadIds={threads.stalledThreadIds}
         selectedThread={threads.selectedThread}
         onClose={threads.closeThreadsPanel}
         onOpenThread={threads.openThread}

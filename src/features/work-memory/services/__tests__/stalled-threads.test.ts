@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ThreadSummary } from '../../types';
-import { selectStalledThreadGaps } from '../stalled-threads';
+import { selectStalledThreadGaps, selectStalledThreads } from '../stalled-threads';
 
 const REFERENCE_DATE = '2026-06-15';
 
@@ -86,5 +86,26 @@ describe('selectStalledThreadGaps', () => {
     });
 
     expect(gaps).toHaveLength(1);
+  });
+});
+
+describe('selectStalledThreads', () => {
+  it('returns the qualifying summaries with their silent-day count', () => {
+    const stalled = selectStalledThreads([buildSummary({ id: 'thread_pay' })], REFERENCE_DATE);
+
+    expect(stalled).toEqual([
+      { summary: expect.objectContaining({ id: 'thread_pay' }), silentDays: 4 },
+    ]);
+  });
+
+  it('drops threads outside the stalled window', () => {
+    const recent = buildSummary({ id: 'recent', lastOccurredOn: '2026-06-14' });
+    const dormant = buildSummary({
+      id: 'dormant',
+      firstOccurredOn: '2026-05-10',
+      lastOccurredOn: '2026-05-20',
+    });
+
+    expect(selectStalledThreads([recent, dormant], REFERENCE_DATE)).toEqual([]);
   });
 });

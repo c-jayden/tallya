@@ -15,6 +15,7 @@ type HomeToolbarProps = {
   reportsButtonRef: Ref<HTMLButtonElement>;
   selectedDate: string;
   weekday: string;
+  hasThreadsNudge: boolean;
   onDateChange: (date: string) => void;
   onSearchClick: () => void;
   onThreadsClick: () => void;
@@ -32,6 +33,7 @@ export function HomeToolbar({
   reportsButtonRef,
   selectedDate,
   weekday,
+  hasThreadsNudge,
   onDateChange,
   onSearchClick,
   onThreadsClick,
@@ -83,15 +85,21 @@ export function HomeToolbar({
               variant="ghost"
               size="icon-sm"
               type="button"
-              className="size-8.75 cursor-pointer rounded-xl text-app-ink-muted hover:bg-app-surface-muted hover:text-app-ink focus-visible:bg-app-surface-muted focus-visible:text-app-ink [&_svg]:size-3.5"
-              aria-label="线索"
+              className="relative size-8.75 cursor-pointer rounded-xl text-app-ink-muted hover:bg-app-surface-muted hover:text-app-ink focus-visible:bg-app-surface-muted focus-visible:text-app-ink [&_svg]:size-3.5"
+              aria-label={hasThreadsNudge ? '线索，有停顿线索待回顾' : '线索'}
               onClick={onThreadsClick}
             >
               <ListTree aria-hidden="true" />
+              {hasThreadsNudge ? (
+                <span
+                  className="absolute top-1.5 right-1.5 size-1.5 rounded-full bg-app-accent ring-2 ring-app-bg"
+                  aria-hidden="true"
+                />
+              ) : null}
               <span className="sr-only">线索</span>
             </Button>
           </TooltipTrigger>
-          <TooltipContent>线索</TooltipContent>
+          <TooltipContent>{hasThreadsNudge ? '线索 · 有停顿线索待回顾' : '线索'}</TooltipContent>
         </Tooltip>
         <Tooltip>
           <TooltipTrigger asChild>
