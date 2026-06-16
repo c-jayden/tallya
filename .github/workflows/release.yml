@@ -267,18 +267,37 @@ jobs:
             $releaseName = "Tallya $env:TAG_NAME"
           }
 
+          # Release notes come from the matching CHANGELOG.md section (same source
+          # as the in-app updater notes); fall back to a pointer when absent.
+          $changelog = ""
+          if (Test-Path "CHANGELOG.md") {
+            $capture = $false
+            $collected = @()
+            foreach ($line in (Get-Content "CHANGELOG.md")) {
+              if ($line -match '^##\s') {
+                if ($capture) { break }
+                if ($line -match "^##\s+v?$([regex]::Escape($env:APP_VERSION))\b") { $capture = $true }
+                continue
+              }
+              if ($capture) { $collected += $line }
+            }
+            $changelog = ($collected -join "`n").Trim()
+          }
+
+          if ([string]::IsNullOrWhiteSpace($changelog)) {
+            $changelog = "- 本次更新内容见 CHANGELOG.md。"
+          }
+
           $body = @(
-            "Tallya $env:TAG_NAME",
+            "## Tallya $env:TAG_NAME",
             "",
-            "- Windows 安装包（NSIS setup / MSI）与 portable zip 免安装版。",
-            "- macOS 通用版 .dmg（Intel + Apple Silicon）。",
-            "- 当前 AI 生成支持 Codex CLI 和 OpenAI Compatible。",
-            "- 数据默认保存在本机应用数据目录。",
-            "- 覆盖安装不应清空本地数据。",
-            "- 当前安装包未配置代码签名：Windows 可能提示未知发布者；macOS 首次打开需在「系统设置 > 隐私与安全性」放行，或右键打开。"
+            $changelog,
+            "",
+            "---",
+            "- 安装包未配置代码签名：Windows 可能提示未知发布者；macOS 首次打开需在「系统设置 > 隐私与安全性」放行，或右键打开。"
           )
           $bodyPath = "dist/release-body.md"
-          $body | Set-Content -Path $bodyPath -Encoding UTF8
+          ($body -join "`n") | Set-Content -Path $bodyPath -Encoding UTF8
 
           gh release view $env:TAG_NAME *> $null
           if ($LASTEXITCODE -ne 0) {
