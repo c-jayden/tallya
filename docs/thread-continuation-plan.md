@@ -146,6 +146,8 @@ M-B 可以再等——避免在留存尚未验证时继续加面。
 
 ## M-C：线索归并中枢 + 手动归并（来自真机 dogfooding 的真实摩擦）
 
+> **第一期已完成**（typecheck + lint + 444 测试全绿）。第二期（主动 nudge）仍未做。真机验证待做。
+
 **背景**：真机使用发现，跨天补记同一件事经常**没归并成线索**。根因不是判定逻辑，而是归并
 建议本身太脆：
 - 它是**会话内临时态**（不存盘）、**绑在当天 feed 的卡片**上、且**依赖 AI 及时返回**；
@@ -172,12 +174,12 @@ M-B 可以再等——避免在留存尚未验证时继续加面。
 
 ### 分期（避免给一个信号堆四个通道、反而变吵）
 
-**第一期（安静基线，纯 pull —— 本期实现）**：
-1. `thread_suggestions` 表 + 迁移（v8）+ 仓储（内存+SQLite+单例）。
-2. 记录时把建议**持久化**（替代会话内 map），保持 fail-silent。
-3. 线索中枢「待归并」分区（✓/✗）+ 失效校验；**移除 feed 内联建议卡**。
-4. 线索按钮**数字角标**（与 M-B 圆点按优先级共存）。
-5. 手动归并④：entry 操作「归并到…」+ 线索选择器。
+**第一期（安静基线，纯 pull —— ✅ 已完成）**：
+1. ✅ `thread_suggestions` 表 + 迁移（v8）+ 仓储（内存+SQLite+单例）：[thread-suggestion-repository.ts](../src/features/work-memory/services/thread-suggestion-repository.ts)；校验/确认/忽略/过期逻辑在 [thread-suggestion-service.ts](../src/features/work-memory/services/thread-suggestion-service.ts)。
+2. ✅ 记录时把建议**持久化**（替代会话内 map），保持 fail-silent：[use-entries-controller.ts](../src/features/work-memory/hooks/use-entries-controller.ts) `requestThreadSuggestion` → `threadSuggestionService.save`，并经 `onThreadSuggestionsChanged` 通知中枢刷新。
+3. ✅ 线索中枢「待归并」分区（✓/✗）+ 失效校验；**已移除 feed 内联建议卡**：[threads-panel.tsx](../src/features/work-memory/components/threads-panel.tsx)、[use-threads-panel.ts](../src/features/work-memory/hooks/use-threads-panel.ts)。
+4. ✅ 线索按钮**数字角标**（与 M-B 圆点按优先级共存）：[home-toolbar.tsx](../src/features/work-memory/components/home-toolbar.tsx)。
+5. ✅ 手动归并④：entry 操作「归并到…」+ 线索选择器：[entry-merge-dialog.tsx](../src/features/work-memory/components/entry-merge-dialog.tsx)（未在线索中的 entry 才显示入口）。
 
 **第二期（主动 nudge，仅当第一期证明确实会漏才做）**：
 - idle 弹窗：首页 + 前台聚焦 + 无遮罩 + 键鼠静默 ~10s + **一批只弹一次** + 不抢焦点；
