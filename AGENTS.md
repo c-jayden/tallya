@@ -94,3 +94,12 @@ Provider 规则：
 - 不启动新的 dev server；如需查看网页或做浏览器验证，访问用户已运行的 `http://localhost:1420`。
 - 常规验证只运行 `cargo check`、前端 lint 和 type-check。
 - 修改前端逻辑后至少跑 type-check 和 lint。
+
+发版流程（用户要求"发版"时按此走）：
+
+- 先写 CHANGELOG：在 `CHANGELOG.md` 顶部加一段 `## <版本号>`，写**面向用户**的要点（新增/优化/修复，温和清楚，不要照搬 commit 信息）。发布工作流会把这段写进 `latest.json` 的 `notes`，应用内"检查更新"会展示。
+- 再升版本号：运行 `pnpm bump <版本号>`，它会同步更新 `package.json`、`src-tauri/tauri.conf.json`、`src-tauri/Cargo.toml`、`src-tauri/Cargo.lock` 四处（发布工作流校验三处版本一致，缺一不可）。
+- 提交（`chore: release v<版本号>`）并推送 master，然后打 tag `v<版本号>` 推送即触发 `.github/workflows/release.yml`。
+- 工作流默认建 **draft** release；发版后需在 GitHub 手动 Publish，并确保该版本是 "Latest"（更新器 endpoint 用的是 `releases/latest/download/latest.json`，草稿/非 latest 都拉不到）。
+- 自动更新依赖签名：CI 必须配好 `TAURI_SIGNING_PRIVATE_KEY`（及可选 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`）secret，否则 `createUpdaterArtifacts` 打包会失败。
+- 自动更新只验证"能检测+下载+安装"，**不**保证无 SmartScreen（安装包未做 OS 代码签名）。`latest.json` 当前只含 `windows-x86_64`。

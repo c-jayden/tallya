@@ -8,6 +8,7 @@
     "dev": "vite",
     "build": "node scripts/build-frontend.mjs",
     "test": "vitest run",
+    "bump": "node scripts/bump-version.mjs",
     "typecheck": "tsc --noEmit",
     "check": "pnpm typecheck && pnpm lint && pnpm test",
     "check:release": "pnpm check && cargo check --manifest-path src-tauri/Cargo.toml && cargo test --manifest-path src-tauri/Cargo.toml && pnpm build",
