@@ -5,7 +5,7 @@ import { clarificationRepository } from '../services/clarification-repository';
 import { entryRepository } from '../services/entry-repository';
 import { reportRepository } from '../services/report-repository';
 import { threadRepository } from '../services/thread-repository';
-import { threadService } from '../services/thread-service';
+import { threadSuggestionService } from '../services/thread-suggestion-service';
 import { usageStatsRepository } from '../services/usage-stats-repository';
 import type { Clarification, Entry, ThreadLinkCandidate } from '../types';
 
@@ -18,19 +18,13 @@ const THREAD_LINK_CANDIDATE_LIMIT = 20;
 // captures never spawns a burst of (cold-starting) Codex processes.
 const THREAD_SUGGESTION_DEBOUNCE_MS = 1500;
 
-// A pending merge suggestion for one freshly-created entry. existingThreadId is
-// set when the matched entry already belongs to a thread (join it); otherwise a
-// new thread is created from both entries on confirm.
-export type ThreadSuggestionView = {
-  relatedEntry: Entry;
-  threadTitle: string;
-  existingThreadId: string | null;
-  existingThreadTitle: string | null;
-};
-
 type UseEntriesControllerOptions = {
   currentDate: string;
   todayDate: string;
+  // Called after the persisted set of pending merge suggestions changes (a new
+  // suggestion saved, or suggestions cleaned up), so the threads hub can refresh
+  // its count/list without polling.
+  onThreadSuggestionsChanged?: () => void;
 };
 
 type DayData = {
@@ -84,19 +78,27 @@ async function loadDayData(currentDate: string): Promise<DayData> {
   return { entries, clarificationsByEntry: groupByEntry(clarifications) };
 }
 
-export function useEntriesController({ currentDate, todayDate }: UseEntriesControllerOptions) {
+export function useEntriesController({
+  currentDate,
+  todayDate,
+  onThreadSuggestionsChanged,
+}: UseEntriesControllerOptions) {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [clarificationsByEntry, setClarificationsByEntry] = useState<
     Record<string, Clarification[]>
-  >({});
-  const [threadSuggestionByEntry, setThreadSuggestionByEntry] = useState<
-    Record<string, ThreadSuggestionView>
   >({});
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const suggestionTimeoutRef = useRef<number | null>(null);
   const suggestionInFlightRef = useRef(false);
+  // Held in a ref so the background suggestion callbacks stay stable regardless of
+  // how often the parent re-creates the handler.
+  const onSuggestionsChangedRef = useRef(onThreadSuggestionsChanged);
+
+  useEffect(() => {
+    onSuggestionsChangedRef.current = onThreadSuggestionsChanged;
+  }, [onThreadSuggestionsChanged]);
 
   const applyDayData = useCallback((data: DayData) => {
     setEntries(data.entries);
@@ -168,10 +170,15 @@ export function useEntriesController({ currentDate, todayDate }: UseEntriesContr
       const threadTitle =
         suggestion.threadTitle.trim() || existingThreadTitle || newEntry.content.slice(0, 14);
 
-      setThreadSuggestionByEntry((current) => ({
-        ...current,
-        [newEntry.id]: { relatedEntry, threadTitle, existingThreadId, existingThreadTitle },
-      }));
+      // Persist the suggestion (not session-only) so a slow/late AI response and
+      // cross-day captures are never lost; the threads hub reads it from here.
+      await threadSuggestionService.save({
+        entryId: newEntry.id,
+        relatedEntryId: relatedEntry.id,
+        proposedThreadTitle: threadTitle,
+        existingThreadId,
+      });
+      onSuggestionsChangedRef.current?.();
     } catch {
       // Silent by design: a missing/failed merge hint must not interrupt logging.
     }
@@ -279,19 +286,6 @@ export function useEntriesController({ currentDate, todayDate }: UseEntriesContr
     [reload, scheduleThreadSuggestion],
   );
 
-  const dropThreadSuggestion = useCallback((entryId: string) => {
-    setThreadSuggestionByEntry((current) => {
-      if (!(entryId in current)) {
-        return current;
-      }
-
-      const next = { ...current };
-      delete next[entryId];
-
-      return next;
-    });
-  }, []);
-
   const removeEntry = useCallback(
     async (id: string) => {
       try {
@@ -299,49 +293,16 @@ export function useEntriesController({ currentDate, todayDate }: UseEntriesContr
         // Clarifications are children of the entry; remove them so deleting an
         // entry never leaves orphaned detail behind.
         await clarificationRepository.removeByEntry(id);
-        dropThreadSuggestion(id);
+        // Drop any pending merge suggestion that pointed at this entry.
+        await threadSuggestionService.removeForEntries([id]);
+        onSuggestionsChangedRef.current?.();
         await reload();
         toast.success('已删除这条记录');
       } catch (error) {
         toast.error(error instanceof Error ? error.message : '删除失败，请稍后重试。');
       }
     },
-    [dropThreadSuggestion, reload],
-  );
-
-  const confirmThreadSuggestion = useCallback(
-    async (entryId: string) => {
-      const suggestion = threadSuggestionByEntry[entryId];
-
-      if (!suggestion) {
-        return;
-      }
-
-      try {
-        if (suggestion.existingThreadId) {
-          await threadService.addEntryToThread(suggestion.existingThreadId, entryId);
-        } else {
-          await threadService.createThreadFromEntries(suggestion.threadTitle, [
-            suggestion.relatedEntry.id,
-            entryId,
-          ]);
-        }
-
-        dropThreadSuggestion(entryId);
-        await reload();
-        toast.success('已归并到线索');
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : '归并失败，请稍后重试。');
-      }
-    },
-    [dropThreadSuggestion, reload, threadSuggestionByEntry],
-  );
-
-  const dismissThreadSuggestion = useCallback(
-    (entryId: string) => {
-      dropThreadSuggestion(entryId);
-    },
-    [dropThreadSuggestion],
+    [reload],
   );
 
   const addClarification = useCallback(
@@ -386,16 +347,16 @@ export function useEntriesController({ currentDate, todayDate }: UseEntriesContr
     await entryRepository.clearLocalData();
     await clarificationRepository.clearLocalData();
     await threadRepository.clearLocalData();
+    await threadSuggestionService.clearLocalData();
     await reportRepository.clearReports();
     setEntries([]);
     setClarificationsByEntry({});
-    setThreadSuggestionByEntry({});
+    onSuggestionsChangedRef.current?.();
   }, []);
 
   return {
     entries,
     clarificationsByEntry,
-    threadSuggestionByEntry,
     isLoading,
     isSaving,
     composerRef,
@@ -404,8 +365,6 @@ export function useEntriesController({ currentDate, todayDate }: UseEntriesContr
     removeEntry,
     addClarification,
     removeClarification,
-    confirmThreadSuggestion,
-    dismissThreadSuggestion,
     suggestQuestions,
     reload,
     clearLocalData,

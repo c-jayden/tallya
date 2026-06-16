@@ -16,6 +16,7 @@ type HomeToolbarProps = {
   selectedDate: string;
   weekday: string;
   hasThreadsNudge: boolean;
+  mergeCount: number;
   onDateChange: (date: string) => void;
   onSearchClick: () => void;
   onThreadsClick: () => void;
@@ -34,12 +35,20 @@ export function HomeToolbar({
   selectedDate,
   weekday,
   hasThreadsNudge,
+  mergeCount,
   onDateChange,
   onSearchClick,
   onThreadsClick,
   onReportsClick,
   onSettingsClick,
 }: HomeToolbarProps) {
+  const threadsButtonLabel =
+    mergeCount > 0
+      ? `线索，有 ${mergeCount} 条待归并`
+      : hasThreadsNudge
+        ? '线索，有停顿线索待回顾'
+        : '线索';
+
   return (
     <header className="mb-3 flex h-9 items-center justify-between overflow-visible">
       <DatePickerPopover
@@ -86,11 +95,15 @@ export function HomeToolbar({
               size="icon-sm"
               type="button"
               className="relative size-8.75 cursor-pointer rounded-xl text-app-ink-muted hover:bg-app-surface-muted hover:text-app-ink focus-visible:bg-app-surface-muted focus-visible:text-app-ink [&_svg]:size-3.5"
-              aria-label={hasThreadsNudge ? '线索，有停顿线索待回顾' : '线索'}
+              aria-label={threadsButtonLabel}
               onClick={onThreadsClick}
             >
               <ListTree aria-hidden="true" />
-              {hasThreadsNudge ? (
+              {mergeCount > 0 ? (
+                <span className="absolute -top-1 -right-1 grid h-4 min-w-4 place-items-center rounded-full bg-app-accent px-1 text-[10px] leading-none font-semibold text-app-accent-ink ring-2 ring-app-bg">
+                  {mergeCount > 99 ? '99+' : mergeCount}
+                </span>
+              ) : hasThreadsNudge ? (
                 <span
                   className="absolute top-1 right-1 size-2 rounded-full bg-app-accent ring-2 ring-app-bg"
                   aria-hidden="true"
@@ -99,7 +112,7 @@ export function HomeToolbar({
               <span className="sr-only">线索</span>
             </Button>
           </TooltipTrigger>
-          <TooltipContent>{hasThreadsNudge ? '线索 · 有停顿线索待回顾' : '线索'}</TooltipContent>
+          <TooltipContent>{threadsButtonLabel}</TooltipContent>
         </Tooltip>
         <Tooltip>
           <TooltipTrigger asChild>

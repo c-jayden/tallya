@@ -55,7 +55,6 @@ export function WorkMemoryHome() {
   }, [selectedDate, todayDate]);
   const commandKey = getCommandKeyLabel();
   const contentRef = useHomeWindowSizing();
-  const entries = useEntriesController({ currentDate: selectedDate, todayDate });
   const isSelectedDateToday = isTodayDate(selectedDate, todayDate);
   const [focusedEntryId, setFocusedEntryId] = useState<string | null>(null);
   const focusTimeoutRef = useRef<number | null>(null);
@@ -87,6 +86,13 @@ export function WorkMemoryHome() {
   const search = useMemorySearch({ onOpenMemory: openEntry });
   const threads = useThreadsPanel({ currentDate: todayDate });
   const stalledReview = useStalledThreadReview({ currentDate: todayDate });
+  // Declared after threads so a newly persisted merge suggestion can refresh the
+  // hub's count/list without polling.
+  const entries = useEntriesController({
+    currentDate: selectedDate,
+    todayDate,
+    onThreadSuggestionsChanged: threads.refreshSuggestions,
+  });
   const aiTasks = useAiTaskCoordinator();
   const weeklyReport = useWeeklyReportFlow({ aiTaskCoordinator: aiTasks });
   const dailyReport = useDailyReportFlow({ aiTaskCoordinator: aiTasks });
@@ -184,6 +190,7 @@ export function WorkMemoryHome() {
             selectedDate={selectedDate}
             weekday={toolbarDate.weekday}
             hasThreadsNudge={stalledReview.hasReviewNudge}
+            mergeCount={threads.pendingMergeCount}
             onDateChange={updateSelectedDate}
             onSearchClick={() => {
               closeOverlays();
@@ -233,7 +240,6 @@ export function WorkMemoryHome() {
           <EntryFeed
             entries={entries.entries}
             clarificationsByEntry={entries.clarificationsByEntry}
-            threadSuggestionByEntry={entries.threadSuggestionByEntry}
             focusedEntryId={focusedEntryId}
             isLoading={entries.isLoading}
             emptyHint={emptyHint}
@@ -241,8 +247,6 @@ export function WorkMemoryHome() {
             onRemoveEntry={entries.removeEntry}
             onAddClarification={entries.addClarification}
             onRemoveClarification={entries.removeClarification}
-            onConfirmThreadSuggestion={entries.confirmThreadSuggestion}
-            onDismissThreadSuggestion={entries.dismissThreadSuggestion}
             onSuggestQuestions={entries.suggestQuestions}
           />
         </div>
@@ -271,8 +275,11 @@ export function WorkMemoryHome() {
         currentDate={todayDate}
         threadSummaries={threads.threadSummaries}
         stalledThreadIds={threads.stalledThreadIds}
+        pendingSuggestions={threads.pendingSuggestions}
         selectedThread={threads.selectedThread}
         onClose={threads.closeThreadsPanel}
+        onConfirmSuggestion={threads.confirmSuggestion}
+        onDismissSuggestion={threads.dismissSuggestion}
         onOpenThread={threads.openThread}
         onBackThreadList={threads.backToThreadList}
         onOpenEntry={openEntryFromThread}

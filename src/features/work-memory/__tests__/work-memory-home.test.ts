@@ -6,7 +6,8 @@ describe('WorkMemoryHome selected date wiring', () => {
     const source = readFileSync(new URL('../work-memory-home.tsx', import.meta.url), 'utf8');
 
     expect(source).toContain('const [selectedDate, setSelectedDate] = useState(todayDate)');
-    expect(source).toContain('useEntriesController({ currentDate: selectedDate, todayDate })');
+    expect(source).toContain('useEntriesController({');
+    expect(source).toContain('currentDate: selectedDate,');
     expect(source).toContain('maxDate={todayDate}');
   });
 

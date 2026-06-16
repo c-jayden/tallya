@@ -1,23 +1,82 @@
-import { ChevronLeft, ListTree } from 'lucide-react';
+import { Check, ChevronLeft, GitMerge, ListTree, X } from 'lucide-react';
 import type { RefObject } from 'react';
+import { Button } from '@/components/ui/button';
 import { TallyaScrollArea } from '@/components/tallya-scroll-area';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { formatMemoryDate, getRelativeMemoryDate } from '../memory-view-model';
 import type { ThreadStoryline } from '../services/thread-service';
-import type { Entry, ThreadSummary } from '../types';
+import type { Entry, PendingMergeSuggestion, ThreadSummary } from '../types';
 
 type ThreadsPanelProps = {
   open: boolean;
   currentDate: string;
   threadSummaries: ThreadSummary[];
   stalledThreadIds: Set<string>;
+  pendingSuggestions: PendingMergeSuggestion[];
   selectedThread: ThreadStoryline | null;
   inputRef?: RefObject<HTMLButtonElement | null>;
   onClose: () => void;
+  onConfirmSuggestion: (entryId: string) => void;
+  onDismissSuggestion: (entryId: string) => void;
   onOpenThread: (threadId: string) => void;
   onBackThreadList: () => void;
   onOpenEntry: (entry: Entry) => void;
 };
+
+function summarizeContent(content: string) {
+  const normalized = content.replace(/\s+/g, ' ').trim();
+
+  return normalized.length <= 22 ? normalized : `${normalized.slice(0, 22)}…`;
+}
+
+type PendingSuggestionRowProps = {
+  suggestion: PendingMergeSuggestion;
+  onConfirm: () => void;
+  onDismiss: () => void;
+};
+
+// One AI merge proposal in the hub: the entry to merge, the target (an existing
+// thread, or "same thing as" the matched entry for a brand-new thread), and a
+// check / cross to confirm or ignore.
+function PendingSuggestionRow({ suggestion, onConfirm, onDismiss }: PendingSuggestionRowProps) {
+  const target = suggestion.existingThreadTitle
+    ? `延续线索《${suggestion.existingThreadTitle}》？`
+    : `和「${summarizeContent(suggestion.relatedEntryContent)}」是同一件事？`;
+
+  return (
+    <div className="flex items-start gap-2 rounded-[10px] bg-app-surface-muted px-3 py-2.5">
+      <GitMerge className="mt-0.5 size-3.5 shrink-0 text-app-ink-subtle" aria-hidden="true" />
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-[13.5px] leading-[1.5] text-app-ink">
+          {summarizeContent(suggestion.entryContent)}
+        </p>
+        <p className="mt-0.5 text-[12px] leading-[1.5] text-app-ink-subtle">{target}</p>
+      </div>
+      <div className="flex shrink-0 items-center gap-1">
+        <Button
+          type="button"
+          size="icon-xs"
+          variant="ghost"
+          className="cursor-pointer text-app-ink-muted hover:bg-app-surface hover:text-app-ink [&_svg]:size-3.5"
+          onClick={onConfirm}
+          aria-label="归并"
+        >
+          <Check aria-hidden="true" />
+        </Button>
+        <Button
+          type="button"
+          size="icon-xs"
+          variant="ghost"
+          className="cursor-pointer text-app-ink-subtle hover:bg-app-surface hover:text-app-ink [&_svg]:size-3.5"
+          onClick={onDismiss}
+          aria-label="忽略"
+        >
+          <X aria-hidden="true" />
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 function formatThreadSpan(thread: ThreadSummary) {
   const first = formatMemoryDate(thread.firstOccurredOn);
@@ -133,8 +192,11 @@ export function ThreadsPanel({
   currentDate,
   threadSummaries,
   stalledThreadIds,
+  pendingSuggestions,
   selectedThread,
   onClose,
+  onConfirmSuggestion,
+  onDismissSuggestion,
   onOpenThread,
   onBackThreadList,
   onOpenEntry,
@@ -177,6 +239,21 @@ export function ThreadsPanel({
                 </span>
               </div>
               <TallyaScrollArea className="min-h-0 flex-1 p-2">
+                {pendingSuggestions.length > 0 ? (
+                  <div className="mb-1 grid gap-1">
+                    <p className="px-1.5 pt-0.5 pb-0.5 text-[11px] leading-4 font-medium text-app-ink-subtle">
+                      待归并
+                    </p>
+                    {pendingSuggestions.map((suggestion) => (
+                      <PendingSuggestionRow
+                        key={suggestion.entryId}
+                        suggestion={suggestion}
+                        onConfirm={() => onConfirmSuggestion(suggestion.entryId)}
+                        onDismiss={() => onDismissSuggestion(suggestion.entryId)}
+                      />
+                    ))}
+                  </div>
+                ) : null}
                 {threadSummaries.length > 0 ? (
                   <div className="grid gap-1">
                     {threadSummaries.map((thread) => (
@@ -188,7 +265,7 @@ export function ThreadsPanel({
                       />
                     ))}
                   </div>
-                ) : (
+                ) : pendingSuggestions.length === 0 ? (
                   <div className="px-4 py-6 text-center">
                     <p className="text-[13px] leading-[1.5] font-medium text-app-ink-muted">
                       还没有线索
@@ -197,7 +274,7 @@ export function ThreadsPanel({
                       记录跨天做同一件事时，会自动建议归并成线索
                     </p>
                   </div>
-                )}
+                ) : null}
               </TallyaScrollArea>
             </>
           )}

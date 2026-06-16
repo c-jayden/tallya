@@ -1,17 +1,15 @@
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
-import { Check, GitMerge, MessageSquarePlus, Pencil, Trash2, X } from 'lucide-react';
+import { Check, MessageSquarePlus, Pencil, Trash2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { EntrySupplementPanel } from './entry-supplement-panel';
-import type { ThreadSuggestionView } from '../hooks/use-entries-controller';
 import type { Clarification, Entry } from '../types';
 
 type EntryFeedItemProps = {
   entry: Entry;
   clarifications: Clarification[];
-  threadSuggestion?: ThreadSuggestionView;
   fadeOpacity: number;
   isEditing: boolean;
   isFocused: boolean;
@@ -21,8 +19,6 @@ type EntryFeedItemProps = {
   onRequestDelete: () => void;
   onAddClarification: (question: string | null, answer: string) => Promise<boolean> | boolean;
   onRemoveClarification: (id: string) => void;
-  onConfirmThreadSuggestion: () => void;
-  onDismissThreadSuggestion: () => void;
   onSuggestQuestions: (content: string) => Promise<string[]>;
 };
 
@@ -129,58 +125,9 @@ function EntryInlineEditor({ initialValue, onSubmit, onCancel }: EntryInlineEdit
   );
 }
 
-type ThreadSuggestionCardProps = {
-  suggestion: ThreadSuggestionView;
-  onConfirm: () => void;
-  onDismiss: () => void;
-};
-
-function summarizeRelatedEntry(content: string) {
-  const normalized = content.replace(/\s+/g, ' ').trim();
-
-  return normalized.length <= 18 ? normalized : `${normalized.slice(0, 18)}…`;
-}
-
-// AI-suggested merge surfaced under a freshly-logged entry. Phrasing differs by
-// whether the match already lives in a thread (join it) or not (start one). The
-// "归并" action lives on the button, so the text only states the relationship.
-function ThreadSuggestionCard({ suggestion, onConfirm, onDismiss }: ThreadSuggestionCardProps) {
-  const description = suggestion.existingThreadTitle
-    ? `延续线索《${suggestion.existingThreadTitle}》？`
-    : `和「${summarizeRelatedEntry(suggestion.relatedEntry.content)}」是同一件事？`;
-
-  return (
-    <div className="mt-1.5 ml-9 flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded-lg bg-app-surface px-2.5 py-2 ring-1 ring-inset ring-app-border">
-      <GitMerge className="size-3.5 shrink-0 text-app-ink-subtle" aria-hidden="true" />
-      <p className="min-w-0 flex-1 text-[12.5px] leading-[1.5] text-app-ink-muted">{description}</p>
-      <div className="flex shrink-0 items-center gap-1.5">
-        <Button
-          type="button"
-          size="xs"
-          className="h-7 cursor-pointer gap-1 rounded-lg px-2.5 text-[12.5px] font-medium [&_svg]:size-3.5"
-          onClick={onConfirm}
-        >
-          <Check aria-hidden="true" />
-          归并
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="xs"
-          className="h-7 cursor-pointer rounded-lg px-2 text-[12.5px] text-app-ink-muted hover:bg-app-surface-muted hover:text-app-ink"
-          onClick={onDismiss}
-        >
-          忽略
-        </Button>
-      </div>
-    </div>
-  );
-}
-
 export function EntryFeedItem({
   entry,
   clarifications,
-  threadSuggestion,
   fadeOpacity,
   isEditing,
   isFocused,
@@ -190,8 +137,6 @@ export function EntryFeedItem({
   onRequestDelete,
   onAddClarification,
   onRemoveClarification,
-  onConfirmThreadSuggestion,
-  onDismissThreadSuggestion,
   onSuggestQuestions,
 }: EntryFeedItemProps) {
   const [isSupplementOpen, setIsSupplementOpen] = useState(false);
@@ -311,14 +256,6 @@ export function EntryFeedItem({
             </li>
           ))}
         </ul>
-      ) : null}
-
-      {threadSuggestion ? (
-        <ThreadSuggestionCard
-          suggestion={threadSuggestion}
-          onConfirm={onConfirmThreadSuggestion}
-          onDismiss={onDismissThreadSuggestion}
-        />
       ) : null}
 
       {isSupplementOpen ? (
