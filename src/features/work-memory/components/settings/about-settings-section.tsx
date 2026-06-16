@@ -3,6 +3,7 @@ import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { appVersion } from '@/lib/app-version';
 import type { AppSettings } from '../../services/app-settings-repository';
+import { logger } from '../../services/logger/logger';
 import { updateService } from '../../services/update-service';
 import { SwitchField } from './settings-shared';
 import type { Update } from '@tauri-apps/plugin-updater';
@@ -18,7 +19,7 @@ type UpdateState =
   | { kind: 'up-to-date' }
   | { kind: 'available'; version: string; notes: string | null; update: Update }
   | { kind: 'installing'; version: string }
-  | { kind: 'error' };
+  | { kind: 'error'; detail: string };
 
 export function AboutSettingsSection({ settings, onUpdateSettings }: AboutSettingsSectionProps) {
   const [state, setState] = useState<UpdateState>({ kind: 'idle' });
@@ -65,8 +66,10 @@ export function AboutSettingsSection({ settings, onUpdateSettings }: AboutSettin
           ? { kind: 'available', version: result.version, notes: result.notes, update: result.update }
           : { kind: 'up-to-date' },
       );
-    } catch {
-      setState({ kind: 'error' });
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      logger.warn('app', 'updater.check_failed', 'Manual update check failed', { detail });
+      setState({ kind: 'error', detail });
     }
   }
 
@@ -81,8 +84,10 @@ export function AboutSettingsSection({ settings, onUpdateSettings }: AboutSettin
     try {
       // On success the app relaunches, so this promise typically never resolves.
       await updateService.downloadAndInstall(update);
-    } catch {
-      setState({ kind: 'error' });
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      logger.warn('app', 'updater.install_failed', 'Update install failed', { detail });
+      setState({ kind: 'error', detail });
     }
   }
 
@@ -120,9 +125,14 @@ export function AboutSettingsSection({ settings, onUpdateSettings }: AboutSettin
         ) : null}
 
         {state.kind === 'error' ? (
-          <p className="mt-2 text-[13px] text-app-ink-subtle">
-            暂时没检查到更新，可能还没有发布新版本或网络不可用，稍后再试。
-          </p>
+          <div className="mt-2 space-y-1">
+            <p className="text-[13px] text-app-ink-subtle">
+              暂时没检查到更新，可能还没有发布新版本或网络不可用，稍后再试。
+            </p>
+            <p className="text-[12px] leading-[1.5] break-all text-app-ink-subtle/80">
+              {state.detail}
+            </p>
+          </div>
         ) : null}
 
         {state.kind === 'available' ? (
