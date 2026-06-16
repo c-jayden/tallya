@@ -196,10 +196,12 @@ fn openai_compatible_http_client_builder(
 ) -> reqwest::ClientBuilder {
     let builder = reqwest::Client::builder().timeout(timeout);
 
+    // Local gateways must never be proxied; everything else follows the OS proxy
+    // so the app reaches remote AI endpoints the same way the browser does.
     if is_loopback_url(url) {
         builder.no_proxy()
     } else {
-        builder
+        crate::system_proxy::apply_system_proxy(builder)
     }
 }
 
