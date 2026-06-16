@@ -10,13 +10,17 @@ import type {
   ReportGenerationType,
   ReportSourceEntry,
   Thread,
+  ThreadSummary,
 } from '../types';
 import { aiService as defaultAIService } from './ai/ai-service';
 import { clarificationRepository as defaultClarificationRepository } from './clarification-repository';
 import { entryRepository as defaultEntryRepository } from './entry-repository';
 import { reportRepository as defaultReportRepository } from './report-repository';
 import { threadRepository as defaultThreadRepository } from './thread-repository';
+import { threadService as defaultThreadService } from './thread-service';
 import { getCurrentWeekRange } from './report-date';
+import { getDailyMemoryDate } from './memory-date';
+import { selectStalledThreadGaps } from './stalled-threads';
 import { logger } from './logger/logger';
 
 export type ReportEntryRepository = {
@@ -30,6 +34,12 @@ export type ReportClarificationRepository = {
 
 export type ReportThreadRepository = {
   list(): Promise<Thread[]>;
+};
+
+// Stalled-thread review needs thread-level stats across all time (entry count and
+// day span), not just the entries inside the report range, so it reads summaries.
+export type ReportThreadSummaryProvider = {
+  listThreadSummaries(): Promise<ThreadSummary[]>;
 };
 
 export type ReportRepository = {
@@ -58,6 +68,7 @@ export type ReportServiceOptions = {
   entryRepository?: ReportEntryRepository;
   clarificationRepository?: ReportClarificationRepository;
   threadRepository?: ReportThreadRepository;
+  threadSummaryProvider?: ReportThreadSummaryProvider;
   reportRepository?: ReportRepository;
   aiService?: ReportAIService;
 };
@@ -89,6 +100,7 @@ export function createReportService({
   entryRepository = defaultEntryRepository,
   clarificationRepository = defaultClarificationRepository,
   threadRepository = defaultThreadRepository,
+  threadSummaryProvider = defaultThreadService,
   reportRepository = defaultReportRepository,
   aiService = defaultAIService,
 }: ReportServiceOptions = {}) {
@@ -207,49 +219,17 @@ export function createReportService({
       return report;
     },
 
-    // Fail-open: any failure (no AI, network/parse error) yields no gaps so
-    // report generation is never blocked or shown an error by gap detection.
+    // Pre-generation follow-ups, from two independent fail-open sources: the AI's
+    // "important but thin" picks within the range, and stalled threads ("还在进行吗？")
+    // derived purely from timestamps. Either source failing never blocks the other
+    // or the report; the no-AI case still surfaces stalled-thread questions.
     async getReportGaps(startDate: string, endDate: string): Promise<ReportGap[]> {
-      let gapEntries: ReportGapEntry[] = [];
+      const [aiGaps, stalledGaps] = await Promise.all([
+        getAiReportGaps(sourceRepositories, aiService, startDate, endDate),
+        getStalledThreadGaps(threadSummaryProvider, getDailyMemoryDate(now())),
+      ]);
 
-      try {
-        gapEntries = await buildGapEntries(sourceRepositories, startDate, endDate);
-
-        if (gapEntries.length === 0) {
-          logger.debug('ai', 'report-gaps.completed', 'Report gap detection completed', {
-            startDate,
-            endDate,
-            entryCount: 0,
-            entriesWithThreadCount: 0,
-            entriesWithClarificationCount: 0,
-            gapCount: 0,
-            skippedReason: 'no_entries',
-          });
-          return [];
-        }
-
-        const gaps = await aiService.suggestReportGaps({ entries: gapEntries });
-
-        logger.debug('ai', 'report-gaps.completed', 'Report gap detection completed', {
-          startDate,
-          endDate,
-          entryCount: gapEntries.length,
-          entriesWithThreadCount: gapEntries.filter((entry) => Boolean(entry.threadTitle)).length,
-          entriesWithClarificationCount: gapEntries.filter((entry) => entry.clarificationCount > 0)
-            .length,
-          gapCount: gaps.length,
-        });
-
-        return gaps;
-      } catch (error) {
-        logger.warn('ai', 'report-gaps.failed', 'Report gap detection failed', {
-          startDate,
-          endDate,
-          entryCount: gapEntries.length,
-          errorMessage: error instanceof Error ? error.message : String(error),
-        });
-        return [];
-      }
+      return mergeReportGaps(aiGaps, stalledGaps);
     },
 
     async saveGapAnswers(answers: GapAnswer[]): Promise<void> {
@@ -347,6 +327,114 @@ async function buildGapEntries(
       threadId: entry.threadId,
       threadTitle: entry.threadId ? titleByThread.get(entry.threadId) ?? null : null,
     }));
+}
+
+// At most this many follow-up questions are shown before generating, across both
+// sources, so the pre-generation step stays a quick "补一两句", not a survey.
+const MAX_REPORT_GAPS = 3;
+
+// Fail-open: any failure (no AI, network/parse error) yields no gaps so report
+// generation is never blocked or shown an error by AI gap detection.
+async function getAiReportGaps(
+  repositories: SourceRepositories,
+  aiService: ReportAIService,
+  startDate: string,
+  endDate: string,
+): Promise<ReportGap[]> {
+  let gapEntries: ReportGapEntry[] = [];
+
+  try {
+    gapEntries = await buildGapEntries(repositories, startDate, endDate);
+
+    if (gapEntries.length === 0) {
+      logger.debug('ai', 'report-gaps.completed', 'Report gap detection completed', {
+        startDate,
+        endDate,
+        entryCount: 0,
+        entriesWithThreadCount: 0,
+        entriesWithClarificationCount: 0,
+        gapCount: 0,
+        skippedReason: 'no_entries',
+      });
+      return [];
+    }
+
+    const gaps = await aiService.suggestReportGaps({ entries: gapEntries });
+
+    logger.debug('ai', 'report-gaps.completed', 'Report gap detection completed', {
+      startDate,
+      endDate,
+      entryCount: gapEntries.length,
+      entriesWithThreadCount: gapEntries.filter((entry) => Boolean(entry.threadTitle)).length,
+      entriesWithClarificationCount: gapEntries.filter((entry) => entry.clarificationCount > 0)
+        .length,
+      gapCount: gaps.length,
+    });
+
+    return gaps;
+  } catch (error) {
+    logger.warn('ai', 'report-gaps.failed', 'Report gap detection failed', {
+      startDate,
+      endDate,
+      entryCount: gapEntries.length,
+      errorMessage: error instanceof Error ? error.message : String(error),
+    });
+    return [];
+  }
+}
+
+// Fail-open companion that needs no AI: stalled threads are flagged from their
+// recorded day span alone, so they still surface when AI is unconfigured.
+async function getStalledThreadGaps(
+  threadSummaryProvider: ReportThreadSummaryProvider,
+  referenceDate: string,
+): Promise<ReportGap[]> {
+  try {
+    const summaries = await threadSummaryProvider.listThreadSummaries();
+    const gaps = selectStalledThreadGaps(summaries, referenceDate);
+
+    logger.debug('report', 'report-gaps.stalled_completed', 'Stalled thread detection completed', {
+      referenceDate,
+      threadCount: summaries.length,
+      gapCount: gaps.length,
+    });
+
+    return gaps;
+  } catch (error) {
+    logger.warn('report', 'report-gaps.stalled_failed', 'Stalled thread detection failed', {
+      referenceDate,
+      errorMessage: error instanceof Error ? error.message : String(error),
+    });
+    return [];
+  }
+}
+
+// AI gaps come first (period-specific picks), then stalled threads fill any
+// remaining slots. Duplicates are dropped by entry id and by thread title so a
+// thread flagged by both sources is asked about once. Capped at MAX_REPORT_GAPS.
+function mergeReportGaps(aiGaps: ReportGap[], stalledGaps: ReportGap[]): ReportGap[] {
+  const merged: ReportGap[] = [];
+  const seenEntryIds = new Set<string>();
+  const seenTitles = new Set<string>();
+
+  for (const gap of [...aiGaps, ...stalledGaps]) {
+    if (merged.length >= MAX_REPORT_GAPS) {
+      break;
+    }
+
+    if (seenEntryIds.has(gap.entryId) || (gap.threadTitle && seenTitles.has(gap.threadTitle))) {
+      continue;
+    }
+
+    merged.push(gap);
+    seenEntryIds.add(gap.entryId);
+
+    if (gap.threadTitle) {
+      seenTitles.add(gap.threadTitle);
+    }
+  }
+
+  return merged;
 }
 
 async function getReportContext(

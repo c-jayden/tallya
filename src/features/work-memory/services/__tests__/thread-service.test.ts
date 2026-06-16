@@ -98,6 +98,7 @@ describe('threadService', () => {
       entryCount: 2,
       firstOccurredOn: '2026-06-08',
       lastOccurredOn: '2026-06-10',
+      lastEntryId: 'e2',
     });
   });
 

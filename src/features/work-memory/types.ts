@@ -203,6 +203,9 @@ export type ThreadSummary = Thread & {
   entryCount: number;
   firstOccurredOn: string;
   lastOccurredOn: string;
+  // Id of the thread's most recent entry, used to attach a follow-up answer back
+  // to a real entry (e.g. when a stalled thread is surfaced for review).
+  lastEntryId: string;
 };
 
 // One recent entry offered to the AI as a possible match for a new entry. The

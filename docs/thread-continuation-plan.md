@@ -46,10 +46,29 @@
 
 ---
 
-## M-A：整理时追问停顿线索（优先做，改动最小）
+## M-A：整理时追问停顿线索 ✅ 已完成
 
-**目标**：生成日报/周报/范围报告前的「补充」环节，除了现有「重点但记得简略的线索」，
+> 已实现并随测试通过（typecheck + lint + 420 测试全绿）。真机验证仍待做（见末尾）。
+
+**目标**：生成周报/范围报告前的「补充」环节，除了现有「重点但记得简略的线索」，
 再带上「停顿线索」，各问一句「还在进行吗？」。
+
+**实现摘要**：
+
+- 新增纯逻辑 [stalled-threads.ts](../src/features/work-memory/services/stalled-threads.ts)：
+  `selectStalledThreadGaps(summaries, referenceDate)` 按停顿规则（默认值见下）从
+  `ThreadSummary` 直接算出 `ReportGap[]`，问题是固定模板、不调 AI。
+- [types.ts](../src/features/work-memory/types.ts) `ThreadSummary` 加 `lastEntryId`，
+  [thread-service.ts](../src/features/work-memory/services/thread-service.ts) 填充——答案挂回该线索最近一条真实 entry。
+- [report-service.ts](../src/features/work-memory/services/report-service.ts) `getReportGaps`
+  拆成两个**各自 fail-open** 的来源并行跑：`getAiReportGaps`（原逻辑）+ `getStalledThreadGaps`
+  （新增，参照日 = `now()`），再 `mergeReportGaps` 去重（按 entryId / threadTitle）并截断
+  至 `MAX_REPORT_GAPS = 3`，AI 选优先、停顿补位。注入新依赖 `threadSummaryProvider`
+  （默认 `threadService`）。
+- UI / `ReportGapDialog` / `saveGapAnswers` **未改**：停顿线索就是普通 `ReportGap`，答案照旧存 clarification。
+- 无 AI 也生效：停顿线索不依赖 AI，AI 失败/未配置时仍能出现。
+- ④「问过静默」未接（报告本就低频，留 M-B 统一处理）。仅周报/范围报告路径有缺口环节，
+  日报快速流（`use-daily-report-flow`）无此环节，不受影响。
 
 **复用**：整套缺口补全流程已存在——
 [report-gap-dialog.tsx](../src/features/work-memory/components/report-gap-dialog.tsx)、

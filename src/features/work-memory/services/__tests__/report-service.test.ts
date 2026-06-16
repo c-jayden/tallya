@@ -7,6 +7,7 @@ import type {
   RangeReportSourceInput,
   Report,
   Thread,
+  ThreadSummary,
 } from '../../types';
 import {
   createReportService,
@@ -346,6 +347,110 @@ describe('createReportService', () => {
     );
   });
 
+  it('surfaces stalled threads as gaps even without AI gaps', async () => {
+    // No entries in range and no AI picks; the stalled thread (last recorded
+    // before the range) still gets a "还在进行吗？" question attached to its
+    // most recent entry.
+    const service = createService({
+      threadSummaries: [
+        createThreadSummary('thread_perm', '权限重构', {
+          entryCount: 3,
+          firstOccurredOn: '2026-05-27',
+          lastOccurredOn: '2026-05-29',
+          lastEntryId: 'e9',
+        }),
+      ],
+    });
+
+    const gaps = await service.getReportGaps('2026-06-01', '2026-06-07');
+
+    expect(gaps).toEqual([
+      expect.objectContaining({ entryId: 'e9', threadTitle: '权限重构' }),
+    ]);
+    expect(gaps[0].question).toContain('《权限重构》');
+  });
+
+  it('ignores one-off and long-dormant threads when detecting stalled gaps', async () => {
+    const service = createService({
+      threadSummaries: [
+        // One-off note: no cross-day momentum.
+        createThreadSummary('thread_oneoff', '帮看 bug', {
+          entryCount: 1,
+          firstOccurredOn: '2026-05-29',
+          lastOccurredOn: '2026-05-29',
+          lastEntryId: 'e1',
+        }),
+        // Dormant for months: past the silence upper bound.
+        createThreadSummary('thread_old', '年初项目', {
+          entryCount: 4,
+          firstOccurredOn: '2026-01-10',
+          lastOccurredOn: '2026-01-20',
+          lastEntryId: 'e2',
+        }),
+      ],
+    });
+
+    await expect(service.getReportGaps('2026-06-01', '2026-06-07')).resolves.toEqual([]);
+  });
+
+  it('dedupes a thread flagged by both AI gaps and stalled detection', async () => {
+    const suggestReportGaps = vi
+      .fn<ReportAIService['suggestReportGaps']>()
+      .mockResolvedValue([{ entryId: 'e1', threadTitle: '权限重构', question: '卡在哪了？' }]);
+    const service = createService({
+      entries: [createEntry('e1', '2026-06-01', '继续权限重构', 'thread_perm')],
+      threads: [createThread('thread_perm', '权限重构')],
+      threadSummaries: [
+        createThreadSummary('thread_perm', '权限重构', {
+          entryCount: 3,
+          firstOccurredOn: '2026-05-27',
+          lastOccurredOn: '2026-05-29',
+          lastEntryId: 'e9',
+        }),
+      ],
+      suggestReportGaps,
+    });
+
+    await expect(service.getReportGaps('2026-06-01', '2026-06-07')).resolves.toEqual([
+      { entryId: 'e1', threadTitle: '权限重构', question: '卡在哪了？' },
+    ]);
+  });
+
+  it('caps merged gaps at three, AI picks first', async () => {
+    const suggestReportGaps = vi.fn<ReportAIService['suggestReportGaps']>().mockResolvedValue([
+      { entryId: 'a1', threadTitle: 'A', question: 'qa' },
+      { entryId: 'b1', threadTitle: 'B', question: 'qb' },
+    ]);
+    const service = createService({
+      // At least one in-range entry so the AI gap path runs and the mock is used.
+      entries: [createEntry('a1', '2026-06-01', '推进 A'), createEntry('b1', '2026-06-02', '推进 B')],
+      threadSummaries: [
+        createThreadSummary('thread_c', 'C', {
+          entryCount: 2,
+          firstOccurredOn: '2026-05-27',
+          lastOccurredOn: '2026-05-29',
+          lastEntryId: 'c9',
+        }),
+        createThreadSummary('thread_d', 'D', {
+          entryCount: 2,
+          firstOccurredOn: '2026-05-26',
+          lastOccurredOn: '2026-05-28',
+          lastEntryId: 'd9',
+        }),
+      ],
+      suggestReportGaps,
+    });
+
+    const gaps = await service.getReportGaps('2026-06-01', '2026-06-07');
+
+    expect(gaps).toHaveLength(3);
+    expect(gaps.slice(0, 2)).toEqual([
+      { entryId: 'a1', threadTitle: 'A', question: 'qa' },
+      { entryId: 'b1', threadTitle: 'B', question: 'qb' },
+    ]);
+    expect(gaps[2]).toEqual(expect.objectContaining({ entryId: 'c9', threadTitle: 'C' }));
+  });
+
   it('saves non-empty gap answers as clarifications', async () => {
     const createClarificationMock =
       vi.fn<(input: CreateClarificationInput) => Promise<Clarification>>();
@@ -369,6 +474,7 @@ function createService({
   entries = [],
   clarifications = [],
   threads = [],
+  threadSummaries = [],
   existingReport = null,
   generateRangeReport = vi
     .fn<ReportAIService['generateRangeReport']>()
@@ -380,6 +486,7 @@ function createService({
   entries?: Entry[];
   clarifications?: Clarification[];
   threads?: Thread[];
+  threadSummaries?: ThreadSummary[];
   existingReport?: Report | null;
   generateRangeReport?: ReportAIService['generateRangeReport'];
   suggestReportGaps?: ReportAIService['suggestReportGaps'];
@@ -397,6 +504,9 @@ function createService({
     },
     threadRepository: {
       list: vi.fn().mockResolvedValue(threads),
+    },
+    threadSummaryProvider: {
+      listThreadSummaries: vi.fn().mockResolvedValue(threadSummaries),
     },
     aiService: { generateRangeReport, suggestReportGaps },
     reportRepository:
@@ -473,5 +583,29 @@ function createThread(id: string, title: string): Thread {
     status: 'open',
     createdAt: '2026-06-01T00:00:00.000Z',
     updatedAt: '2026-06-03T00:00:00.000Z',
+  };
+}
+
+function createThreadSummary(
+  id: string,
+  title: string,
+  {
+    entryCount,
+    firstOccurredOn,
+    lastOccurredOn,
+    lastEntryId,
+  }: {
+    entryCount: number;
+    firstOccurredOn: string;
+    lastOccurredOn: string;
+    lastEntryId: string;
+  },
+): ThreadSummary {
+  return {
+    ...createThread(id, title),
+    entryCount,
+    firstOccurredOn,
+    lastOccurredOn,
+    lastEntryId,
   };
 }

@@ -49,6 +49,7 @@ export function createThreadService({
             entryCount: entries.length,
             firstOccurredOn: entries[0].occurredOn,
             lastOccurredOn: entries[entries.length - 1].occurredOn,
+            lastEntryId: entries[entries.length - 1].id,
           } satisfies ThreadSummary;
         }),
       );
