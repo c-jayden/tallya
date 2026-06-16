@@ -57,7 +57,7 @@ function PendingSuggestionRow({ suggestion, onConfirm, onDismiss }: PendingSugge
           type="button"
           size="xs"
           variant="ghost"
-          className="cursor-pointer gap-1 text-app-ink hover:bg-app-surface [&_svg]:size-3.5"
+          className="cursor-pointer gap-1 font-medium text-app-ink hover:bg-app-surface [&_svg]:size-3.5"
           onClick={onConfirm}
         >
           <Check aria-hidden="true" />
@@ -67,7 +67,7 @@ function PendingSuggestionRow({ suggestion, onConfirm, onDismiss }: PendingSugge
           type="button"
           size="xs"
           variant="ghost"
-          className="cursor-pointer gap-1 text-app-ink-subtle hover:bg-app-surface hover:text-app-ink [&_svg]:size-3.5"
+          className="cursor-pointer gap-1 text-app-ink-muted hover:bg-app-surface hover:text-app-ink [&_svg]:size-3.5"
           onClick={onDismiss}
         >
           <X aria-hidden="true" />
