@@ -62,7 +62,7 @@ pub async fn send_ai_http_request(
 
     let client = openai_compatible_http_client_builder(
         &url,
-        Duration::from_millis(timeout_ms.clamp(1_000, 120_000)),
+        Duration::from_millis(timeout_ms.clamp(1_000, 300_000)),
     )
     .build()
     .map_err(|error| {

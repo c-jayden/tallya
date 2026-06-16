@@ -143,7 +143,7 @@ describe('Anthropic Provider', () => {
     expect(tauriMocks.invoke).toHaveBeenCalledWith('send_ai_http_request', {
       url: 'https://api.anthropic.com/v1/messages',
       bodyText: expect.stringContaining('"model":"claude-haiku-4-5"'),
-      timeoutMs: 120_000,
+      timeoutMs: 300_000,
       headers: [
         { name: 'x-api-key', value: 'anthropic-key' },
         { name: 'anthropic-version', value: '2023-06-01' },

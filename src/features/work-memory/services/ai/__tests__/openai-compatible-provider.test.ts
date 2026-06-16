@@ -147,7 +147,7 @@ describe('OpenAI Compatible Provider', () => {
       url: 'https://api.example.com/v1/chat/completions',
       apiKey: 'secret-api-key',
       bodyText: expect.stringContaining('"model":"gpt-test"'),
-      timeoutMs: 120_000,
+      timeoutMs: 300_000,
     });
   });
 
@@ -236,7 +236,7 @@ describe('OpenAI Compatible Provider', () => {
         message: 'AI 服务响应超时，请检查网关或稍后再试。',
       });
 
-      await vi.advanceTimersByTimeAsync(120_000);
+      await vi.advanceTimersByTimeAsync(300_000);
       await request;
     } finally {
       vi.useRealTimers();

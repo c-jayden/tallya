@@ -27,7 +27,7 @@ const OPENAI_COMPATIBLE_PROVIDER_ID = 'openai-compatible';
 // Range reports are the heaviest call (largest output) and run non-streamed, so
 // slower models/gateways need the full Tauri HTTP timeout window before surfacing
 // "响应超时".
-const OPENAI_COMPATIBLE_REQUEST_TIMEOUT_MS = 120_000;
+const OPENAI_COMPATIBLE_REQUEST_TIMEOUT_MS = 300_000;
 const API_VERSION_PATH = '/v1';
 const CHAT_COMPLETIONS_PATH = '/chat/completions';
 const RESPONSES_PATH = '/responses';
