@@ -18,6 +18,7 @@ describe('database migrations', () => {
         'entries',
         'entry_clarifications',
         'threads',
+        'thread_suggestions',
       ]),
     );
   });
@@ -56,7 +57,7 @@ describe('database migrations', () => {
     await runMigrations(database);
 
     expect(database.userVersionReads).toBe(1);
-    expect(database.writtenUserVersions).toEqual([1, 2, 3, 4, 5, 6, SCHEMA_VERSION]);
+    expect(database.writtenUserVersions).toEqual([1, 2, 3, 4, 5, 6, 7, SCHEMA_VERSION]);
     expect(database.userVersion).toBe(SCHEMA_VERSION);
   });
 

@@ -1,5 +1,5 @@
 export const DATABASE_PATH = 'sqlite:tallya.db';
-export const SCHEMA_VERSION = 7;
+export const SCHEMA_VERSION = 8;
 
 export const createDailyMemoriesTableSql = `
   CREATE TABLE IF NOT EXISTS daily_memories (
@@ -57,6 +57,22 @@ export const createThreadsTableSql = `
 
 export const createThreadsIndexSql = `
   CREATE INDEX IF NOT EXISTS idx_threads_updated_at ON threads(updated_at)
+`;
+
+// A pending AI merge suggestion: "the entry continues related_entry, propose
+// thread title; existing_thread_id is set when related_entry already belongs to
+// a thread". Persisted (not session-only) so a slow/late AI response and cross-day
+// captures are not lost. One pending suggestion per entry (entry_id is the key);
+// re-analysis upserts. Rows are pruned when stale (entry gone / already threaded).
+export const createThreadSuggestionsTableSql = `
+  CREATE TABLE IF NOT EXISTS thread_suggestions (
+    entry_id TEXT PRIMARY KEY,
+    related_entry_id TEXT NOT NULL,
+    proposed_thread_title TEXT NOT NULL,
+    existing_thread_id TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  )
 `;
 
 // Clarifications add detail to an entry (AI-asked or manual). They are short and

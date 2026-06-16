@@ -11,6 +11,7 @@ import {
   createEntryClarificationsIndexSql,
   createEntryClarificationsTableSql,
   createReportsTableSql,
+  createThreadSuggestionsTableSql,
   createThreadsIndexSql,
   createThreadsTableSql,
 } from './schema';
@@ -90,6 +91,12 @@ const schemaMigrations: SchemaMigration[] = [
     version: 7,
     async migrate(database) {
       await database.execute('DROP TABLE IF EXISTS report_sources');
+    },
+  },
+  {
+    version: 8,
+    async migrate(database) {
+      await database.execute(createThreadSuggestionsTableSql);
     },
   },
 ];

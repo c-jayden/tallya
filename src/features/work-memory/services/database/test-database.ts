@@ -66,7 +66,8 @@ type TableName =
   | 'app_settings'
   | 'entries'
   | 'entry_clarifications'
-  | 'threads';
+  | 'threads'
+  | 'thread_suggestions';
 
 export class TestDatabaseClient implements DatabaseClient {
   readonly createdTables = new Set<TableName>();
@@ -536,6 +537,10 @@ export class TestDatabaseClient implements DatabaseClient {
 
     if (/create table if not exists threads\b/.test(query)) {
       this.createdTables.add('threads');
+    }
+
+    if (/create table if not exists thread_suggestions\b/.test(query)) {
+      this.createdTables.add('thread_suggestions');
     }
   }
 
