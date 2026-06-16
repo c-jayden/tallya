@@ -55,23 +55,23 @@ function PendingSuggestionRow({ suggestion, onConfirm, onDismiss }: PendingSugge
       <div className="flex shrink-0 items-center gap-1">
         <Button
           type="button"
-          size="icon-xs"
+          size="xs"
           variant="ghost"
-          className="cursor-pointer text-app-ink-muted hover:bg-app-surface hover:text-app-ink [&_svg]:size-3.5"
+          className="cursor-pointer gap-1 text-app-ink hover:bg-app-surface [&_svg]:size-3.5"
           onClick={onConfirm}
-          aria-label="归并"
         >
           <Check aria-hidden="true" />
+          归并
         </Button>
         <Button
           type="button"
-          size="icon-xs"
+          size="xs"
           variant="ghost"
-          className="cursor-pointer text-app-ink-subtle hover:bg-app-surface hover:text-app-ink [&_svg]:size-3.5"
+          className="cursor-pointer gap-1 text-app-ink-subtle hover:bg-app-surface hover:text-app-ink [&_svg]:size-3.5"
           onClick={onDismiss}
-          aria-label="忽略"
         >
           <X aria-hidden="true" />
+          忽略
         </Button>
       </div>
     </div>
