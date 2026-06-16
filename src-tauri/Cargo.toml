@@ -28,6 +28,9 @@ serde_json = "1"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
 tauri-plugin-notification = "2.3.3"
 tauri-plugin-sql = { version = "2.4.0", features = ["sqlite"] }
+tauri-plugin-process = "2"
+# In-app updates pull signed packages from GitHub Releases (desktop-only app).
+tauri-plugin-updater = "2"
 
 [target.'cfg(windows)'.dependencies]
 tauri-winrt-notification = "0.7.2"

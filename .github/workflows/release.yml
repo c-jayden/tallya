@@ -167,6 +167,11 @@ jobs:
 
       - name: Build Windows bundles
         uses: tauri-apps/tauri-action@v0
+        env:
+          # Required because bundle.createUpdaterArtifacts is enabled: signs the
+          # updater artifacts so the in-app updater can verify them.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           args: ${{ matrix.tauriArgs }}
 
@@ -203,6 +208,29 @@ jobs:
             ForEach-Object { Copy-Item $_.FullName $portableDir }
 
           Compress-Archive -Path "$portableDir/*" -DestinationPath "$assetsDir/${prefix}_portable.zip" -Force
+
+          # Updater manifest (Windows only for now). The .sig is produced next to
+          # the NSIS installer when signing keys are set; renaming the installer
+          # doesn't change its bytes, so the signature still matches the asset.
+          $sig = Get-ChildItem -Path "src-tauri/target" -Recurse -Filter "*.sig" |
+            Where-Object { $_.FullName -match "\\bundle\\nsis\\" } |
+            Select-Object -First 1
+          if (-not $sig) {
+            throw "NSIS updater signature (.sig) was not found. Set the TAURI_SIGNING_PRIVATE_KEY secret."
+          }
+          $signature = (Get-Content $sig.FullName -Raw).Trim()
+          $downloadUrl = "https://github.com/${{ github.repository }}/releases/download/$env:TAG_NAME/${prefix}_setup.exe"
+          $manifest = [ordered]@{
+            version = $env:APP_VERSION
+            pub_date = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+            platforms = [ordered]@{
+              "windows-x86_64" = [ordered]@{
+                signature = $signature
+                url = $downloadUrl
+              }
+            }
+          }
+          $manifest | ConvertTo-Json -Depth 5 | Set-Content -Path "$assetsDir/latest.json" -Encoding UTF8
 
           Get-ChildItem $assetsDir | ForEach-Object { "- $($_.Name)" } | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
 
@@ -324,6 +352,11 @@ jobs:
 
       - name: Build macOS universal bundle
         uses: tauri-apps/tauri-action@v0
+        env:
+          # Required because bundle.createUpdaterArtifacts is enabled; the build
+          # fails without it. (macOS is not yet listed in latest.json.)
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           args: "--target universal-apple-darwin"
 
