@@ -17,6 +17,7 @@ type HomeToolbarProps = {
   weekday: string;
   hasThreadsNudge: boolean;
   mergeCount: number;
+  hasUpdate: boolean;
   onDateChange: (date: string) => void;
   onSearchClick: () => void;
   onThreadsClick: () => void;
@@ -36,6 +37,7 @@ export function HomeToolbar({
   weekday,
   hasThreadsNudge,
   mergeCount,
+  hasUpdate,
   onDateChange,
   onSearchClick,
   onThreadsClick,
@@ -137,15 +139,21 @@ export function HomeToolbar({
               variant="ghost"
               size="icon-sm"
               type="button"
-              className="size-8.75 cursor-pointer rounded-xl text-app-ink-muted hover:bg-app-surface-muted hover:text-app-ink focus-visible:bg-app-surface-muted focus-visible:text-app-ink [&_svg]:size-3.5"
-              aria-label="设置"
+              className="relative size-8.75 cursor-pointer rounded-xl text-app-ink-muted hover:bg-app-surface-muted hover:text-app-ink focus-visible:bg-app-surface-muted focus-visible:text-app-ink [&_svg]:size-3.5"
+              aria-label={hasUpdate ? '设置，有可用更新' : '设置'}
               onClick={onSettingsClick}
             >
               <Settings aria-hidden="true" />
+              {hasUpdate ? (
+                <span
+                  className="absolute top-1 right-1 size-2 rounded-full bg-app-accent ring-2 ring-app-bg"
+                  aria-hidden="true"
+                />
+              ) : null}
               <span className="sr-only">设置</span>
             </Button>
           </TooltipTrigger>
-          <TooltipContent>设置</TooltipContent>
+          <TooltipContent>{hasUpdate ? '设置 · 有可用更新' : '设置'}</TooltipContent>
         </Tooltip>
         </div>
       </div>

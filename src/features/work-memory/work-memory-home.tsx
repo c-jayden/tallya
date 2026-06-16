@@ -21,6 +21,7 @@ import { useHomeWindowSizing } from './hooks/use-home-window-sizing';
 import { useMemorySearch } from './hooks/use-memory-search';
 import { useStalledThreadReview } from './hooks/use-stalled-thread-review';
 import { useThreadsPanel } from './hooks/use-threads-panel';
+import { useUpdateCheck } from './hooks/use-update-check';
 import { useTodayDate } from './hooks/use-today-date';
 import { useWeeklyReportFlow } from './hooks/use-weekly-report-flow';
 import { useAiTaskCoordinator } from './hooks/use-ai-task-coordinator';
@@ -86,6 +87,7 @@ export function WorkMemoryHome() {
   const search = useMemorySearch({ onOpenMemory: openEntry });
   const threads = useThreadsPanel({ currentDate: todayDate });
   const stalledReview = useStalledThreadReview({ currentDate: todayDate });
+  const updateCheck = useUpdateCheck();
   // Declared after threads so a newly persisted merge suggestion can refresh the
   // hub's count/list without polling.
   const entries = useEntriesController({
@@ -191,6 +193,7 @@ export function WorkMemoryHome() {
             weekday={toolbarDate.weekday}
             hasThreadsNudge={stalledReview.hasReviewNudge}
             mergeCount={threads.pendingMergeCount}
+            hasUpdate={updateCheck.hasUpdate}
             onDateChange={updateSelectedDate}
             onSearchClick={() => {
               closeOverlays();
