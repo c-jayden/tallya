@@ -103,3 +103,10 @@ Provider 规则：
 - 工作流默认建 **draft** release；发版后需在 GitHub 手动 Publish，并确保该版本是 "Latest"（更新器 endpoint 用的是 `releases/latest/download/latest.json`，草稿/非 latest 都拉不到）。
 - 自动更新依赖签名：CI 必须配好 `TAURI_SIGNING_PRIVATE_KEY`（及可选 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`）secret，否则 `createUpdaterArtifacts` 打包会失败。
 - 自动更新只验证"能检测+下载+安装"，**不**保证无 SmartScreen（安装包未做 OS 代码签名）。`latest.json` 当前只含 `windows-x86_64`。
+
+网络与代理：
+
+- 所有原生 HTTP（更新器、OpenAI Compatible / Anthropic 请求、网关探测）统一走系统代理——见 `system_proxy.rs`，逻辑：有系统代理走代理、没有走默认网络（并回退环境变量），**loopback（本地网关）永远直连**。新增对外 HTTP 请求时沿用这条，不要绕开。
+- Codex CLI 是子进程，不走我们的 reqwest，代理需它自己/继承环境变量。
+- 时序坑：0.2.6 的更新器读不到系统代理，**代理环境下 0.2.6 无法自动更新**；0.2.7 起修复。因此 0.2.7 需手动安装，自动更新首次端到端验证是 0.2.7 → 0.2.8。
+- 若给更新加 GitHub 加速镜像：**必须多 endpoint 兜底**（镜像在前、直连 GitHub 在后），绝不硬编码单一镜像（免费镜像会挂，会焊死更新通道）。镜像只对无代理用户有意义。
