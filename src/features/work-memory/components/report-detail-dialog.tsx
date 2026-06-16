@@ -183,7 +183,7 @@ export function ReportDetailDialog({
               ) : (
                 <RefreshCw className="size-4" aria-hidden="true" />
               )}
-              {isRegenerating ? '重新整理中...' : '重新整理'}
+              {isRegenerating ? '重新整理中' : '重新整理'}
             </Button>
           </TallyaDialogFooter>
         </DialogContent>

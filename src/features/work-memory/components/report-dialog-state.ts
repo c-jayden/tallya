@@ -19,7 +19,7 @@ export function getReportGenerateActionLabel(
   reportType: ReportGenerationType = 'weekly',
 ) {
   if (isGenerating) {
-    return hasExistingReport ? '重新整理中...' : '整理中...';
+    return hasExistingReport ? '重新整理中' : '整理中';
   }
 
   if (hasExistingReport) {

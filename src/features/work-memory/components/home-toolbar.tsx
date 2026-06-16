@@ -92,7 +92,7 @@ export function HomeToolbar({
               <ListTree aria-hidden="true" />
               {hasThreadsNudge ? (
                 <span
-                  className="absolute top-1.5 right-1.5 size-1.5 rounded-full bg-app-accent ring-2 ring-app-bg"
+                  className="absolute top-1 right-1 size-2 rounded-full bg-app-accent ring-2 ring-app-bg"
                   aria-hidden="true"
                 />
               ) : null}

@@ -19,13 +19,13 @@ describe('shouldAllowReportDialogOpenChange', () => {
 describe('getReportGenerateActionLabel', () => {
   it('uses regenerate labels when the current weekly report already exists', () => {
     expect(getReportGenerateActionLabel(true, false)).toBe('重新整理');
-    expect(getReportGenerateActionLabel(true, true)).toBe('重新整理中...');
+    expect(getReportGenerateActionLabel(true, true)).toBe('重新整理中');
   });
 
   it('uses generate labels for a new weekly report', () => {
     expect(getReportGenerateActionLabel(false, false, 'weekly')).toBe('整理本周');
     expect(getReportGenerateActionLabel(false, false, 'custom')).toBe('整理这段时间');
-    expect(getReportGenerateActionLabel(false, true)).toBe('整理中...');
+    expect(getReportGenerateActionLabel(false, true)).toBe('整理中');
   });
 });
 
@@ -96,7 +96,7 @@ describe('getReportGenerateDialogState', () => {
       cancelDisabled: false,
       showPrimary: true,
       primaryDisabled: true,
-      primaryLabel: '重新整理中...',
+      primaryLabel: '重新整理中',
     });
   });
 
