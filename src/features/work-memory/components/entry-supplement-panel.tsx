@@ -155,9 +155,12 @@ export function EntrySupplementPanel({
               <textarea
                 className={answerFieldClass}
                 value={answers[index] ?? ''}
-                onChange={(event) =>
-                  setAnswers((current) => ({ ...current, [index]: event.currentTarget.value }))
-                }
+                onChange={(event) => {
+                  // Read the value before the state updater runs: React may call
+                  // it after the event settles, when event.currentTarget is null.
+                  const { value } = event.target;
+                  setAnswers((current) => ({ ...current, [index]: value }));
+                }}
                 onKeyDown={(event) => handleAnswerKeyDown(event, index, question)}
                 placeholder="写一两句，回车保存"
                 rows={1}

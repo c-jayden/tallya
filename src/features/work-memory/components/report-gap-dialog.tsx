@@ -46,6 +46,17 @@ export function ReportGapDialog({
   const [isAppCloseRequest, setIsAppCloseRequest] = useState(false);
   const handledCloseRequestIdRef = useRef(closeRequestId);
   const afterForceCloseRef = useRef<(() => void) | null>(null);
+  const [wasOpen, setWasOpen] = useState(open);
+
+  // Reset typed answers only when the dialog is (re)opened fresh — never mid-flow.
+  // Clearing on submit would wipe the visible text while "整理中" is still showing.
+  if (open !== wasOpen) {
+    setWasOpen(open);
+
+    if (open) {
+      setAnswers({});
+    }
+  }
 
   function resetPendingCloseRequest() {
     afterForceCloseRef.current = null;
@@ -100,12 +111,12 @@ export function ReportGapDialog({
       }))
       .filter((answer) => answer.answer.length > 0);
 
-    setAnswers({});
+    // Keep the typed answers visible while generation runs; they reset on the
+    // dialog's next fresh open.
     onSubmit(collected);
   }
 
   function handleSkip() {
-    setAnswers({});
     onSkip();
   }
 
@@ -156,9 +167,13 @@ export function ReportGapDialog({
                 <Textarea
                   className="field-sizing-content max-h-40 min-h-16 w-full resize-none rounded-lg border border-app-border bg-app-surface px-3 py-2 text-sm leading-6 text-app-ink shadow-none outline-none focus-visible:border-app-border-strong focus-visible:ring-0"
                   value={answers[gap.entryId] ?? ''}
-                  onChange={(event) =>
-                    setAnswers((current) => ({ ...current, [gap.entryId]: event.currentTarget.value }))
-                  }
+                  onChange={(event) => {
+                    // Capture the value before the state updater runs: React may
+                    // call the updater after the event is done, by which point
+                    // event.currentTarget is null.
+                    const { value } = event.target;
+                    setAnswers((current) => ({ ...current, [gap.entryId]: value }));
+                  }}
                   placeholder="写一两句就好，留空也可以跳过"
                   disabled={isGenerating}
                 />
