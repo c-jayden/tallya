@@ -392,7 +392,8 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           # Required because bundle.createUpdaterArtifacts is enabled; the build
-          # fails without it. (macOS is not yet listed in latest.json.)
+          # produces the .app.tar.gz + .sig that the manifest step below adds to
+          # latest.json so macOS gets in-app updates too.
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
@@ -418,6 +419,15 @@ jobs:
             ( cd "$(dirname "$app")" && zip -ry "$GITHUB_WORKSPACE/$assetsDir/${prefix}_app.zip" "$(basename "$app")" )
           fi
 
+          # The updater artifact (.app.tar.gz) is what the in-app updater downloads;
+          # ship it under a stable name so latest.json can point at it.
+          tarball="$(find src-tauri/target -path '*/bundle/macos/*.app.tar.gz' | head -n1)"
+          if [ -z "$tarball" ]; then
+            echo "::error::macOS updater artifact (.app.tar.gz) was not found. Is createUpdaterArtifacts + the signing key set?"
+            exit 1
+          fi
+          cp "$tarball" "$assetsDir/${prefix}.app.tar.gz"
+
           ls -1 "$assetsDir" | sed 's/^/- /' >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload assets to GitHub Release
@@ -425,6 +435,34 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh release upload "$TAG_NAME" dist/release-assets/* --clobber
+
+      - name: Add macOS to updater manifest
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          prefix="Tallya_${APP_VERSION}_macos_universal"
+
+          sigfile="$(find src-tauri/target -path '*/bundle/macos/*.app.tar.gz.sig' | head -n1)"
+          if [ -z "$sigfile" ]; then
+            echo "::error::macOS updater signature (.sig) was not found."
+            exit 1
+          fi
+          signature="$(tr -d '\n' < "$sigfile")"
+          url="https://github.com/${{ github.repository }}/releases/download/${TAG_NAME}/${prefix}.app.tar.gz"
+
+          # The Windows job already published latest.json (windows-x86_64 only).
+          # Pull it, add the darwin entries (the universal build serves both arches),
+          # and re-upload — leaving the Windows pipeline untouched if this fails.
+          gh release download "$TAG_NAME" --pattern latest.json --output latest.json --clobber
+          tmp="$(mktemp)"
+          jq --arg sig "$signature" --arg url "$url" '
+            .platforms["darwin-aarch64"] = { signature: $sig, url: $url }
+            | .platforms["darwin-x86_64"] = { signature: $sig, url: $url }
+          ' latest.json > "$tmp"
+          mv "$tmp" latest.json
+          gh release upload "$TAG_NAME" latest.json --clobber
 
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4
