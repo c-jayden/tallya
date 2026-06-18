@@ -181,10 +181,30 @@ M-B 可以再等——避免在留存尚未验证时继续加面。
 4. ✅ 线索按钮**数字角标**（与 M-B 圆点按优先级共存）：[home-toolbar.tsx](../src/features/work-memory/components/home-toolbar.tsx)。
 5. ✅ 手动归并④：entry 操作「归并到…」+ 线索选择器：[entry-merge-dialog.tsx](../src/features/work-memory/components/entry-merge-dialog.tsx)（未在线索中的 entry 才显示入口）。
 
-**第二期（主动 nudge，仅当第一期证明确实会漏才做）**：
-- idle 弹窗：首页 + 前台聚焦 + 无遮罩 + 键鼠静默 ~10s + **一批只弹一次** + 不抢焦点；
-- 后台→系统通知：AI 任务队列清空后只发一次、count>0、受通知开关控制、点开唤起并打开中枢（复用 [use-ai-task-coordinator](../src/features/work-memory/hooks/use-ai-task-coordinator.ts) + `useTrayWindowEvents`）；
-- OS 角标数字（Tauri `set_badge_count`）——**Windows 上是任务栏 overlay，数字渲染受限，需先验证**。
+**第二期（主动 nudge —— ✅ 已实现，真机调参待做）**：
+
+统一收在一个**默认关**的设置开关「主动提醒待归并的线索」（`mergeNudgeEnabled`，见
+[app-settings-repository.ts](../src/features/work-memory/services/app-settings-repository.ts) +
+[notification-settings-section.tsx](../src/features/work-memory/components/settings/notification-settings-section.tsx)）。
+三个通道共用一条「新高才触发、归零重置」的纯逻辑
+[merge-nudge.ts](../src/features/work-memory/services/merge-nudge.ts) `planMergeNudge`（只数
+**待归并**，不含停顿；落实「一批只弹一次 / 不反复唠叨」），由
+[use-merge-nudge.ts](../src/features/work-memory/hooks/use-merge-nudge.ts) 接到 home：
+
+- ✅ **idle 弹窗**：前台 + `document.visibilityState==='visible'` + 无任何遮罩（home 算
+  `isAnyOverlayOpen`）+ 键鼠静默 10s（`MERGE_NUDGE_IDLE_MS`）才用 sonner toast 轻提示，带
+  「查看」打开中枢；不抢焦点、按 `id` 去重不堆叠。
+- ✅ **后台→系统通知**：窗口隐藏时若待归并数涨到新高（慢 AI 在后台才返回的场景），经
+  `sendMergeNudgeNotification` 发一条，每个新高只发一次。
+  - ✅ **点开打开中枢**：新增 Rust `send_merge_nudge_notification` 命令，Windows `on_activated`
+    在 `show_and_focus` 后再发 `tray://open-threads` 事件；前端 `useTrayWindowEvents` 接到
+    `onOpenThreads → openThreadsHub`。macOS 插件通知无法把点击路由回 JS（需注册 action 监听），
+    故仍只「唤起应用」，靠中枢按钮的数字角标（第一期）引导——可接受。
+- ✅ **OS 角标数字**：Rust 新增 `set_badge_count` 命令（[lib.rs](../src-tauri/src/lib.rs)）调
+  `window.set_badge_count`，前端 `setMergeBadgeCount` 镜像待归并数、关开关即清零。macOS dock /
+  Linux launcher 生效；**Windows 是任务栏 overlay，`set_badge_count` 在该后端基本 no-op，仍需真机确认**。
+
+真机调参待做：10s 静默手感、通知频次是否打扰、Windows 角标表现、Windows 点通知是否真能打开中枢。
 
 ---
 
@@ -203,10 +223,9 @@ M-B 可以再等——避免在留存尚未验证时继续加面。
 
 这两条来自同批想法，方向认可，但当前先聚焦「线索续接」，不展开：
 
-- **补充选项化**：信息补充时让 AI 生成 1–4 个预设选项（每行最多两个）+ 一个自由输入框。
-  收益是降输入负担，但有「诱导用户选个差不多对的、污染记忆真实性」的风险——预设须从
-  **真实数据**（现有 thread 名、时长区间等枚举型问题）生成，开放型问题不给预设。待 M-A/M-B
-  稳定后单独立项。
+- ~~**补充选项化**~~：✅ 已实现（2026-06-18，见 [clarification-options-plan.md](./clarification-options-plan.md)）。
+  枚举型追问给 1–4 个预设（每行≤2）+ 始终保留自由输入，开放型不给预设；只改 AI 输出与 UI 层，
+  不动 Clarification 数据模型。真机验证待做。
 - **应用内自动更新**：经 GitHub Release 分发更新，设置→关于里放「检查更新」。注意这是
   **整包替换**（`tauri-plugin-updater`），非二进制增量；需引入插件 + 签名密钥对 + CI 产出
   `latest.json`/`.sig`，且 OS 级代码签名缺失时仍会触发 SmartScreen/Gatekeeper 警告。
