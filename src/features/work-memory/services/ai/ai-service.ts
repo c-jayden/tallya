@@ -6,6 +6,7 @@ import type {
   GenerateDailyMemoryInput,
   RangeReportSourceInput,
   ReportGap,
+  ClarificationPrompt,
   SuggestClarificationsInput,
   SuggestReportGapsInput,
   SuggestThreadLinkInput,
@@ -220,7 +221,7 @@ export function createAIService({
       });
     },
 
-    async suggestClarifications(input: SuggestClarificationsInput): Promise<string[]> {
+    async suggestClarifications(input: SuggestClarificationsInput): Promise<ClarificationPrompt[]> {
       const settings = await settingsRepository.getSettings();
 
       return runWithResolvedProvider(settings, (provider, options) => {

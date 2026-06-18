@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import type {
   AnalyzedReportStyle,
+  ClarificationPrompt,
   GeneratedDailyMemory,
   GeneratedReportContent,
   ReportGap,
@@ -86,7 +87,7 @@ export function createCodexCliProvider(invokeCommand: TauriInvoke = invoke): AIP
     },
     async suggestClarifications(input: SuggestClarificationsInput, options) {
       try {
-        return await invokeCommand<string[]>('suggest_clarifications_with_codex', {
+        return await invokeCommand<ClarificationPrompt[]>('suggest_clarifications_with_codex', {
           input,
           codexCommand: options.codexCommand,
           codexModel: options.codexModel,

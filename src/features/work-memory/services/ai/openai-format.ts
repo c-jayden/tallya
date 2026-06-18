@@ -5,6 +5,7 @@
 import type {
   AnalyzeReportStyleInput,
   AnalyzedReportStyle,
+  ClarificationPrompt,
   GenerateDailyMemoryInput,
   GenerateRangeReportInput,
   GeneratedDailyMemory,
@@ -18,6 +19,7 @@ import type {
 import { normalizeReportText } from '../report-text';
 
 const MAX_CLARIFICATION_QUESTIONS = 2;
+const MAX_CLARIFICATION_OPTIONS = 4;
 const MAX_REPORT_GAPS = 3;
 
 export function buildDailyMemoryPrompt(input: GenerateDailyMemoryInput) {
@@ -91,10 +93,12 @@ export function buildClarificationsPrompt(input: SuggestClarificationsInput) {
   return [
     '用户记下了一条很简短的工作记录，你要追问 1-2 个问题，帮他之后整理阶段总结时能把这件事展开。',
     '只输出合法 JSON，不要解释或 markdown。',
-    'JSON keys: questions:string[]。',
+    'JSON keys: questions:Array<{ question:string, options:string[] }>。',
     '要求：',
     '- 最多 2 个问题，每个一句话、口语化、容易回答。',
     '- 问题围绕：难点、原因、卡了多久、和谁协作、产出或结果。',
+    '- options：仅当问题是「答案空间有限、能枚举」的类型（如时长区间、是否、从常见取值里选）才给 1-4 个选项，每个≤8字、互斥、来自真实或常识可枚举的取值；开放型问题（难点、原因、思路等）options 必须是空数组。',
+    '- 选项宁缺毋滥，不要为了凑数而给；绝不把具体事实编造成选项；无论有无选项，用户都能自由作答。',
     '- 只追问这条记录本身，不要扩展到无关的事，也不要替用户编造答案。',
     '- 如果记录已经足够清楚、没什么可追问的，questions 返回空数组。',
     '- 用中文，避免重复用户已经写过的信息。',
@@ -102,10 +106,40 @@ export function buildClarificationsPrompt(input: SuggestClarificationsInput) {
   ].join('\n');
 }
 
-export function parseSuggestedClarifications(rawOutput: string): string[] {
+export function parseSuggestedClarifications(rawOutput: string): ClarificationPrompt[] {
   const parsed = parseStrictJSON<{ questions?: unknown }>(rawOutput);
 
-  return normalizeStringList(parsed.questions).slice(0, MAX_CLARIFICATION_QUESTIONS);
+  return normalizeClarificationPrompts(parsed.questions);
+}
+
+// Tolerates both the structured shape ({ question, options }) and a bare question
+// string, so a model that ignores the options instruction still works.
+function normalizeClarificationPrompts(value: unknown): ClarificationPrompt[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const prompts: ClarificationPrompt[] = [];
+
+  for (const item of value) {
+    const raw = typeof item === 'string' ? item : (item as { question?: unknown })?.question;
+    const question = normalizeOptionalString(raw);
+
+    if (!question) {
+      continue;
+    }
+
+    const rawOptions =
+      item && typeof item === 'object' ? (item as { options?: unknown }).options : undefined;
+    const options = Array.from(new Set(normalizeStringList(rawOptions))).slice(
+      0,
+      MAX_CLARIFICATION_OPTIONS,
+    );
+
+    prompts.push({ question, options });
+  }
+
+  return prompts.slice(0, MAX_CLARIFICATION_QUESTIONS);
 }
 
 export function buildThreadLinkPrompt(input: SuggestThreadLinkInput) {

@@ -77,6 +77,15 @@ export type SuggestClarificationsInput = {
   content: string;
 };
 
+// One AI follow-up question. options is empty for open-ended questions (free text
+// only); 1–4 entries for enum-type questions (duration ranges, yes/no, picking
+// from known thread names…). Options must come from a real/finite answer space —
+// never fabricated facts — and there is always a free-text fallback.
+export type ClarificationPrompt = {
+  question: string;
+  options: string[];
+};
+
 export type AnalyzedReportStyle = {
   summary: string;
   promptHint: string;

@@ -99,9 +99,20 @@ const reportStyleSchema = objectSchema(
   ['summary', 'promptHint'],
 );
 
+const clarificationPromptSchema = objectSchema(
+  {
+    question: { type: 'string' },
+    options: stringArraySchema,
+  },
+  ['question'],
+);
+
 const clarificationsSchema = objectSchema(
   {
-    questions: stringArraySchema,
+    questions: {
+      type: 'array',
+      items: clarificationPromptSchema,
+    },
   },
   ['questions'],
 );

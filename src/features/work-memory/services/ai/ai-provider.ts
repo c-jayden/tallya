@@ -7,6 +7,7 @@ import type {
   GenerateRangeReportInput,
   GenerateWeeklyReportInput,
   ReportGap,
+  ClarificationPrompt,
   SuggestClarificationsInput,
   SuggestReportGapsInput,
   SuggestThreadLinkInput,
@@ -80,7 +81,7 @@ export type AIProvider = {
   suggestClarifications?(
     input: SuggestClarificationsInput,
     options: AIProviderOptions,
-  ): Promise<string[]>;
+  ): Promise<ClarificationPrompt[]>;
   suggestThreadLink?(
     input: SuggestThreadLinkInput,
     options: AIProviderOptions,

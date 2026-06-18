@@ -125,10 +125,28 @@ pub struct SuggestClarificationsInput {
     content: String,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ClarificationPrompt {
+    question: String,
+    #[serde(default)]
+    options: Vec<String>,
+}
+
+// Tolerates both the structured shape ({ question, options }) and a bare question
+// string, mirroring the TS parser, so a model that ignores the options instruction
+// still works.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(untagged)]
+enum RawClarification {
+    Text(String),
+    Prompt(ClarificationPrompt),
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
 pub struct SuggestedClarifications {
     #[serde(default)]
-    questions: Vec<String>,
+    questions: Vec<RawClarification>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -342,7 +360,7 @@ pub async fn suggest_clarifications_with_codex(
     input: SuggestClarificationsInput,
     codex_command: String,
     codex_model: String,
-) -> Result<Vec<String>, String> {
+) -> Result<Vec<ClarificationPrompt>, String> {
     tauri::async_runtime::spawn_blocking(move || {
         run_codex_clarifications(input, codex_command, codex_model)
     })
@@ -433,7 +451,7 @@ fn run_codex_clarifications(
     input: SuggestClarificationsInput,
     codex_command: String,
     codex_model: String,
-) -> Result<Vec<String>, String> {
+) -> Result<Vec<ClarificationPrompt>, String> {
     let prompt = build_codex_clarifications_prompt(&input);
     run_codex_prompt_generation(
         prompt,
@@ -1098,8 +1116,8 @@ promptHint 要求：
 fn build_codex_clarifications_prompt(input: &SuggestClarificationsInput) -> String {
     format!(
         r#"用户记下了一条很简短的工作记录，你要追问 1-2 个问题，帮他之后写周报时能把这件事展开。只输出合法 JSON，不要 markdown、解释、代码块或工具调用。
-JSON keys: questions:string[].
-要求：最多 2 个问题，每个一句话、口语化、容易回答；问题围绕难点、原因、卡了多久、和谁协作、产出或结果；只追问这条记录本身，不要扩展到无关的事，也不要替用户编造答案；如果记录已经足够清楚、没什么可追问的，questions 返回空数组；用中文，避免重复用户已经写过的信息。
+JSON keys: questions:Array<{{ question:string, options:string[] }}>.
+要求：最多 2 个问题，每个一句话、口语化、容易回答；问题围绕难点、原因、卡了多久、和谁协作、产出或结果；options 仅当问题是「答案空间有限、能枚举」的类型（如时长区间、是否、从常见取值里选）才给 1-4 个选项，每个≤8字、互斥、来自真实或常识可枚举的取值，开放型问题 options 必须为空数组；选项宁缺毋滥，绝不把具体事实编造成选项；只追问这条记录本身，不要扩展到无关的事，也不要替用户编造答案；如果记录已经足够清楚、没什么可追问的，questions 返回空数组；用中文，避免重复用户已经写过的信息。
 工作记录：{}"#,
         input.content
     )
@@ -1425,17 +1443,34 @@ mod tests {
 
     #[test]
     fn parse_suggested_clarifications_trims_caps_and_tolerates_empty() {
-        assert_eq!(
-            parse_suggested_clarifications("").expect("empty"),
-            Vec::<String>::new()
-        );
+        assert!(parse_suggested_clarifications("").expect("empty").is_empty());
         assert!(parse_suggested_clarifications("not json").is_err());
+
+        // Legacy bare-string shape still parses (options default to empty), the
+        // question cap holds, and blank questions drop out.
+        let legacy = parse_suggested_clarifications(
+            r#"{"questions":[" 难点在哪？ ","","卡了多久？","多余的问题"]}"#,
+        )
+        .expect("questions");
+        let legacy_questions: Vec<&str> = legacy.iter().map(|item| item.question.as_str()).collect();
+        assert_eq!(legacy_questions, vec!["难点在哪？", "卡了多久？"]);
+        assert!(legacy.iter().all(|item| item.options.is_empty()));
+
+        // Structured shape keeps options, trims/dedupes them, and caps at 4.
+        let structured = parse_suggested_clarifications(
+            r#"{"questions":[{"question":"卡了多久？","options":[" 半天 ","半天","1-2天","一周以上","额外1","额外2"]}]}"#,
+        )
+        .expect("structured");
+        assert_eq!(structured.len(), 1);
+        assert_eq!(structured[0].question, "卡了多久？");
         assert_eq!(
-            parse_suggested_clarifications(
-                r#"{"questions":[" 难点在哪？ ","","卡了多久？","多余的问题"]}"#
-            )
-            .expect("questions"),
-            vec!["难点在哪？".to_string(), "卡了多久？".to_string()],
+            structured[0].options,
+            vec![
+                "半天".to_string(),
+                "1-2天".to_string(),
+                "一周以上".to_string(),
+                "额外1".to_string(),
+            ],
         );
     }
 
@@ -1445,7 +1480,7 @@ mod tests {
             content: "对接订单接口".to_string(),
         });
 
-        assert!(prompt.contains("questions:string[]"));
+        assert!(prompt.contains("options:string[]"));
         assert!(prompt.contains("对接订单接口"));
     }
 
@@ -1886,7 +1921,7 @@ fn parse_analyzed_report_style(raw_output: &str) -> Result<AnalyzedReportStyle, 
     })
 }
 
-fn parse_suggested_clarifications(raw_output: &str) -> Result<Vec<String>, String> {
+fn parse_suggested_clarifications(raw_output: &str) -> Result<Vec<ClarificationPrompt>, String> {
     let raw_output = raw_output.trim();
 
     // No output means the model had nothing to ask; treat as zero questions
@@ -1903,8 +1938,28 @@ fn parse_suggested_clarifications(raw_output: &str) -> Result<Vec<String>, Strin
     Ok(parsed
         .questions
         .into_iter()
-        .map(|question| question.trim().to_string())
-        .filter(|question| !question.is_empty())
+        .filter_map(|item| {
+            let (question, options) = match item {
+                RawClarification::Text(text) => (text, Vec::new()),
+                RawClarification::Prompt(prompt) => (prompt.question, prompt.options),
+            };
+
+            let question = question.trim().to_string();
+
+            if question.is_empty() {
+                return None;
+            }
+
+            let mut seen = std::collections::HashSet::new();
+            let options = options
+                .into_iter()
+                .map(|option| option.trim().to_string())
+                .filter(|option| !option.is_empty() && seen.insert(option.clone()))
+                .take(4)
+                .collect();
+
+            Some(ClarificationPrompt { question, options })
+        })
         .take(2)
         .collect())
 }

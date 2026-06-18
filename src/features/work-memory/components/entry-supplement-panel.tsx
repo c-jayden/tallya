@@ -8,11 +8,12 @@ import {
 import { Loader2, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import type { ClarificationPrompt } from '../types';
 
 type EntrySupplementPanelProps = {
   entryContent: string;
   onAdd: (question: string | null, answer: string) => Promise<boolean> | boolean;
-  onSuggest: (content: string) => Promise<string[]>;
+  onSuggest: (content: string) => Promise<ClarificationPrompt[]>;
   onClose: () => void;
 };
 
@@ -30,7 +31,7 @@ export function EntrySupplementPanel({
   // Starts in 'loading' because opening the panel immediately fetches AI
   // questions; the effect only flips it from inside async callbacks.
   const [suggestState, setSuggestState] = useState<SuggestState>('loading');
-  const [questions, setQuestions] = useState<string[]>([]);
+  const [questions, setQuestions] = useState<ClarificationPrompt[]>([]);
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [manualValue, setManualValue] = useState('');
   const manualRef = useRef<HTMLTextAreaElement>(null);
@@ -79,14 +80,8 @@ export function EntrySupplementPanel({
     };
   }, [entryContent, onSuggest]);
 
-  async function submitAnswer(index: number, question: string) {
-    const value = answers[index]?.trim();
-
-    if (!value) {
-      return;
-    }
-
-    const saved = await onAdd(question, value);
+  async function saveAndRemove(index: number, question: string, answer: string) {
+    const saved = await onAdd(question, answer);
 
     if (saved) {
       setQuestions((current) => current.filter((_, itemIndex) => itemIndex !== index));
@@ -98,6 +93,22 @@ export function EntrySupplementPanel({
         return next;
       });
     }
+  }
+
+  async function submitAnswer(index: number, question: string) {
+    const value = answers[index]?.trim();
+
+    if (!value) {
+      return;
+    }
+
+    await saveAndRemove(index, question, value);
+  }
+
+  // Picking a preset option is just a pre-filled answer — it saves the option text
+  // verbatim as the clarification, same path as typing it.
+  async function submitOption(index: number, question: string, option: string) {
+    await saveAndRemove(index, question, option);
   }
 
   async function submitManual() {
@@ -146,12 +157,30 @@ export function EntrySupplementPanel({
 
       {suggestState === 'ready' && questions.length > 0 ? (
         <div className="grid gap-2">
-          {questions.map((question, index) => (
-            <div key={`${question}-${index}`} className="grid gap-1">
+          {questions.map((prompt, index) => (
+            <div key={`${prompt.question}-${index}`} className="grid gap-1">
               <p className="flex items-start gap-1 text-[12.5px] leading-5 text-app-ink-muted">
                 <Sparkles className="mt-0.5 size-3 shrink-0 text-app-ink-subtle" aria-hidden="true" />
-                {question}
+                {prompt.question}
               </p>
+              {prompt.options.length > 0 ? (
+                // Enum-type question: one tap on a preset saves it. Two per row,
+                // with the free-text box below as the always-present fallback.
+                <div className="grid grid-cols-2 gap-1">
+                  {prompt.options.map((option) => (
+                    <Button
+                      key={option}
+                      type="button"
+                      variant="outline"
+                      size="xs"
+                      className="h-7 cursor-pointer justify-start rounded-md px-2 text-[12.5px] font-normal text-app-ink-muted hover:text-app-ink"
+                      onClick={() => void submitOption(index, prompt.question, option)}
+                    >
+                      {option}
+                    </Button>
+                  ))}
+                </div>
+              ) : null}
               <textarea
                 className={answerFieldClass}
                 value={answers[index] ?? ''}
@@ -161,8 +190,8 @@ export function EntrySupplementPanel({
                   const { value } = event.target;
                   setAnswers((current) => ({ ...current, [index]: value }));
                 }}
-                onKeyDown={(event) => handleAnswerKeyDown(event, index, question)}
-                placeholder="写一两句，回车保存"
+                onKeyDown={(event) => handleAnswerKeyDown(event, index, prompt.question)}
+                placeholder={prompt.options.length > 0 ? '或自己写一句，回车保存' : '写一两句，回车保存'}
                 rows={1}
               />
             </div>

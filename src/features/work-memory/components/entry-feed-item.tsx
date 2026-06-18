@@ -5,7 +5,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { EntrySupplementPanel } from './entry-supplement-panel';
-import type { Clarification, Entry } from '../types';
+import type { ClarificationPrompt, Clarification, Entry } from '../types';
 
 type EntryFeedItemProps = {
   entry: Entry;
@@ -20,7 +20,7 @@ type EntryFeedItemProps = {
   onAddClarification: (question: string | null, answer: string) => Promise<boolean> | boolean;
   onRemoveClarification: (id: string) => void;
   onRequestMerge: () => void;
-  onSuggestQuestions: (content: string) => Promise<string[]>;
+  onSuggestQuestions: (content: string) => Promise<ClarificationPrompt[]>;
 };
 
 const timeFormatter = new Intl.DateTimeFormat('zh-CN', {

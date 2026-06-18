@@ -12,7 +12,7 @@ import {
 import { TallyaScrollArea } from '@/components/tallya-scroll-area';
 import { EntryFeedItem } from './entry-feed-item';
 import { EntryMergeDialog } from './entry-merge-dialog';
-import type { Clarification, Entry } from '../types';
+import type { ClarificationPrompt, Clarification, Entry } from '../types';
 
 // Entries are newest-first, so each older row dims a little more, fading toward
 // the empty bottom of the page — but never below the floor so it stays readable.
@@ -38,7 +38,7 @@ type EntryFeedProps = {
   onRemoveClarification: (id: string) => void;
   onMergeEntryExisting: (entryId: string, threadId: string) => void;
   onMergeEntryNew: (entryId: string, title: string) => void;
-  onSuggestQuestions: (content: string) => Promise<string[]>;
+  onSuggestQuestions: (content: string) => Promise<ClarificationPrompt[]>;
 };
 
 export function EntryFeed({
