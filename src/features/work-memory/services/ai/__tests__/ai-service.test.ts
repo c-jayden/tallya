@@ -101,6 +101,7 @@ const settings: AppSettings = {
   startMinimized: false,
   diagnosticLoggingEnabled: false,
   autoCheckUpdates: true,
+  mergeNudgeEnabled: false,
 };
 
 describe('createAIService', () => {

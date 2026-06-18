@@ -115,6 +115,17 @@ export function NotificationSettingsSection({
       </div>
 
       <div className="space-y-2">
+        <SwitchField
+          label="主动提醒待归并的线索"
+          checked={settings.mergeNudgeEnabled}
+          onCheckedChange={(checked) => onUpdateSettings({ mergeNudgeEnabled: checked })}
+        />
+        <p className="text-sm text-app-ink-subtle">
+          有记录可能属于同一条线索却没归并时，闲下来轻轻提示一下，并在图标上标记数量。关闭后只在打开线索面板时才看得到。
+        </p>
+      </div>
+
+      <div className="space-y-2">
         <Button
           type="button"
           variant="outline"

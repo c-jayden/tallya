@@ -24,6 +24,7 @@ const TRAY_EVENT_OPEN_SETTINGS: &str = "tray://open-settings";
 const TRAY_EVENT_CHECK_UPDATE: &str = "tray://check-update";
 const TRAY_EVENT_WINDOW_HIDDEN: &str = "tray://window-hidden";
 const TRAY_EVENT_CLOSE_BLOCKED: &str = "tray://close-blocked";
+const TRAY_EVENT_OPEN_THREADS: &str = "tray://open-threads";
 #[cfg(target_os = "windows")]
 const TALLYA_NOTIFICATION_APP_ID: &str = "com.tallya";
 #[cfg(target_os = "windows")]
@@ -56,9 +57,20 @@ impl Default for AppWindowState {
 
 #[tauri::command]
 fn send_tallya_notification(app: tauri::AppHandle, body: String) -> Result<(), String> {
-    send_system_notification(app, body).map_err(|error| {
+    send_system_notification(app, body, None).map_err(|error| {
         eprintln!("Failed to send Tallya notification: {error}");
         "发送测试通知失败，请检查系统通知权限。".to_string()
+    })
+}
+
+// Like send_tallya_notification, but clicking it also opens the threads hub (where
+// the pending merges live). Only the Windows toast carries the click action; on
+// other platforms clicking just brings the app forward.
+#[tauri::command]
+fn send_merge_nudge_notification(app: tauri::AppHandle, body: String) -> Result<(), String> {
+    send_system_notification(app, body, Some(TRAY_EVENT_OPEN_THREADS)).map_err(|error| {
+        eprintln!("Failed to send merge-nudge notification: {error}");
+        "发送通知失败，请检查系统通知权限。".to_string()
     })
 }
 
@@ -87,6 +99,28 @@ fn hide_main_window(app: tauri::AppHandle) -> Result<(), String> {
         eprintln!("Failed to hide main window: {error}");
         "隐藏主窗口失败，请稍后重试。".to_string()
     })
+}
+
+// Mirrors the pending-merge count onto the OS app badge (macOS dock / Linux
+// launcher). `None` clears it. Best-effort: a windowing backend that can't render
+// a numeric badge (notably Windows, where it'd need a taskbar overlay) just no-ops
+// rather than erroring — the in-app badge stays the source of truth.
+#[tauri::command]
+fn set_badge_count(app: tauri::AppHandle, count: Option<u32>) -> Result<(), String> {
+    let window = app
+        .get_webview_window(MAIN_WINDOW_LABEL)
+        .ok_or_else(|| "未找到主窗口。".to_string())?;
+
+    let badge = match count {
+        Some(value) if value > 0 => Some(i64::from(value)),
+        _ => None,
+    };
+
+    if let Err(error) = window.set_badge_count(badge) {
+        eprintln!("Failed to set badge count: {error}");
+    }
+
+    Ok(())
 }
 
 #[tauri::command]
@@ -142,7 +176,11 @@ fn quit_app(app: tauri::AppHandle, state: tauri::State<'_, AppWindowState>) -> R
 }
 
 #[cfg(target_os = "windows")]
-fn send_system_notification(app: tauri::AppHandle, body: String) -> Result<(), String> {
+fn send_system_notification(
+    app: tauri::AppHandle,
+    body: String,
+    on_activate_event: Option<&'static str>,
+) -> Result<(), String> {
     use tauri_winrt_notification::{Duration as ToastDuration, Scenario, Toast};
 
     ensure_windows_notification_app_id()?;
@@ -156,6 +194,9 @@ fn send_system_notification(app: tauri::AppHandle, body: String) -> Result<(), S
         .scenario(Scenario::Reminder)
         .on_activated(move |_| {
             show_and_focus_main_window(&app_for_activation);
+            if let Some(event) = on_activate_event {
+                let _ = app_for_activation.emit(event, ());
+            }
             Ok(())
         })
         .show()
@@ -193,7 +234,13 @@ fn get_system_proxy() -> Option<String> {
 }
 
 #[cfg(not(target_os = "windows"))]
-fn send_system_notification(app: tauri::AppHandle, body: String) -> Result<(), String> {
+fn send_system_notification(
+    app: tauri::AppHandle,
+    body: String,
+    // The plugin notification can't route a click back to JS without action-type
+    // listeners, so non-Windows platforms ignore this and just show the toast.
+    _on_activate_event: Option<&'static str>,
+) -> Result<(), String> {
     app.notification()
         .builder()
         .title("Tallya")
@@ -387,8 +434,10 @@ pub fn run() {
             hide_main_window,
             open_app_directory,
             quit_app,
+            send_merge_nudge_notification,
             send_tallya_notification,
             set_active_ai_task_running,
+            set_badge_count,
             set_window_behavior,
             show_main_window,
             codex::suggest_clarifications_with_codex,

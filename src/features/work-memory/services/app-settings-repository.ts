@@ -64,6 +64,7 @@ export type AppSettings = {
   startMinimized: boolean;
   diagnosticLoggingEnabled: boolean;
   autoCheckUpdates: boolean;
+  mergeNudgeEnabled: boolean;
 };
 
 const STORAGE_KEY = 'tallya.app-settings.v1';
@@ -128,6 +129,9 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   startMinimized: false,
   diagnosticLoggingEnabled: false,
   autoCheckUpdates: true,
+  // Off by default: the passive dot/badge (phase 1) is enough until a user opts
+  // into being actively nudged about un-merged threads.
+  mergeNudgeEnabled: false,
 };
 
 function getBrowserStorage() {
@@ -352,6 +356,7 @@ function appSettingsToRows(settings: AppSettings): Record<string, string> {
     startMinimized: String(settings.startMinimized),
     diagnosticLoggingEnabled: String(settings.diagnosticLoggingEnabled),
     autoCheckUpdates: String(settings.autoCheckUpdates),
+    mergeNudgeEnabled: String(settings.mergeNudgeEnabled),
   };
 }
 
@@ -398,6 +403,7 @@ function rowsToAppSettingsInput(rows: AppSettingsRow[]) {
     startMinimized: getBooleanString(values.startMinimized),
     diagnosticLoggingEnabled: getBooleanString(values.diagnosticLoggingEnabled),
     autoCheckUpdates: getBooleanString(values.autoCheckUpdates),
+    mergeNudgeEnabled: getBooleanString(values.mergeNudgeEnabled),
   };
 }
 
@@ -472,6 +478,7 @@ function normalizeAppSettings(value: unknown): AppSettings {
       DEFAULT_APP_SETTINGS.diagnosticLoggingEnabled,
     ),
     autoCheckUpdates: getBoolean(input.autoCheckUpdates, DEFAULT_APP_SETTINGS.autoCheckUpdates),
+    mergeNudgeEnabled: getBoolean(input.mergeNudgeEnabled, DEFAULT_APP_SETTINGS.mergeNudgeEnabled),
   };
 }
 

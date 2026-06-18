@@ -8,6 +8,7 @@ type UseTrayWindowEventsOptions = {
   onCheckUpdate: () => void;
   onWindowHidden?: () => void;
   onCloseBlocked?: () => void;
+  onOpenThreads?: () => void;
 };
 
 export function useTrayWindowEvents(options: UseTrayWindowEventsOptions) {
@@ -28,6 +29,7 @@ export function useTrayWindowEvents(options: UseTrayWindowEventsOptions) {
       onCheckUpdate: () => handlersRef.current.onCheckUpdate(),
       onWindowHidden: () => handlersRef.current.onWindowHidden?.(),
       onCloseBlocked: () => handlersRef.current.onCloseBlocked?.(),
+      onOpenThreads: () => handlersRef.current.onOpenThreads?.(),
     }).then((unlisten) => {
       if (isMounted) {
         dispose = unlisten;

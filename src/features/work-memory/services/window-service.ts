@@ -8,6 +8,7 @@ export const trayEvents = {
   checkUpdate: 'tray://check-update',
   windowHidden: 'tray://window-hidden',
   closeBlocked: 'tray://close-blocked',
+  openThreads: 'tray://open-threads',
 } as const;
 
 export type MainWindowState = {
@@ -23,6 +24,7 @@ type TrayEventHandlers = {
   onCheckUpdate: () => void;
   onWindowHidden: () => void;
   onCloseBlocked: () => void;
+  onOpenThreads: () => void;
 };
 
 export async function showMainWindow() {
@@ -69,8 +71,22 @@ export async function sendTallyaNotification(body: string) {
   await invoke('send_tallya_notification', { body });
 }
 
+// Same as sendTallyaNotification, but clicking the toast opens the threads hub
+// (Windows only; elsewhere it just brings the app forward).
+export async function sendMergeNudgeNotification(body: string) {
+  const { invoke } = await import('@tauri-apps/api/core');
+
+  await invoke('send_merge_nudge_notification', { body });
+}
+
 export async function setActiveAiTaskRunning(active: boolean) {
   await invokeWindowCommand('set_active_ai_task_running', { active });
+}
+
+// Mirrors the pending-merge count onto the OS app badge; 0 clears it. Best-effort
+// (no-op in the dev server / on backends without a numeric badge).
+export async function setMergeBadgeCount(count: number) {
+  await invokeWindowCommand('set_badge_count', { count });
 }
 
 export async function syncWindowBehaviorSettings(settings: AppSettings) {
@@ -119,6 +135,7 @@ export async function registerTrayEventHandlers(handlers: TrayEventHandlers) {
       listen(trayEvents.checkUpdate, handlers.onCheckUpdate),
       listen(trayEvents.windowHidden, handlers.onWindowHidden),
       listen(trayEvents.closeBlocked, handlers.onCloseBlocked),
+      listen(trayEvents.openThreads, handlers.onOpenThreads),
     ]);
 
     return () => {

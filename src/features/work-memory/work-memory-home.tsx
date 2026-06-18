@@ -19,6 +19,7 @@ import { useDailyReportFlow } from './hooks/use-daily-report-flow';
 import { useEntriesController } from './hooks/use-entries-controller';
 import { useHomeWindowSizing } from './hooks/use-home-window-sizing';
 import { useMemorySearch } from './hooks/use-memory-search';
+import { useMergeNudge } from './hooks/use-merge-nudge';
 import { useStalledThreadReview } from './hooks/use-stalled-thread-review';
 import { useThreadsPanel } from './hooks/use-threads-panel';
 import { useUpdateCheck } from './hooks/use-update-check';
@@ -33,6 +34,7 @@ import {
   isFutureMemoryDate,
   isTodayDate,
 } from './memory-date-view-model';
+import { appSettingsRepository } from './services/app-settings-repository';
 import { quitApp } from './services/window-service';
 import type { SettingsSection } from './components/settings/settings-types';
 import type { Entry } from './types';
@@ -43,6 +45,7 @@ export function WorkMemoryHome() {
     undefined,
   );
   const [closeBlockedRequestId, setCloseBlockedRequestId] = useState(0);
+  const [mergeNudgeEnabled, setMergeNudgeEnabled] = useState(false);
   const todayDate = useTodayDate();
   const [selectedDate, setSelectedDate] = useState(todayDate);
   const previousTodayRef = useRef(todayDate);
@@ -71,6 +74,27 @@ export function WorkMemoryHome() {
       }
     };
   }, []);
+
+  // Read the merge-nudge opt-in on mount and re-read whenever the settings dialog
+  // closes, so toggling it takes effect without a restart (no reactive settings
+  // store; this mirrors the once-per-launch pattern in useUpdateCheck).
+  useEffect(() => {
+    if (isSettingsOpen) {
+      return;
+    }
+
+    let isMounted = true;
+
+    void appSettingsRepository.getSettings().then((settings) => {
+      if (isMounted) {
+        setMergeNudgeEnabled(settings.mergeNudgeEnabled);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isSettingsOpen]);
 
   function openEntry(entry: Entry) {
     // Opening a search hit jumps to its day and briefly highlights the row, so
@@ -108,6 +132,34 @@ export function WorkMemoryHome() {
     threads.closeThreadsPanel();
     openEntry(entry);
   }
+
+  function openThreadsHub() {
+    closeOverlays();
+    // Opening the panel counts as seeing the review, so clear the dot.
+    stalledReview.markReviewed();
+    threads.openThreadsPanel();
+  }
+
+  // The phase-2 active nudge only ever points at the same threads hub. Suppress
+  // the idle popup whenever any overlay is open so it never lands mid-task.
+  const isAnyOverlayOpen =
+    search.isSearchOpen ||
+    threads.isThreadsOpen ||
+    isSettingsOpen ||
+    dailyReport.isOpen ||
+    weeklyReport.isGenerateDialogOpen ||
+    weeklyReport.isGapDialogOpen ||
+    weeklyReport.isPreviewDialogOpen ||
+    weeklyReport.isRestorePromptOpen ||
+    weeklyReport.isReportListOpen ||
+    weeklyReport.isReportDetailOpen;
+
+  useMergeNudge({
+    pendingMergeCount: threads.pendingMergeCount,
+    enabled: mergeNudgeEnabled,
+    suppressPopup: isAnyOverlayOpen,
+    onOpenHub: openThreadsHub,
+  });
 
   function closeOverlays() {
     search.closeSearchPanel();
@@ -167,6 +219,7 @@ export function WorkMemoryHome() {
     onCheckUpdate: () => openSettings('about'),
     onWindowHidden: aiTasks.handleWindowHidden,
     onCloseBlocked: () => setCloseBlockedRequestId((current) => current + 1),
+    onOpenThreads: openThreadsHub,
   });
 
   function updateSelectedDate(date: string) {
@@ -207,12 +260,7 @@ export function WorkMemoryHome() {
               closeOverlays();
               search.openSearchPanel();
             }}
-            onThreadsClick={() => {
-              closeOverlays();
-              // Opening the panel counts as seeing the review, so clear the dot.
-              stalledReview.markReviewed();
-              threads.openThreadsPanel();
-            }}
+            onThreadsClick={openThreadsHub}
             onReportsClick={() => {
               closeOverlays();
               weeklyReport.openGenerateDialog();
