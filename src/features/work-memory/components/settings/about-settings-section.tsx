@@ -17,6 +17,7 @@ type UpdateState =
   | { kind: 'idle' }
   | { kind: 'checking' }
   | { kind: 'up-to-date' }
+  | { kind: 'unsupported' }
   | { kind: 'available'; version: string; notes: string | null; update: Update }
   | { kind: 'installing'; version: string }
   | { kind: 'error'; detail: string };
@@ -64,7 +65,9 @@ export function AboutSettingsSection({ settings, onUpdateSettings }: AboutSettin
       setState(
         result.status === 'available'
           ? { kind: 'available', version: result.version, notes: result.notes, update: result.update }
-          : { kind: 'up-to-date' },
+          : result.status === 'unsupported-platform'
+            ? { kind: 'unsupported' }
+            : { kind: 'up-to-date' },
       );
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
@@ -122,6 +125,12 @@ export function AboutSettingsSection({ settings, onUpdateSettings }: AboutSettin
 
         {state.kind === 'up-to-date' ? (
           <p className="mt-2 text-[13px] text-app-ink-subtle">已是最新版本。</p>
+        ) : null}
+
+        {state.kind === 'unsupported' ? (
+          <p className="mt-2 text-[13px] text-app-ink-subtle">
+            当前平台暂无可用更新包（目前仅发布 Windows 版），请留意后续版本。
+          </p>
         ) : null}
 
         {state.kind === 'error' ? (

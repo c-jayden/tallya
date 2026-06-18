@@ -18,10 +18,25 @@ async function getSystemProxy(): Promise<string | undefined> {
 }
 
 // Result of a manual update check. `update` is kept so the UI can trigger the
-// download/install only after the user opts in.
+// download/install only after the user opts in. `unsupported-platform` means the
+// manifest was fetched fine but has no build for this OS (today: macOS, since only
+// Windows is published to latest.json) — a benign "nothing for you" state, not a
+// failure to retry.
 export type UpdateCheckResult =
   | { status: 'up-to-date' }
+  | { status: 'unsupported-platform' }
   | { status: 'available'; version: string; notes: string | null; update: Update };
+
+// The updater throws this when latest.json was parsed but has no `platforms` entry
+// for the current target. We treat it as "no build for this platform" rather than
+// surfacing the raw English error.
+function isUnsupportedPlatformError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+
+  // Matches e.g. "None of the fallback platforms `[...]` were found in the
+  // response `platforms` object".
+  return message.includes('fallback platforms') || message.includes('`platforms` object');
+}
 
 export type UpdateService = {
   check(): Promise<UpdateCheckResult>;
@@ -33,8 +48,20 @@ export type UpdateService = {
 // up-to-date rather than throwing.
 async function checkForUpdate(): Promise<UpdateCheckResult> {
   const proxy = await getSystemProxy();
-  // The proxy set here is reused by the returned Update for the download too.
-  const update = await check(proxy ? { proxy } : undefined);
+
+  let update: Update | null;
+
+  try {
+    // The proxy set here is reused by the returned Update for the download too.
+    update = await check(proxy ? { proxy } : undefined);
+  } catch (error) {
+    if (isUnsupportedPlatformError(error)) {
+      logger.info('app', 'updater.unsupported_platform', 'No update build for this platform');
+      return { status: 'unsupported-platform' };
+    }
+
+    throw error;
+  }
 
   if (!update) {
     logger.info('app', 'updater.up_to_date', 'No update available');
